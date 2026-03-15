@@ -184,7 +184,7 @@ export default function SidebarLayout({ session, children }) {
         </header>
 
         {/* Conteúdo */}
-        <main className="flex-1 overflow-auto min-h-0">{children}</main>
+        <main className="flex-1 overflow-auto min-h-0 relative isolate">{children}</main>
       </div>
     </div>
   );

@@ -10,8 +10,11 @@ import { useMapEvents }  from '@/hooks/useMapEvents'
 import { useGPS }        from '@/hooks/useGPS'
 import { useOfflineQueue } from '@/hooks/useOfflineQueue'
 
-import BottomSheet   from '@/components/map/BottomSheet'
-import LayerToggles  from '@/components/map/LayerToggles'
+import BottomSheet        from '@/components/map/BottomSheet'
+import LayerToggles       from '@/components/map/LayerToggles'
+import ModalMovimentacao  from '@/components/map/ModalMovimentacao'
+import ModalDiagrama      from '@/components/map/ModalDiagrama'
+import ModalDiagramaCDO   from '@/components/map/ModalDiagramaCDO'
 
 import { getCTOs, upsertCTO }   from '@/actions/ctos'
 import { getCaixas, upsertCaixa } from '@/actions/caixas'
@@ -63,6 +66,13 @@ export default function MapaFTTH({
 
   // ---- Estado de reposicionamento ----
   const [reposicionandoEl, setReposicionandoEl] = useState(null) // { type, data }
+
+  // ---- Modais de CTO ----
+  const [movimentacaoEl, setMovimentacaoEl] = useState(null)  // data da CTO
+  const [diagramaEl, setDiagramaEl]         = useState(null)  // data da CTO
+
+  // ---- Modal de Diagrama ABNT para CDO/CE ----
+  const [diagramaCDOEl, setDiagramaCDOEl]   = useState(null)  // data da caixa
 
   // ---- Dados do mapa (hidratados pelo servidor; recarregados após mutações) ----
   const [ctos,   setCTOs]   = useState(initialCTOs)
@@ -196,6 +206,15 @@ export default function MapaFTTH({
       setSelectedElement(null)
     } else if (action === 'editar') {
       router.push('/admin/campo')
+    } else if (action === 'movimentacao') {
+      setMovimentacaoEl(data)
+      setSelectedElement(null)
+    } else if (action === 'diagrama') {
+      setDiagramaEl(data)
+      setSelectedElement(null)
+    } else if (action === 'diagrama_abnt') {
+      setDiagramaCDOEl(data)
+      setSelectedElement(null)
     }
   }, [router])
 
@@ -494,6 +513,35 @@ export default function MapaFTTH({
           </div>
         )}
       </div>
+
+      {/* Modal Movimentação de Clientes */}
+      {movimentacaoEl && (
+        <ModalMovimentacao
+          ctoData={movimentacaoEl}
+          projetoId={projetoId}
+          onClose={() => setMovimentacaoEl(null)}
+          onSaved={() => reloadData()}
+        />
+      )}
+
+      {/* Modal Diagrama de Fibra CTO */}
+      {diagramaEl && (
+        <ModalDiagrama
+          ctoData={diagramaEl}
+          projetoId={projetoId}
+          onClose={() => setDiagramaEl(null)}
+        />
+      )}
+
+      {/* Modal Diagrama ABNT CDO/CE */}
+      {diagramaCDOEl && (
+        <ModalDiagramaCDO
+          caixaData={diagramaCDOEl}
+          projetoId={projetoId}
+          onClose={() => setDiagramaCDOEl(null)}
+          onSaved={() => reloadData()}
+        />
+      )}
 
       {/* Banner de reposicionamento */}
       {reposicionandoEl && (

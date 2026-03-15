@@ -145,9 +145,9 @@ const CaixaEmendaCDOSchema = new Schema(
       default: null,
     },
 
-    // Diagrama interno do CDO (JSON livre no SQL original)
+    // Diagrama interno do CDO (JSON livre — armazena bandejas, splitters, fusões ABNT)
     diagrama: {
-      type:    DiagramaCDOSchema,
+      type:    Schema.Types.Mixed,
       default: null,
     },
   },

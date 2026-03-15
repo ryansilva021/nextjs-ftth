@@ -85,11 +85,13 @@ function CTOContent({ data, isAdmin, onAction }) {
       <InfoRow label="CDO pai" value={data.cdo_id} />
       <InfoRow label="Porta CDO" value={data.porta_cdo} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+        <ActionBtn onClick={() => onAction('movimentacao')}>👤 Movimentação</ActionBtn>
+        <ActionBtn onClick={() => onAction('diagrama')}>🔍 Diagrama</ActionBtn>
         {isAdmin && (
           <ActionBtn onClick={() => onAction('reposicionar')}>📍 Reposicionar</ActionBtn>
         )}
         {isAdmin && (
-          <ActionBtn onClick={() => onAction('editar')}>✏️ Editar dados</ActionBtn>
+          <ActionBtn onClick={() => onAction('editar')}>✏️ Editar</ActionBtn>
         )}
       </div>
     </div>
@@ -116,6 +118,7 @@ function CaixaContent({ data, isAdmin, onAction }) {
       <InfoRow label="OLT" value={data.olt_id} />
       <InfoRow label="Porta OLT" value={data.porta_olt} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+        <ActionBtn onClick={() => onAction('diagrama_abnt')}>🧩 Diagrama ABNT</ActionBtn>
         {isAdmin && (
           <ActionBtn onClick={() => onAction('reposicionar')}>📍 Reposicionar</ActionBtn>
         )}
