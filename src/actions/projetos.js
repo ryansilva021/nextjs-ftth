@@ -77,10 +77,9 @@ export async function upsertProjeto(data) {
   await connectDB()
 
   const update = {
-    nome:          nome.trim(),
-    descricao:     descricao?.trim() ?? null,
-    is_active:     is_active ?? true,
-    configuracoes: configuracoes ?? {},
+    nome:      nome.trim(),
+    descricao: descricao?.trim() ?? null,
+    ativo:     is_active ?? true,
   }
 
   const projeto = await Projeto.findOneAndUpdate(
@@ -170,7 +169,7 @@ export async function getProjetosStats() {
         _id:           p._id.toString(),
         projeto_id:    pid,
         nome:          p.nome,
-        is_active:     p.is_active,
+        is_active:     p.ativo ?? true,
         ctos,
         caixas,
         rotas,
@@ -228,4 +227,33 @@ export async function limparProjeto(projetoId) {
   revalidatePath('/superadmin/projetos')
 
   return { limpado: true, colecoesLimpas }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/projetos/toggle → toggleProjetoAtivo
+// ---------------------------------------------------------------------------
+
+/**
+ * Ativa ou desativa um projeto (toggle do campo `ativo`).
+ * Requer: superadmin.
+ *
+ * @param {string} projetoId
+ * @returns {Promise<{ projeto_id: string, ativo: boolean }>}
+ */
+export async function toggleProjetoAtivo(projetoId) {
+  await requireActiveEmpresa(SUPERADMIN_ONLY)
+
+  if (!projetoId) throw new Error('projeto_id é obrigatório')
+
+  await connectDB()
+
+  const projeto = await Projeto.findOne({ projeto_id: projetoId })
+  if (!projeto) throw new Error('Projeto não encontrado')
+
+  projeto.ativo = !projeto.ativo
+  await projeto.save()
+
+  revalidatePath('/superadmin/projetos')
+
+  return { projeto_id: projetoId, ativo: projeto.ativo }
 }

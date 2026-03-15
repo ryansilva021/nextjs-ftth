@@ -6,21 +6,18 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Mapa", icon: "🗺️" },
-  { href: "/admin/ctos", label: "CTOs", icon: "📦", minRole: "admin" },
-  { href: "/admin/usuarios", label: "Usuários", icon: "👥", minRole: "admin" },
-  {
-    href: "/superadmin/projetos",
-    label: "Projetos",
-    icon: "🏢",
-    minRole: "superadmin",
-  },
-  {
-    href: "/superadmin/registros",
-    label: "Registros",
-    icon: "📋",
-    minRole: "superadmin",
-  },
+  { href: "/",                   label: "Mapa",        icon: "🗺️" },
+  // --- Admin ---
+  { href: "/admin/ctos",         label: "CTOs",        icon: "📦", minRole: "admin" },
+  { href: "/admin/caixas",       label: "CE / CDO",    icon: "🔌", minRole: "admin" },
+  { href: "/admin/rotas",        label: "Rotas",       icon: "〰️", minRole: "admin" },
+  { href: "/admin/postes",       label: "Postes",      icon: "🏗️", minRole: "admin" },
+  { href: "/admin/diagramas",    label: "Diagramas",   icon: "🧩", minRole: "admin" },
+  { href: "/admin/usuarios",     label: "Usuários",    icon: "👥", minRole: "admin" },
+  // --- Superadmin ---
+  { href: "/superadmin/projetos",  label: "Projetos",  icon: "🏢", minRole: "superadmin" },
+  { href: "/superadmin/empresas",  label: "Empresas",  icon: "🏬", minRole: "superadmin" },
+  { href: "/superadmin/registros", label: "Registros", icon: "📋", minRole: "superadmin" },
 ];
 
 const ROLE_RANK = {
@@ -98,25 +95,35 @@ export default function SidebarLayout({ session, children }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-          {itensVisiveis.map((item) => {
-            const ativa = pathname === item.href;
+        <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
+          {itensVisiveis.map((item, idx, arr) => {
+            const ativa = pathname === item.href
+            const prevItem = arr[idx - 1]
+            // Separador visual entre grupos (mapa → admin → superadmin)
+            const showSeparator = idx > 0 && item.minRole !== prevItem?.minRole
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setAberta(false)}
-                style={{
-                  backgroundColor: ativa ? "#0c2340" : "transparent",
-                  color: ativa ? "#38bdf8" : "#94a3b8",
-                  border: ativa ? "1px solid #0369a1" : "1px solid transparent",
-                }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800 hover:text-white"
-              >
-                <span>{item.icon}</span>
-                {item.label}
-              </Link>
-            );
+              <div key={item.href}>
+                {showSeparator && (
+                  <div
+                    className="my-2 mx-1 h-px"
+                    style={{ backgroundColor: '#1f2937' }}
+                  />
+                )}
+                <Link
+                  href={item.href}
+                  onClick={() => setAberta(false)}
+                  style={{
+                    backgroundColor: ativa ? "#0c2340" : "transparent",
+                    color: ativa ? "#38bdf8" : "#94a3b8",
+                    border: ativa ? "1px solid #0369a1" : "1px solid transparent",
+                  }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800 hover:text-white"
+                >
+                  <span>{item.icon}</span>
+                  {item.label}
+                </Link>
+              </div>
+            )
           })}
         </nav>
 

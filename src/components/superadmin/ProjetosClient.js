@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { upsertProjeto, deleteProjeto, limparProjeto } from '@/actions/projetos'
+import { upsertProjeto, deleteProjeto, limparProjeto, toggleProjetoAtivo } from '@/actions/projetos'
 
 const inputStyle = {
   backgroundColor: '#0b1220',
@@ -116,6 +116,22 @@ export default function ProjetosClient({ projetosIniciais }) {
     })
   }
 
+  function handleToggleAtivo(p) {
+    startTransition(async () => {
+      try {
+        const res = await toggleProjetoAtivo(p.projeto_id)
+        setProjetos((prev) =>
+          prev.map((proj) =>
+            proj.projeto_id === p.projeto_id ? { ...proj, is_active: res.ativo } : proj
+          )
+        )
+        flash(`Projeto ${p.projeto_id} ${res.ativo ? 'ativado' : 'desativado'}.`)
+      } catch (e) {
+        setErro(e.message)
+      }
+    })
+  }
+
   function confirmarLimpar() {
     if (!confirmLimpar) return
     startTransition(async () => {
@@ -193,7 +209,18 @@ export default function ProjetosClient({ projetosIniciais }) {
             </div>
 
             {/* Ações */}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
+              <button
+                onClick={() => handleToggleAtivo(p)}
+                disabled={isPending}
+                style={{
+                  border: `1px solid ${p.is_active ? '#166534' : '#1f2937'}`,
+                  color: p.is_active ? '#4ade80' : '#94a3b8',
+                }}
+                className="flex-1 text-xs py-1.5 rounded-lg hover:opacity-80 transition-colors disabled:opacity-40"
+              >
+                {p.is_active ? '✓ Desativar' : '▶ Ativar'}
+              </button>
               <button
                 onClick={() => abrirEditar(p)}
                 style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
@@ -206,7 +233,7 @@ export default function ProjetosClient({ projetosIniciais }) {
                 style={{ border: '1px solid #1f2937', color: '#fbbf24' }}
                 className="flex-1 text-xs py-1.5 rounded-lg hover:bg-amber-900/20 transition-colors"
               >
-                Limpar dados
+                Limpar
               </button>
               <button
                 onClick={() => setConfirmDelete(p)}

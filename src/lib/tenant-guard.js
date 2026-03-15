@@ -25,6 +25,7 @@
 
 import { auth } from '@/lib/auth'
 import { verificarStatusEmpresa } from '@/lib/tenant'
+import { connectDB } from '@/lib/db'
 
 // Mensagens de erro por status de empresa
 const MENSAGENS_STATUS = {
@@ -56,11 +57,27 @@ export async function requireActiveEmpresa(allowedRoles = null) {
     return session
   }
 
+  // Se não há empresa_id no token, tenta resolver via projeto_id (usuários criados antes da migração)
+  let resolvedEmpresaId = empresa_id
+  if (!resolvedEmpresaId && session.user.projeto_id) {
+    try {
+      await connectDB()
+      const { Empresa } = await import('@/models/Empresa')
+      const empresa = await Empresa.findOne(
+        { projetos: session.user.projeto_id, is_active: true },
+        '_id'
+      ).lean()
+      if (empresa) resolvedEmpresaId = empresa._id.toString()
+    } catch {
+      // Não bloqueia — segue sem empresa_id
+    }
+  }
+
   // Usuário sem empresa associada não pode operar
-  if (!empresa_id) throw new Error('Usuário sem empresa associada')
+  if (!resolvedEmpresaId) throw new Error('Usuário sem empresa associada. Contate o administrador.')
 
   // Consulta status atual da empresa no MongoDB
-  const status = await verificarStatusEmpresa(empresa_id)
+  const status = await verificarStatusEmpresa(resolvedEmpresaId)
 
   if (!status.ativa) {
     const msgFn = MENSAGENS_STATUS[status.status]
