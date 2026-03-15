@@ -7,7 +7,7 @@ import { upsertCTO, deleteCTO } from '@/actions/ctos'
 const LocationPicker = dynamic(() => import('@/components/map/LocationPicker'), {
   ssr: false,
   loading: () => (
-    <div style={{ height: 220, backgroundColor: '#0d1526', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ height: 220, backgroundColor: '#060d1a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <span style={{ color: '#475569', fontSize: 13 }}>Carregando mapa...</span>
     </div>
   ),
@@ -15,19 +15,51 @@ const LocationPicker = dynamic(() => import('@/components/map/LocationPicker'), 
 
 const CAPACIDADES = [8, 16, 24, 32, 48, 64]
 
-const inputStyle = {
-  backgroundColor: '#0b1220',
-  border: '1px solid #1f2937',
-  color: '#f1f5f9',
+// ── Shared modal styles (inspired by old project design) ──────────────────────
+const modalOverlay = { backgroundColor: 'rgba(0,0,0,0.85)' }
+
+const modalPanel = {
+  backgroundColor: 'rgba(8,13,28,0.98)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  width: 'min(580px,100%)',
+}
+
+const fieldInput = {
+  backgroundColor: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.10)',
+  color: '#e2e8f0',
+  fontSize: '13px',
+  outline: 'none',
+}
+
+const fieldTextarea = {
+  ...fieldInput,
+  resize: 'vertical',
+}
+
+const fieldGroup = {
+  backgroundColor: 'rgba(255,255,255,0.025)',
+  border: '1px solid rgba(255,255,255,0.07)',
+  borderRadius: '12px',
+  padding: '14px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px',
+}
+
+const labelStyle = {
+  fontSize: '10px',
+  color: 'rgba(255,255,255,0.35)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  fontWeight: 600,
+  marginBottom: '4px',
+  display: 'block',
 }
 
 const cardStyle = {
   backgroundColor: '#111827',
   border: '1px solid #1f2937',
-}
-
-const modalBgStyle = {
-  backgroundColor: 'rgba(0,0,0,0.7)',
 }
 
 export default function CTOsClient({ ctosIniciais, projetoId, userRole }) {
@@ -42,22 +74,15 @@ export default function CTOsClient({ ctosIniciais, projetoId, userRole }) {
   const [gpsCarregando, setGpsCarregando] = useState(false)
 
   const [form, setForm] = useState({
-    cto_id: '',
-    nome: '',
-    rua: '',
-    bairro: '',
-    capacidade: 16,
-    lat: '',
-    lng: '',
-    cdo_id: '',
-    porta_cdo: '',
-    splitter_cto: '',
+    cto_id: '', nome: '', rua: '', bairro: '', capacidade: 16,
+    lat: '', lng: '', cdo_id: '', porta_cdo: '', splitter_cto: '',
   })
 
   function abrirNovo() {
     setForm({ cto_id: '', nome: '', rua: '', bairro: '', capacidade: 16, lat: '', lng: '', cdo_id: '', porta_cdo: '', splitter_cto: '' })
     setCTOEditando(null)
     setErro(null)
+    setMostrarMapa(false)
     setModalAberto(true)
   }
 
@@ -76,6 +101,7 @@ export default function CTOsClient({ ctosIniciais, projetoId, userRole }) {
     })
     setCTOEditando(cto)
     setErro(null)
+    setMostrarMapa(false)
     setModalAberto(true)
   }
 
@@ -87,24 +113,14 @@ export default function CTOsClient({ ctosIniciais, projetoId, userRole }) {
   }
 
   function usarGPS() {
-    if (!navigator.geolocation) {
-      setErro('Geolocalização não suportada neste dispositivo.')
-      return
-    }
+    if (!navigator.geolocation) { setErro('Geolocalização não suportada.'); return }
     setGpsCarregando(true)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setForm((prev) => ({
-          ...prev,
-          lat: pos.coords.latitude.toFixed(7),
-          lng: pos.coords.longitude.toFixed(7),
-        }))
+        setForm((prev) => ({ ...prev, lat: pos.coords.latitude.toFixed(7), lng: pos.coords.longitude.toFixed(7) }))
         setGpsCarregando(false)
       },
-      () => {
-        setErro('Não foi possível obter a localização GPS.')
-        setGpsCarregando(false)
-      },
+      () => { setErro('Não foi possível obter GPS.'); setGpsCarregando(false) },
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }
@@ -141,10 +157,6 @@ export default function CTOsClient({ ctosIniciais, projetoId, userRole }) {
     })
   }
 
-  function handleExcluir(cto) {
-    setConfirmDelete(cto)
-  }
-
   function confirmarExclusao() {
     if (!confirmDelete) return
     startTransition(async () => {
@@ -170,13 +182,12 @@ export default function CTOsClient({ ctosIniciais, projetoId, userRole }) {
     <>
       {/* Barra de ações */}
       <div className="flex items-center justify-between mb-4">
-        {sucesso && (
-          <p className="text-sm text-green-400">{sucesso}</p>
-        )}
+        {sucesso && <p className="text-sm text-green-400">{sucesso}</p>}
         {!sucesso && <div />}
         <button
           onClick={abrirNovo}
-          className="bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#052e16', fontWeight: 700 }}
+          className="text-sm px-4 py-2 rounded-lg transition-opacity hover:opacity-90"
         >
           + Nova CTO
         </button>
@@ -189,69 +200,36 @@ export default function CTOsClient({ ctosIniciais, projetoId, userRole }) {
             <thead>
               <tr style={{ borderBottom: '1px solid #1f2937', backgroundColor: '#0d1526' }}>
                 {['ID', 'Nome', 'Endereço', 'Capacidade', 'Ocupação', 'CDO', 'Ações'].map((h) => (
-                  <th key={h} className="text-left text-xs text-slate-400 font-semibold uppercase tracking-wider px-4 py-3">
-                    {h}
-                  </th>
+                  <th key={h} className="text-left text-xs text-slate-400 font-semibold uppercase tracking-wider px-4 py-3">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {ctos.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="text-center text-slate-500 py-12 text-sm">
-                    Nenhuma CTO cadastrada ainda.
-                  </td>
-                </tr>
+                <tr><td colSpan={7} className="text-center text-slate-500 py-12 text-sm">Nenhuma CTO cadastrada ainda.</td></tr>
               )}
               {ctos.map((cto, i) => {
                 const pct = ocupacaoPct(cto)
                 return (
-                  <tr
-                    key={cto._id}
-                    style={{ borderBottom: i < ctos.length - 1 ? '1px solid #1f2937' : 'none' }}
-                    className="hover:bg-slate-800/30 transition-colors"
-                  >
+                  <tr key={cto._id} style={{ borderBottom: i < ctos.length - 1 ? '1px solid #1f2937' : 'none' }} className="hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-sky-400">{cto.cto_id}</td>
                     <td className="px-4 py-3 text-slate-200">{cto.nome ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">
-                      {[cto.rua, cto.bairro].filter(Boolean).join(', ') || '—'}
-                    </td>
+                    <td className="px-4 py-3 text-slate-400 text-xs">{[cto.rua, cto.bairro].filter(Boolean).join(', ') || '—'}</td>
                     <td className="px-4 py-3 text-slate-300">{cto.capacidade ?? '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div
-                          style={{ backgroundColor: '#1f2937' }}
-                          className="w-16 h-1.5 rounded-full overflow-hidden"
-                        >
-                          <div
-                            style={{
-                              width: `${pct}%`,
-                              backgroundColor: pct > 80 ? '#ef4444' : pct > 50 ? '#f59e0b' : '#22c55e',
-                            }}
-                            className="h-full rounded-full transition-all"
-                          />
+                        <div style={{ backgroundColor: '#1f2937' }} className="w-16 h-1.5 rounded-full overflow-hidden">
+                          <div style={{ width: `${pct}%`, backgroundColor: pct > 80 ? '#ef4444' : pct > 50 ? '#f59e0b' : '#22c55e' }} className="h-full rounded-full" />
                         </div>
-                        <span className="text-xs text-slate-400">
-                          {cto.ocupacao ?? 0}/{cto.capacidade ?? 0}
-                        </span>
+                        <span className="text-xs text-slate-400">{cto.ocupacao ?? 0}/{cto.capacidade ?? 0}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-400">{cto.cdo_id ?? '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => abrirEditar(cto)}
-                          className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
-                        >
-                          Editar
-                        </button>
+                        <button onClick={() => abrirEditar(cto)} className="text-xs text-sky-400 hover:text-sky-300">Editar</button>
                         <span className="text-slate-700">|</span>
-                        <button
-                          onClick={() => handleExcluir(cto)}
-                          className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                        >
-                          Excluir
-                        </button>
+                        <button onClick={() => setConfirmDelete(cto)} className="text-xs text-red-400 hover:text-red-300">Excluir</button>
                       </div>
                     </td>
                   </tr>
@@ -264,200 +242,119 @@ export default function CTOsClient({ ctosIniciais, projetoId, userRole }) {
 
       {/* Modal Nova/Editar CTO */}
       {modalAberto && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={modalBgStyle}
-        >
-          <div style={cardStyle} className="rounded-2xl w-full max-w-lg p-6">
-            <h2 className="text-lg font-bold text-white mb-5">
-              {ctoEditando ? 'Editar CTO' : 'Nova CTO'}
-            </h2>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" style={modalOverlay} onClick={(e) => e.target === e.currentTarget && fecharModal()}>
+          <div style={modalPanel} className="rounded-t-2xl sm:rounded-2xl w-full p-6 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h2 style={{ color: '#e2e8f0', fontSize: 17, fontWeight: 700 }}>
+                {ctoEditando ? 'Editar CTO' : 'Nova CTO'}
+              </h2>
+              <button onClick={fecharModal} style={{ color: 'rgba(255,255,255,0.3)', fontSize: 20, lineHeight: 1 }} className="hover:text-white transition-colors">✕</button>
+            </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">ID da CTO *</label>
-                <input
-                  name="cto_id"
-                  value={form.cto_id}
-                  onChange={handleFormChange}
-                  disabled={!!ctoEditando}
-                  placeholder="ex: CTO-001"
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">Nome</label>
-                <input
-                  name="nome"
-                  value={form.nome}
-                  onChange={handleFormChange}
-                  placeholder="Nome descritivo"
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">Rua</label>
-                <input
-                  name="rua"
-                  value={form.rua}
-                  onChange={handleFormChange}
-                  placeholder="Rua / Av."
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">Bairro</label>
-                <input
-                  name="bairro"
-                  value={form.bairro}
-                  onChange={handleFormChange}
-                  placeholder="Bairro"
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-              {/* Coordenadas + ações de localização */}
-              <div className="col-span-2 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs text-slate-400 uppercase tracking-wider">Localização *</label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={usarGPS}
-                      disabled={gpsCarregando}
-                      style={{ border: '1px solid #1e40af', color: '#93c5fd', backgroundColor: '#1e3a5f' }}
-                      className="text-xs px-3 py-1 rounded-lg disabled:opacity-40 hover:brightness-110 transition-all flex items-center gap-1"
-                    >
-                      {gpsCarregando ? '⏳ Obtendo...' : '📍 Usar GPS'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMostrarMapa((v) => !v)}
-                      style={{ border: '1px solid #065f46', color: '#6ee7b7', backgroundColor: '#064e3b' }}
-                      className="text-xs px-3 py-1 rounded-lg hover:brightness-110 transition-all"
-                    >
-                      {mostrarMapa ? '✕ Fechar mapa' : '🗺 Selecionar no mapa'}
-                    </button>
-                  </div>
-                </div>
-
-                {mostrarMapa && (
-                  <LocationPicker
-                    lat={form.lat}
-                    lng={form.lng}
-                    onChange={(lat, lng) =>
-                      setForm((prev) => ({ ...prev, lat: String(lat), lng: String(lng) }))
-                    }
-                  />
-                )}
-
+            <div className="flex flex-col gap-4">
+              {/* Grupo: Identificação */}
+              <div style={fieldGroup}>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Identificação</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-slate-500">Latitude</label>
+                  <div>
+                    <label style={labelStyle}>ID da CTO *</label>
                     <input
-                      name="lat"
-                      value={form.lat}
-                      onChange={handleFormChange}
-                      placeholder="-23.550520"
-                      type="number"
-                      step="any"
-                      style={inputStyle}
-                      className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      name="cto_id" value={form.cto_id} onChange={handleFormChange}
+                      disabled={!!ctoEditando} placeholder="ex: CTO-001"
+                      style={{ ...fieldInput, opacity: ctoEditando ? 0.5 : 1 }}
+                      className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40"
                     />
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-slate-500">Longitude</label>
-                    <input
-                      name="lng"
-                      value={form.lng}
-                      onChange={handleFormChange}
-                      placeholder="-46.633309"
-                      type="number"
-                      step="any"
-                      style={inputStyle}
-                      className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    />
+                  <div>
+                    <label style={labelStyle}>Nome</label>
+                    <input name="nome" value={form.nome} onChange={handleFormChange} placeholder="Nome descritivo" style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Rua</label>
+                    <input name="rua" value={form.rua} onChange={handleFormChange} placeholder="Rua / Av." style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Bairro</label>
+                    <input name="bairro" value={form.bairro} onChange={handleFormChange} placeholder="Bairro" style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
                   </div>
                 </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">Capacidade</label>
-                <select
-                  name="capacidade"
-                  value={form.capacidade}
-                  onChange={handleFormChange}
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                >
-                  {CAPACIDADES.map((c) => (
-                    <option key={c} value={c}>{c} portas</option>
-                  ))}
-                </select>
+
+              {/* Grupo: Localização */}
+              <div style={fieldGroup}>
+                <div className="flex items-center justify-between">
+                  <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Localização *</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={usarGPS} disabled={gpsCarregando}
+                      style={{ backgroundColor: '#0c2340', border: '1px solid #0369a1', color: '#38bdf8', fontSize: 11, padding: '4px 10px', borderRadius: 8 }}
+                      className="disabled:opacity-40 hover:brightness-110 transition-all flex items-center gap-1">
+                      {gpsCarregando ? '⏳' : '📍'} GPS
+                    </button>
+                    <button type="button" onClick={() => setMostrarMapa((v) => !v)}
+                      style={{ backgroundColor: mostrarMapa ? '#064e3b' : '#111827', border: `1px solid ${mostrarMapa ? '#065f46' : '#1f2937'}`, color: mostrarMapa ? '#6ee7b7' : '#94a3b8', fontSize: 11, padding: '4px 10px', borderRadius: 8 }}
+                      className="hover:brightness-110 transition-all">
+                      🗺 {mostrarMapa ? 'Fechar' : 'Selecionar'}
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label style={labelStyle}>Latitude</label>
+                    <input name="lat" value={form.lat} onChange={handleFormChange} placeholder="-23.550520" type="number" step="any" style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Longitude</label>
+                    <input name="lng" value={form.lng} onChange={handleFormChange} placeholder="-46.633309" type="number" step="any" style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                  </div>
+                </div>
+                {mostrarMapa && (
+                  <LocationPicker lat={form.lat} lng={form.lng}
+                    onChange={(lat, lng) => setForm((prev) => ({ ...prev, lat: String(lat), lng: String(lng) }))} />
+                )}
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">CDO vinculado</label>
-                <input
-                  name="cdo_id"
-                  value={form.cdo_id}
-                  onChange={handleFormChange}
-                  placeholder="ID do CDO"
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">Porta CDO</label>
-                <input
-                  name="porta_cdo"
-                  value={form.porta_cdo}
-                  onChange={handleFormChange}
-                  placeholder="ex: 1"
-                  type="number"
-                  min={1}
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-              <div className="flex flex-col gap-1 col-span-2">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">Splitter CTO</label>
-                <input
-                  name="splitter_cto"
-                  value={form.splitter_cto}
-                  onChange={handleFormChange}
-                  placeholder="ex: 1:8, 1:16, passthrough"
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
+
+              {/* Grupo: Rede */}
+              <div style={fieldGroup}>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Configuração de Rede</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label style={labelStyle}>Capacidade</label>
+                    <select name="capacidade" value={form.capacidade} onChange={handleFormChange} style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40">
+                      {CAPACIDADES.map((c) => <option key={c} value={c}>{c} portas</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>CDO vinculado</label>
+                    <input name="cdo_id" value={form.cdo_id} onChange={handleFormChange} placeholder="ID do CDO" style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Porta CDO</label>
+                    <input name="porta_cdo" value={form.porta_cdo} onChange={handleFormChange} placeholder="ex: 1" type="number" min={1} style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Splitter CTO</label>
+                    <input name="splitter_cto" value={form.splitter_cto} onChange={handleFormChange} placeholder="ex: 1:8, 1:16" style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                  </div>
+                </div>
               </div>
             </div>
 
             {erro && (
-              <div
-                style={{ backgroundColor: '#450a0a', border: '1px solid #7f1d1d' }}
-                className="rounded-lg px-4 py-3 text-sm text-red-400 mb-4"
-              >
+              <div style={{ backgroundColor: '#450a0a', border: '1px solid #7f1d1d' }} className="rounded-lg px-4 py-3 text-sm text-red-400 mt-4">
                 {erro}
               </div>
             )}
 
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={fecharModal}
-                disabled={isPending}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
-                className="px-4 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors disabled:opacity-40"
-              >
+            <div className="flex justify-end gap-3 mt-5">
+              <button onClick={fecharModal} disabled={isPending}
+                style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }}
+                className="px-5 py-2.5 rounded-lg text-sm hover:bg-white/5 transition-colors disabled:opacity-40">
                 Cancelar
               </button>
-              <button
-                onClick={handleSalvar}
-                disabled={isPending || !form.cto_id || !form.lat || !form.lng}
-                className="bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-              >
-                {isPending ? 'Salvando...' : 'Salvar'}
+              <button onClick={handleSalvar} disabled={isPending || !form.cto_id || !form.lat || !form.lng}
+                style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#052e16', fontWeight: 700, fontSize: 14 }}
+                className="px-5 py-2.5 rounded-lg transition-opacity hover:opacity-90 disabled:opacity-40">
+                {isPending ? 'Salvando...' : ctoEditando ? 'Salvar alterações' : 'Criar CTO'}
               </button>
             </div>
           </div>
@@ -466,29 +363,20 @@ export default function CTOsClient({ ctosIniciais, projetoId, userRole }) {
 
       {/* Confirm delete */}
       {confirmDelete && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={modalBgStyle}
-        >
-          <div style={cardStyle} className="rounded-2xl w-full max-w-sm p-6 text-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={modalOverlay}>
+          <div style={modalPanel} className="rounded-2xl p-6 text-center max-w-sm">
             <p className="text-white font-semibold mb-2">Excluir CTO?</p>
             <p className="text-sm text-slate-400 mb-6">
-              A CTO <span className="text-white font-mono">{confirmDelete.cto_id}</span> será
-              removida permanentemente.
+              A CTO <span className="text-white font-mono">{confirmDelete.cto_id}</span> será removida permanentemente.
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
-                className="flex-1 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors"
-              >
+              <button onClick={() => setConfirmDelete(null)}
+                style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }}
+                className="flex-1 py-2.5 rounded-lg text-sm hover:bg-white/5 transition-colors">
                 Cancelar
               </button>
-              <button
-                onClick={confirmarExclusao}
-                disabled={isPending}
-                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg transition-colors"
-              >
+              <button onClick={confirmarExclusao} disabled={isPending}
+                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors">
                 {isPending ? 'Removendo...' : 'Excluir'}
               </button>
             </div>

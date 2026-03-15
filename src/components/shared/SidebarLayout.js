@@ -8,10 +8,7 @@ import { signOut } from "next-auth/react";
 const NAV_ITEMS = [
   { href: "/",                   label: "Mapa",        icon: "🗺️" },
   // --- Admin ---
-  { href: "/admin/ctos",         label: "CTOs",        icon: "📦", minRole: "admin" },
-  { href: "/admin/caixas",       label: "CE / CDO",    icon: "🔌", minRole: "admin" },
-  { href: "/admin/rotas",        label: "Rotas",       icon: "〰️", minRole: "admin" },
-  { href: "/admin/postes",       label: "Postes",      icon: "🏗️", minRole: "admin" },
+  { href: "/admin/campo",        label: "Campo",       icon: "📡", minRole: "admin" },
   { href: "/admin/diagramas",    label: "Diagramas",   icon: "🧩", minRole: "admin" },
   { href: "/admin/usuarios",     label: "Usuários",    icon: "👥", minRole: "admin" },
   // --- Superadmin ---
@@ -161,7 +158,7 @@ export default function SidebarLayout({ session, children }) {
             backgroundColor: "#0d1526",
             borderBottom: "1px solid #1f2937",
           }}
-          className="flex items-center justify-between px-4 py-3 lg:hidden"
+          className="relative z-[60] flex items-center justify-between px-4 py-3 lg:hidden"
         >
           <button
             onClick={() => setAberta(true)}
@@ -187,7 +184,7 @@ export default function SidebarLayout({ session, children }) {
         </header>
 
         {/* Conteúdo */}
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto min-h-0">{children}</main>
       </div>
     </div>
   );

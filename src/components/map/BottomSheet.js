@@ -1,90 +1,95 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import {
-  X,
-  Edit,
-  Network,
-  FileText,
-  MapPin,
-  MoveVertical,
-  Zap,
-  Box,
-  Layers,
-  Route,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import OcupacaoBar from '@/components/shared/OcupacaoBar'
 
 const ROTA_TIPO_CONFIG = {
-  BACKBONE: { label: 'Backbone', className: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
-  RAMAL: { label: 'Ramal', className: 'bg-orange-500/20 text-orange-300 border-orange-500/40' },
-  DROP: { label: 'Drop', className: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+  BACKBONE: { label: 'Backbone', bg: 'rgba(99,102,241,0.2)',  border: 'rgba(99,102,241,0.5)',  color: '#a5b4fc' },
+  RAMAL:    { label: 'Ramal',    bg: 'rgba(249,115,22,0.2)',   border: 'rgba(249,115,22,0.5)',   color: '#fdba74' },
+  DROP:     { label: 'Drop',     bg: 'rgba(34,197,94,0.15)',   border: 'rgba(34,197,94,0.4)',    color: '#86efac' },
 }
 
 const STATUS_CONFIG = {
-  ativo: { label: 'Ativo', className: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
-  manutencao: { label: 'Manutenção', className: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' },
-  inativo: { label: 'Inativo', className: 'bg-red-500/20 text-red-300 border-red-500/40' },
+  ativo:          { label: 'Ativo',        bg: 'rgba(34,197,94,0.15)',  border: 'rgba(34,197,94,0.4)',   color: '#86efac' },
+  em_manutencao:  { label: 'Manutenção',   bg: 'rgba(234,179,8,0.15)',  border: 'rgba(234,179,8,0.4)',   color: '#fde047' },
+  inativo:        { label: 'Inativo',      bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.4)',   color: '#fca5a5' },
+  removido:       { label: 'Removido',     bg: 'rgba(100,116,139,0.2)', border: 'rgba(100,116,139,0.4)', color: '#94a3b8' },
+}
+
+function Chip({ label, bg, border, color }) {
+  return (
+    <span style={{ backgroundColor: bg, border: `1px solid ${border}`, color, fontSize: 11, padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>
+      {label}
+    </span>
+  )
 }
 
 function InfoRow({ label, value }) {
-  if (!value) return null
+  if (value == null || value === '' || value === '—') return null
   return (
-    <div className="flex items-start justify-between gap-4 py-1.5">
-      <span className="text-xs text-white/40 shrink-0">{label}</span>
-      <span className="text-xs text-white/80 text-right">{value}</span>
+    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '8px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, flexShrink: 0, paddingTop: 2 }}>{label}</span>
+      <span style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 600, textAlign: 'right' }}>{String(value)}</span>
+    </div>
+  )
+}
+
+function ActionBtn({ onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        color: '#cbd5e1',
+        fontSize: 12,
+        fontWeight: 600,
+        padding: '7px 14px',
+        borderRadius: 8,
+        transition: 'all .15s',
+      }}
+      onMouseOver={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#fff' }}
+      onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#cbd5e1' }}
+    >
+      {children}
+    </button>
+  )
+}
+
+// Barra de ocupação compacta
+function OcupacaoBar({ ocupadas = 0, capacidade = 0 }) {
+  const pct = capacidade > 0 ? Math.round((ocupadas / capacidade) * 100) : 0
+  const barColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e'
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Ocupação</span>
+        <span style={{ fontSize: 12, color: barColor, fontWeight: 700 }}>{ocupadas}/{capacidade} ({pct}%)</span>
+      </div>
+      <div style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', backgroundColor: barColor, borderRadius: 4, transition: 'width .4s' }} />
+      </div>
     </div>
   )
 }
 
 function CTOContent({ data, isAdmin, onAction }) {
-  const clientes = data.clientes || []
   return (
-    <div className="space-y-4">
-      <OcupacaoBar ocupadas={data.ocupadas ?? clientes.length} capacidade={data.capacidade ?? 8} />
-      <Separator className="bg-white/10" />
-      <div className="space-y-0.5">
-        <InfoRow label="ID" value={data.ctoId || data._id} />
-        <InfoRow label="Rua" value={data.rua} />
-        <InfoRow label="Bairro" value={data.bairro} />
-        <InfoRow label="Splitter" value={data.tipoSplitter} />
-        <InfoRow label="CDO pai" value={data.caixaPai?.nome || data.caixaPai} />
-      </div>
-      {clientes.length > 0 && (
-        <>
-          <Separator className="bg-white/10" />
-          <div>
-            <p className="text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">Clientes</p>
-            <ul className="space-y-1">
-              {clientes.map((c, i) => (
-                <li key={i} className="text-xs text-white/70 px-2 py-1 bg-white/5 rounded">
-                  {typeof c === 'string' ? c : c.nome || c.onu}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </>
-      )}
-      <div className="flex flex-wrap gap-2 pt-2">
-        <Button size="sm" variant="outline" onClick={() => onAction('movimentacao')}
-          className="border-white/20 text-white/70 hover:text-white hover:bg-white/10">
-          <FileText className="size-3.5" />
-          Registrar Movimentação
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => onAction('diagrama')}
-          className="border-white/20 text-white/70 hover:text-white hover:bg-white/10">
-          <Network className="size-3.5" />
-          Diagrama
-        </Button>
+    <div>
+      <OcupacaoBar ocupadas={data.ocupacao ?? 0} capacidade={data.capacidade ?? 8} />
+      <InfoRow label="ID" value={data.cto_id} />
+      <InfoRow label="Nome" value={data.nome} />
+      <InfoRow label="Rua" value={data.rua} />
+      <InfoRow label="Bairro" value={data.bairro} />
+      <InfoRow label="Capacidade" value={data.capacidade ? `${data.capacidade} portas` : null} />
+      <InfoRow label="Splitter" value={data.splitter_cto} />
+      <InfoRow label="CDO pai" value={data.cdo_id} />
+      <InfoRow label="Porta CDO" value={data.porta_cdo} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
         {isAdmin && (
-          <Button size="sm" variant="outline" onClick={() => onAction('reposicionar')}
-            className="border-white/20 text-white/70 hover:text-white hover:bg-white/10">
-            <MoveVertical className="size-3.5" />
-            Reposicionar
-          </Button>
+          <ActionBtn onClick={() => onAction('reposicionar')}>📍 Reposicionar</ActionBtn>
+        )}
+        {isAdmin && (
+          <ActionBtn onClick={() => onAction('editar')}>✏️ Editar dados</ActionBtn>
         )}
       </div>
     </div>
@@ -92,37 +97,30 @@ function CTOContent({ data, isAdmin, onAction }) {
 }
 
 function CaixaContent({ data, isAdmin, onAction }) {
-  const tipoCfg = {
-    CE: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-    CDO: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+  const TIPO_CHIP = {
+    CE:  { bg: 'rgba(37,99,235,0.2)',  border: 'rgba(37,99,235,0.5)',  color: '#93c5fd' },
+    CDO: { bg: 'rgba(124,58,237,0.2)', border: 'rgba(124,58,237,0.5)', color: '#c4b5fd' },
   }
+  const chip = TIPO_CHIP[data.tipo] ?? TIPO_CHIP.CDO
+  const caixaId = data.id ?? data.ce_id
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${tipoCfg[data.tipo] || tipoCfg.CDO}`}>
-          {data.tipo || 'CDO'}
-        </span>
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <Chip label={data.tipo || 'CDO'} {...chip} />
       </div>
-      <div className="space-y-0.5">
-        <InfoRow label="ID" value={data.caixaId || data._id} />
-        <InfoRow label="Rua" value={data.rua} />
-        <InfoRow label="Bairro" value={data.bairro} />
-        <InfoRow label="Splitter CDO" value={data.splitterCdo} />
-        <InfoRow label="OLT vinculada" value={data.olt?.nome || data.olt} />
-        <InfoRow label="Porta PON" value={data.portaPon != null ? String(data.portaPon) : null} />
-      </div>
-      <div className="flex flex-wrap gap-2 pt-2">
-        <Button size="sm" variant="outline" onClick={() => onAction('diagrama')}
-          className="border-white/20 text-white/70 hover:text-white hover:bg-white/10">
-          <FileText className="size-3.5" />
-          Diagrama ABNT
-        </Button>
+      <InfoRow label="ID" value={caixaId} />
+      <InfoRow label="Nome" value={data.nome} />
+      <InfoRow label="Rua" value={data.rua} />
+      <InfoRow label="Bairro" value={data.bairro} />
+      <InfoRow label="Splitter" value={data.splitter_cdo} />
+      <InfoRow label="OLT" value={data.olt_id} />
+      <InfoRow label="Porta OLT" value={data.porta_olt} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
         {isAdmin && (
-          <Button size="sm" variant="outline" onClick={() => onAction('editar')}
-            className="border-white/20 text-white/70 hover:text-white hover:bg-white/10">
-            <Edit className="size-3.5" />
-            Editar
-          </Button>
+          <ActionBtn onClick={() => onAction('reposicionar')}>📍 Reposicionar</ActionBtn>
+        )}
+        {isAdmin && (
+          <ActionBtn onClick={() => onAction('editar')}>✏️ Editar dados</ActionBtn>
         )}
       </div>
     </div>
@@ -130,29 +128,18 @@ function CaixaContent({ data, isAdmin, onAction }) {
 }
 
 function RotaContent({ data, isAdmin, onAction }) {
-  const tipoCfg = ROTA_TIPO_CONFIG[data.tipo] || ROTA_TIPO_CONFIG.RAMAL
-  const distancia = data.distancia != null
-    ? `${data.distancia >= 1000 ? (data.distancia / 1000).toFixed(2) + ' km' : data.distancia + ' m'}`
-    : null
+  const cfg = ROTA_TIPO_CONFIG[data.tipo] ?? ROTA_TIPO_CONFIG.RAMAL
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${tipoCfg.className}`}>
-          {tipoCfg.label}
-        </span>
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <Chip label={cfg.label} {...cfg} />
       </div>
-      <div className="space-y-0.5">
-        <InfoRow label="ID" value={data.rotaId || data._id} />
-        <InfoRow label="Nome" value={data.nome} />
-        <InfoRow label="Distância" value={distancia} />
-      </div>
+      <InfoRow label="ID" value={data.rota_id} />
+      <InfoRow label="Nome" value={data.nome} />
+      <InfoRow label="Obs" value={data.obs} />
       {isAdmin && (
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Button size="sm" variant="outline" onClick={() => onAction('editar')}
-            className="border-white/20 text-white/70 hover:text-white hover:bg-white/10">
-            <Edit className="size-3.5" />
-            Editar
-          </Button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <ActionBtn onClick={() => onAction('editar')}>✏️ Editar dados</ActionBtn>
         </div>
       )}
     </div>
@@ -160,57 +147,47 @@ function RotaContent({ data, isAdmin, onAction }) {
 }
 
 function PosteContent({ data, isAdmin, onAction }) {
-  const statusCfg = STATUS_CONFIG[data.status] || STATUS_CONFIG.ativo
+  const statusCfg = STATUS_CONFIG[data.status] ?? STATUS_CONFIG.ativo
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusCfg.className}`}>
-          {statusCfg.label}
-        </span>
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <Chip label={statusCfg.label} {...statusCfg} />
       </div>
-      <div className="space-y-0.5">
-        <InfoRow label="ID" value={data.posteId || data._id} />
-        <InfoRow label="Tipo" value={data.tipo} />
-        <InfoRow label="Altura" value={data.altura} />
-        <InfoRow label="Material" value={data.material} />
-        <InfoRow label="Proprietário" value={data.proprietario} />
-        <InfoRow label="Rua" value={data.rua} />
-        <InfoRow label="Bairro" value={data.bairro} />
+      <InfoRow label="ID" value={data.poste_id} />
+      <InfoRow label="Tipo" value={data.tipo} />
+      <InfoRow label="Altura" value={data.altura} />
+      <InfoRow label="Material" value={data.material} />
+      <InfoRow label="Proprietário" value={data.proprietario} />
+      <InfoRow label="Rua" value={data.rua} />
+      <InfoRow label="Bairro" value={data.bairro} />
+      <InfoRow label="Obs" value={data.obs} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+        {isAdmin && (
+          <ActionBtn onClick={() => onAction('reposicionar')}>📍 Reposicionar</ActionBtn>
+        )}
+        {isAdmin && (
+          <ActionBtn onClick={() => onAction('editar')}>✏️ Editar dados</ActionBtn>
+        )}
       </div>
-      {isAdmin && (
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Button size="sm" variant="outline" onClick={() => onAction('editar')}
-            className="border-white/20 text-white/70 hover:text-white hover:bg-white/10">
-            <Edit className="size-3.5" />
-            Editar
-          </Button>
-        </div>
-      )}
     </div>
   )
 }
 
-const TYPE_ICONS = {
-  cto: Box,
-  cdo: Layers,
-  rota: Route,
-  poste: Zap,
+const TYPE_EMOJI = { cto: '📦', caixa: '🔌', rota: '〰️', poste: '🏗️' }
+const TYPE_LABELS = { cto: 'CTO', caixa: 'CE / CDO', rota: 'Rota', poste: 'Poste' }
+const TYPE_COLOR = {
+  cto:   '#16a34a',
+  caixa: '#7c3aed',
+  rota:  '#6366f1',
+  poste: '#d97706',
 }
 
-const TYPE_LABELS = {
-  cto: 'CTO',
-  cdo: 'CE/CDO',
-  rota: 'Rota',
-  poste: 'Poste',
-}
-
-export default function BottomSheet({ element, onClose, session, onAction }) {
+export default function BottomSheet({ element, onClose, session, userRole, onAction }) {
   const [visible, setVisible] = useState(false)
   const startYRef = useRef(null)
-  const currentYRef = useRef(0)
   const sheetRef = useRef(null)
 
-  const role = session?.user?.role || 'user'
+  const role = userRole || session?.user?.role || 'user'
   const isAdmin = role === 'admin' || role === 'superadmin'
 
   useEffect(() => {
@@ -226,14 +203,10 @@ export default function BottomSheet({ element, onClose, session, onAction }) {
   }
 
   const handleDragEnd = (e) => {
-    const endY = e.type === 'touchend'
-      ? e.changedTouches[0].clientY
-      : e.clientY
-    if (endY - startYRef.current > 80) {
-      onClose?.()
-    }
+    if (startYRef.current === null) return
+    const endY = e.type === 'touchend' ? e.changedTouches[0].clientY : e.clientY
+    if (endY - startYRef.current > 80) onClose?.()
     startYRef.current = null
-    currentYRef.current = 0
     if (sheetRef.current) sheetRef.current.style.transform = ''
   }
 
@@ -241,33 +214,39 @@ export default function BottomSheet({ element, onClose, session, onAction }) {
     if (startYRef.current === null) return
     const y = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY
     const delta = Math.max(0, y - startYRef.current)
-    currentYRef.current = delta
-    if (sheetRef.current) {
-      sheetRef.current.style.transform = `translateY(${delta}px)`
-    }
+    if (sheetRef.current) sheetRef.current.style.transform = `translateY(${delta}px)`
   }
 
   if (!element) return null
 
   const { type, data } = element
-  const Icon = TYPE_ICONS[type] || MapPin
-  const typeLabel = TYPE_LABELS[type] || type
-  const name = data?.nome || data?.ctoId || data?.rotaId || data?.posteId || data?._id || 'Sem nome'
+  const accentColor = TYPE_COLOR[type] ?? '#6366f1'
+  const emoji = TYPE_EMOJI[type] ?? '📍'
+  const typeLabel = TYPE_LABELS[type] ?? type
+  const name = data?.nome || data?.cto_id || data?.rota_id || data?.poste_id || data?.id || data?.ce_id || data?._id || 'Sem nome'
 
   const handleAction = (action) => onAction?.({ type, data, action })
 
   return (
     <div
+      ref={sheetRef}
       className={[
         'fixed bottom-0 left-0 right-0 z-50',
         'transition-transform duration-300 ease-out',
         visible ? 'translate-y-0' : 'translate-y-full',
       ].join(' ')}
-      ref={sheetRef}
     >
-      {/* Handle area */}
+      {/* Handle / título */}
       <div
-        className="flex justify-center pt-3 pb-1 bg-[#0d1829] rounded-t-2xl border-t border-x border-white/10 cursor-grab active:cursor-grabbing"
+        style={{
+          backgroundColor: 'rgba(8,14,30,0.98)',
+          borderTop: `3px solid ${accentColor}`,
+          borderLeft: '1px solid rgba(255,255,255,0.07)',
+          borderRight: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: '20px 20px 0 0',
+          cursor: 'grab',
+          padding: '10px 16px 8px',
+        }}
         onMouseDown={handleDragStart}
         onMouseMove={handleDragMove}
         onMouseUp={handleDragEnd}
@@ -276,47 +255,44 @@ export default function BottomSheet({ element, onClose, session, onAction }) {
         onTouchMove={handleDragMove}
         onTouchEnd={handleDragEnd}
       >
-        <div className="w-10 h-1 rounded-full bg-white/20" />
-      </div>
-
-      {/* Content */}
-      <div
-        className="bg-[#0d1829] border-x border-b border-white/10 px-4 pb-6"
-        style={{ maxHeight: '60vh', overflowY: 'auto' }}
-      >
-        {/* Sheet header */}
-        <div className="flex items-center justify-between py-3 sticky top-0 bg-[#0d1829] z-10">
-          <div className="flex items-center gap-2">
-            <Icon className="size-4 text-blue-400" />
+        <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.15)', margin: '0 auto 10px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: `${accentColor}22`, border: `1px solid ${accentColor}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+              {emoji}
+            </div>
             <div>
-              <p className="text-xs text-white/40 uppercase tracking-wider">{typeLabel}</p>
-              <p className="text-sm font-semibold text-white">{name}</p>
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>{typeLabel}</p>
+              <p style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', lineHeight: 1.2 }}>{name}</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={onClose}
-            className="size-7 text-white/50 hover:text-white hover:bg-white/10"
+            style={{ color: 'rgba(255,255,255,0.3)', fontSize: 20, lineHeight: 1, padding: 4 }}
+            className="hover:text-white transition-colors"
           >
-            <X className="size-3.5" />
-          </Button>
+            ✕
+          </button>
         </div>
+      </div>
 
-        <Separator className="bg-white/10 mb-4" />
-
-        {type === 'cto' && (
-          <CTOContent data={data} isAdmin={isAdmin} onAction={handleAction} />
-        )}
-        {(type === 'cdo' || type === 'caixa') && (
-          <CaixaContent data={data} isAdmin={isAdmin} onAction={handleAction} />
-        )}
-        {type === 'rota' && (
-          <RotaContent data={data} isAdmin={isAdmin} onAction={handleAction} />
-        )}
-        {type === 'poste' && (
-          <PosteContent data={data} isAdmin={isAdmin} onAction={handleAction} />
-        )}
+      {/* Conteúdo */}
+      <div
+        style={{
+          backgroundColor: 'rgba(8,14,30,0.98)',
+          borderLeft: '1px solid rgba(255,255,255,0.07)',
+          borderRight: '1px solid rgba(255,255,255,0.07)',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          padding: '8px 16px 28px',
+          maxHeight: '55vh',
+          overflowY: 'auto',
+        }}
+      >
+        {type === 'cto' && <CTOContent data={data} isAdmin={isAdmin} onAction={handleAction} />}
+        {(type === 'cdo' || type === 'caixa') && <CaixaContent data={data} isAdmin={isAdmin} onAction={handleAction} />}
+        {type === 'rota' && <RotaContent data={data} isAdmin={isAdmin} onAction={handleAction} />}
+        {type === 'poste' && <PosteContent data={data} isAdmin={isAdmin} onAction={handleAction} />}
       </div>
     </div>
   )

@@ -3,31 +3,63 @@
 import { useState, useTransition } from 'react'
 import { upsertRota, deleteRota } from '@/actions/rotas'
 
+const TIPOS = ['BACKBONE', 'RAMAL', 'DROP']
+
+const TIPO_CONFIG = {
+  BACKBONE: { cor: '#6366f1', bg: 'rgba(99,102,241,0.15)', border: 'rgba(99,102,241,0.4)', desc: 'Fibra principal' },
+  RAMAL:    { cor: '#f97316', bg: 'rgba(249,115,22,0.15)',  border: 'rgba(249,115,22,0.4)',  desc: 'Distribuição' },
+  DROP:     { cor: '#22c55e', bg: 'rgba(34,197,94,0.15)',   border: 'rgba(34,197,94,0.4)',   desc: 'Última milha' },
+}
+
+// ── Shared modal styles ───────────────────────────────────────────────────────
+const modalOverlay = { backgroundColor: 'rgba(0,0,0,0.85)' }
+
+const modalPanel = {
+  backgroundColor: 'rgba(8,13,28,0.98)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  width: 'min(580px,100%)',
+}
+
+const fieldInput = {
+  backgroundColor: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.10)',
+  color: '#e2e8f0',
+  fontSize: '13px',
+  outline: 'none',
+}
+
+const fieldGroup = {
+  backgroundColor: 'rgba(255,255,255,0.025)',
+  border: '1px solid rgba(255,255,255,0.07)',
+  borderRadius: '12px',
+  padding: '14px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px',
+}
+
+const labelStyle = {
+  fontSize: '10px',
+  color: 'rgba(255,255,255,0.35)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  fontWeight: 600,
+  marginBottom: '4px',
+  display: 'block',
+}
+
 const cardStyle = {
   backgroundColor: '#111827',
   border: '1px solid #1f2937',
 }
 
-const modalBgStyle = {
-  backgroundColor: 'rgba(0,0,0,0.7)',
-}
-
-const inputStyle = {
-  backgroundColor: '#0b1220',
-  border: '1px solid #1f2937',
-  color: '#f1f5f9',
-}
-
-const TIPOS = ['BACKBONE', 'RAMAL', 'DROP']
-
-const TIPO_CORES = {
+const TIPO_CORES_TABLE = {
   BACKBONE: 'text-blue-300',
   RAMAL: 'text-orange-300',
   DROP: 'text-emerald-300',
 }
 
 export default function RotasClient({ rotasIniciais, projetoId, userRole }) {
-  // rotasIniciais are GeoJSON Features: { type, id, geometry, properties }
   const [rotas, setRotas] = useState(rotasIniciais)
   const [modalAberto, setModalAberto] = useState(false)
   const [rotaEditando, setRotaEditando] = useState(null)
@@ -37,11 +69,7 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole }) {
   const [isPending, startTransition] = useTransition()
 
   const [form, setForm] = useState({
-    rota_id: '',
-    nome: '',
-    tipo: 'RAMAL',
-    coordinates: '',
-    obs: '',
+    rota_id: '', nome: '', tipo: 'RAMAL', coordinates: '', obs: '',
   })
 
   function abrirNovo() {
@@ -98,14 +126,10 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole }) {
           obs: form.obs || null,
         })
 
-        // Converte o documento retornado para formato Feature para consistência de estado
         const feature = {
           type: 'Feature',
           id: resultado.rota_id,
-          geometry: {
-            type: resultado.geometry_type ?? 'LineString',
-            coordinates: resultado.coordinates ?? [],
-          },
+          geometry: { type: resultado.geometry_type ?? 'LineString', coordinates: resultado.coordinates ?? [] },
           properties: {
             rota_id: resultado.rota_id,
             nome: resultado.nome,
@@ -133,10 +157,6 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole }) {
         setErro(e.message)
       }
     })
-  }
-
-  function handleExcluir(rota) {
-    setConfirmDelete(rota)
   }
 
   function confirmarExclusao() {
@@ -168,16 +188,13 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole }) {
     <>
       {/* Barra de ações */}
       <div className="flex items-center justify-between mb-4">
-        {sucesso && (
-          <p className="text-sm text-green-400">{sucesso}</p>
-        )}
-        {erro && !modalAberto && (
-          <p className="text-sm text-red-400">{erro}</p>
-        )}
+        {sucesso && <p className="text-sm text-green-400">{sucesso}</p>}
+        {erro && !modalAberto && <p className="text-sm text-red-400">{erro}</p>}
         {!sucesso && !erro && <div />}
         <button
           onClick={abrirNovo}
-          className="bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#052e16', fontWeight: 700 }}
+          className="text-sm px-4 py-2 rounded-lg transition-opacity hover:opacity-90"
         >
           + Nova Rota
         </button>
@@ -190,53 +207,36 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole }) {
             <thead>
               <tr style={{ borderBottom: '1px solid #1f2937', backgroundColor: '#0d1526' }}>
                 {['ID', 'Nome', 'Tipo', 'Pontos', 'Ações'].map((h) => (
-                  <th key={h} className="text-left text-xs text-slate-400 font-semibold uppercase tracking-wider px-4 py-3">
-                    {h}
-                  </th>
+                  <th key={h} className="text-left text-xs text-slate-400 font-semibold uppercase tracking-wider px-4 py-3">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rotas.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="text-center text-slate-500 py-12 text-sm">
-                    Nenhuma rota cadastrada ainda.
-                  </td>
-                </tr>
+                <tr><td colSpan={5} className="text-center text-slate-500 py-12 text-sm">Nenhuma rota cadastrada ainda.</td></tr>
               )}
               {rotas.map((rota, i) => {
                 const tipo = getRotaTipo(rota)
+                const cfg = TIPO_CONFIG[tipo]
                 return (
-                  <tr
-                    key={(rota.properties ?? rota)._id ?? i}
-                    style={{ borderBottom: i < rotas.length - 1 ? '1px solid #1f2937' : 'none' }}
-                    className="hover:bg-slate-800/30 transition-colors"
-                  >
+                  <tr key={(rota.properties ?? rota)._id ?? i} style={{ borderBottom: i < rotas.length - 1 ? '1px solid #1f2937' : 'none' }} className="hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-sky-400">{getRotaId(rota)}</td>
                     <td className="px-4 py-3 text-slate-200">{getRotaNome(rota)}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-semibold ${TIPO_CORES[tipo] ?? 'text-slate-300'}`}>
-                        {tipo}
-                      </span>
+                      {cfg ? (
+                        <span style={{ backgroundColor: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.cor }} className="text-xs px-2 py-0.5 rounded-full font-bold">
+                          {tipo}
+                        </span>
+                      ) : (
+                        <span className={`text-xs font-semibold ${TIPO_CORES_TABLE[tipo] ?? 'text-slate-300'}`}>{tipo}</span>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">
-                      {getRotaPontos(rota)} pontos
-                    </td>
+                    <td className="px-4 py-3 text-slate-400 text-xs">{getRotaPontos(rota)} pts</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => abrirEditar(rota)}
-                          className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
-                        >
-                          Editar
-                        </button>
+                        <button onClick={() => abrirEditar(rota)} className="text-xs text-sky-400 hover:text-sky-300">Editar</button>
                         <span className="text-slate-700">|</span>
-                        <button
-                          onClick={() => handleExcluir(rota)}
-                          className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                        >
-                          Excluir
-                        </button>
+                        <button onClick={() => setConfirmDelete(rota)} className="text-xs text-red-400 hover:text-red-300">Excluir</button>
                       </div>
                     </td>
                   </tr>
@@ -249,106 +249,105 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole }) {
 
       {/* Modal Nova/Editar Rota */}
       {modalAberto && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={modalBgStyle}
-        >
-          <div style={cardStyle} className="rounded-2xl w-full max-w-lg p-6">
-            <h2 className="text-lg font-bold text-white mb-5">
-              {rotaEditando ? 'Editar Rota' : 'Nova Rota'}
-            </h2>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" style={modalOverlay} onClick={(e) => e.target === e.currentTarget && fecharModal()}>
+          <div style={modalPanel} className="rounded-t-2xl sm:rounded-2xl w-full p-6 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h2 style={{ color: '#e2e8f0', fontSize: 17, fontWeight: 700 }}>
+                {rotaEditando ? 'Editar Rota' : 'Nova Rota'}
+              </h2>
+              <button onClick={fecharModal} style={{ color: 'rgba(255,255,255,0.3)', fontSize: 20, lineHeight: 1 }} className="hover:text-white transition-colors">✕</button>
+            </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">ID da Rota *</label>
-                <input
-                  name="rota_id"
-                  value={form.rota_id}
-                  onChange={handleFormChange}
-                  disabled={!!rotaEditando}
-                  placeholder="ex: RT-001"
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50"
-                />
+            <div className="flex flex-col gap-4">
+              {/* Grupo: Identificação */}
+              <div style={fieldGroup}>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Identificação</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label style={labelStyle}>ID da Rota *</label>
+                    <input
+                      name="rota_id" value={form.rota_id} onChange={handleFormChange}
+                      disabled={!!rotaEditando} placeholder="ex: RT-001"
+                      style={{ ...fieldInput, opacity: rotaEditando ? 0.5 : 1 }}
+                      className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40"
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Nome</label>
+                    <input name="nome" value={form.nome} onChange={handleFormChange} placeholder="Nome da rota" style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">Tipo</label>
-                <select
-                  name="tipo"
-                  value={form.tipo}
-                  onChange={handleFormChange}
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                >
-                  {TIPOS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+
+              {/* Grupo: Tipo — visual chips */}
+              <div style={fieldGroup}>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Tipo de Rota</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {TIPOS.map((t) => {
+                    const cfg = TIPO_CONFIG[t]
+                    const ativo = form.tipo === t
+                    return (
+                      <button key={t} type="button" onClick={() => setForm((p) => ({ ...p, tipo: t }))}
+                        style={{
+                          backgroundColor: ativo ? cfg.bg : 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${ativo ? cfg.border : 'rgba(255,255,255,0.08)'}`,
+                          padding: '10px 8px',
+                          borderRadius: 10,
+                          transition: 'all .15s',
+                        }}
+                        className="flex flex-col items-center gap-1"
+                      >
+                        <span style={{ color: ativo ? cfg.cor : 'rgba(255,255,255,0.35)', fontWeight: 700, fontSize: 13 }}>{t}</span>
+                        <span style={{ color: ativo ? cfg.cor : 'rgba(255,255,255,0.2)', fontSize: 10 }}>{cfg.desc}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="flex flex-col gap-1 col-span-2">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">Nome</label>
-                <input
-                  name="nome"
-                  value={form.nome}
-                  onChange={handleFormChange}
-                  placeholder="Nome da rota"
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
+
+              {/* Grupo: Coordenadas */}
+              <div style={fieldGroup}>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Coordenadas *</p>
+                <div>
+                  <label style={labelStyle}>Array JSON — [[lng, lat], ...]</label>
+                  <textarea
+                    name="coordinates" value={form.coordinates} onChange={handleFormChange}
+                    rows={6}
+                    placeholder={`[[-46.6333, -23.5505],\n [-46.6340, -23.5510]]`}
+                    style={{ ...fieldInput, fontFamily: 'monospace', fontSize: '12px', resize: 'vertical' }}
+                    className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40"
+                  />
+                  <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, marginTop: 4 }}>
+                    Formato GeoJSON: longitude antes da latitude. Mínimo 2 pontos.
+                  </p>
+                </div>
               </div>
-              <div className="flex flex-col gap-1 col-span-2">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">
-                  Coordenadas * <span className="normal-case text-slate-500">(JSON: [[lng, lat], ...])</span>
-                </label>
-                <textarea
-                  name="coordinates"
-                  value={form.coordinates}
-                  onChange={handleFormChange}
-                  rows={6}
-                  placeholder={`[[-46.6333, -23.5505], [-46.6340, -23.5510]]`}
-                  style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '12px', resize: 'vertical' }}
-                  className="rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-                <p className="text-xs text-slate-500">Formato GeoJSON: [longitude, latitude] por ponto, mínimo 2 pontos.</p>
-              </div>
-              <div className="flex flex-col gap-1 col-span-2">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">Observações</label>
-                <textarea
-                  name="obs"
-                  value={form.obs}
-                  onChange={handleFormChange}
-                  rows={2}
-                  placeholder="Observações sobre a rota..."
-                  style={{ ...inputStyle, resize: 'vertical' }}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
+
+              {/* Grupo: Observações */}
+              <div style={fieldGroup}>
+                <div>
+                  <label style={labelStyle}>Observações</label>
+                  <textarea name="obs" value={form.obs} onChange={handleFormChange} rows={2} placeholder="Observações sobre a rota..." style={{ ...fieldInput, resize: 'vertical' }} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                </div>
               </div>
             </div>
 
             {erro && (
-              <div
-                style={{ backgroundColor: '#450a0a', border: '1px solid #7f1d1d' }}
-                className="rounded-lg px-4 py-3 text-sm text-red-400 mb-4"
-              >
+              <div style={{ backgroundColor: '#450a0a', border: '1px solid #7f1d1d' }} className="rounded-lg px-4 py-3 text-sm text-red-400 mt-4">
                 {erro}
               </div>
             )}
 
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={fecharModal}
-                disabled={isPending}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
-                className="px-4 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors disabled:opacity-40"
-              >
+            <div className="flex justify-end gap-3 mt-5">
+              <button onClick={fecharModal} disabled={isPending}
+                style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }}
+                className="px-5 py-2.5 rounded-lg text-sm hover:bg-white/5 transition-colors disabled:opacity-40">
                 Cancelar
               </button>
-              <button
-                onClick={handleSalvar}
-                disabled={isPending || !form.rota_id || !form.coordinates}
-                className="bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-              >
-                {isPending ? 'Salvando...' : 'Salvar'}
+              <button onClick={handleSalvar} disabled={isPending || !form.rota_id || !form.coordinates}
+                style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#052e16', fontWeight: 700, fontSize: 14 }}
+                className="px-5 py-2.5 rounded-lg transition-opacity hover:opacity-90 disabled:opacity-40">
+                {isPending ? 'Salvando...' : rotaEditando ? 'Salvar alterações' : 'Criar Rota'}
               </button>
             </div>
           </div>
@@ -357,29 +356,20 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole }) {
 
       {/* Confirm delete */}
       {confirmDelete && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={modalBgStyle}
-        >
-          <div style={cardStyle} className="rounded-2xl w-full max-w-sm p-6 text-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={modalOverlay}>
+          <div style={modalPanel} className="rounded-2xl p-6 text-center max-w-sm">
             <p className="text-white font-semibold mb-2">Excluir Rota?</p>
             <p className="text-sm text-slate-400 mb-6">
-              A rota <span className="text-white font-mono">{getRotaId(confirmDelete)}</span> será
-              removida permanentemente.
+              A rota <span className="text-white font-mono">{getRotaId(confirmDelete)}</span> será removida permanentemente.
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
-                className="flex-1 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors"
-              >
+              <button onClick={() => setConfirmDelete(null)}
+                style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }}
+                className="flex-1 py-2.5 rounded-lg text-sm hover:bg-white/5 transition-colors">
                 Cancelar
               </button>
-              <button
-                onClick={confirmarExclusao}
-                disabled={isPending}
-                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg transition-colors"
-              >
+              <button onClick={confirmarExclusao} disabled={isPending}
+                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors">
                 {isPending ? 'Removendo...' : 'Excluir'}
               </button>
             </div>

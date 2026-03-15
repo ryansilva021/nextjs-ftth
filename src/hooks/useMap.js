@@ -32,7 +32,6 @@ export function useMap(containerRef, options = {}) {
       style: {
         version: 8,
         name: 'FiberOps Dark',
-        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
         sources: {
           'osm-tiles': {
             type: 'raster',

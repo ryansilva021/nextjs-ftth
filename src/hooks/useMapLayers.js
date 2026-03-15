@@ -13,14 +13,24 @@ import { useEffect, useRef } from 'react'
  * @param {number} [size=40] - lado do canvas em pixels
  * @returns {ImageData}
  */
-function createCTOIcon(color = '#22c55e', size = 40) {
+function createCTOIcon(color = '#16a34a', size = 32) {
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
   const ctx = canvas.getContext('2d')
+  // Dark outline for contrast
+  ctx.strokeStyle = '#000000'
+  ctx.lineWidth = size * 0.30
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(size * 0.2, size * 0.2)
+  ctx.lineTo(size * 0.8, size * 0.8)
+  ctx.moveTo(size * 0.8, size * 0.2)
+  ctx.lineTo(size * 0.2, size * 0.8)
+  ctx.stroke()
+  // Colored X on top
   ctx.strokeStyle = color
   ctx.lineWidth = size * 0.18
-  ctx.lineCap = 'round'
   ctx.beginPath()
   ctx.moveTo(size * 0.2, size * 0.2)
   ctx.lineTo(size * 0.8, size * 0.8)
@@ -37,17 +47,22 @@ function createCTOIcon(color = '#22c55e', size = 40) {
  * @param {number} [size=36]
  * @returns {ImageData}
  */
-function createCEIcon(color = '#3b82f6', size = 36) {
+function createCEIcon(color = '#1d4ed8', size = 28) {
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
   const ctx = canvas.getContext('2d')
-  const pad = size * 0.15
+  const pad = size * 0.12
+  // Black shadow/border
+  ctx.fillStyle = '#000000'
+  ctx.fillRect(pad - 2, pad - 2, size - pad * 2 + 4, size - pad * 2 + 4)
+  // Main fill
   ctx.fillStyle = color
-  ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = size * 0.08
   ctx.fillRect(pad, pad, size - pad * 2, size - pad * 2)
-  ctx.strokeRect(pad, pad, size - pad * 2, size - pad * 2)
+  // Inner highlight lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+  ctx.lineWidth = 1.5
+  ctx.strokeRect(pad + 4, pad + 4, size - pad * 2 - 8, size - pad * 2 - 8)
   return ctx.getImageData(0, 0, size, size)
 }
 
@@ -58,21 +73,40 @@ function createCEIcon(color = '#3b82f6', size = 36) {
  * @param {number} [size=36]
  * @returns {ImageData}
  */
-function createCDOIcon(color = '#f59e0b', size = 36) {
+function createCDOIcon(color = '#7c3aed', size = 28) {
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
   const ctx = canvas.getContext('2d')
-  const pad = size * 0.1
-  ctx.fillStyle = color
-  ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = size * 0.08
+  const cx = size / 2
+  const top = size * 0.08
+  const bottom = size * 0.92
+  const left = size * 0.04
+  const right = size * 0.96
+  // Black shadow triangle
   ctx.beginPath()
-  ctx.moveTo(size / 2, pad)
-  ctx.lineTo(size - pad, size - pad)
-  ctx.lineTo(pad, size - pad)
+  ctx.moveTo(cx, top - 2)
+  ctx.lineTo(right + 2, bottom + 1)
+  ctx.lineTo(left - 2, bottom + 1)
   ctx.closePath()
+  ctx.fillStyle = '#000000'
   ctx.fill()
+  // Main triangle
+  ctx.beginPath()
+  ctx.moveTo(cx, top)
+  ctx.lineTo(right, bottom)
+  ctx.lineTo(left, bottom)
+  ctx.closePath()
+  ctx.fillStyle = color
+  ctx.fill()
+  // Inner highlight
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(cx, top + 5)
+  ctx.lineTo(right - 5, bottom - 4)
+  ctx.lineTo(left + 5, bottom - 4)
+  ctx.closePath()
   ctx.stroke()
   return ctx.getImageData(0, 0, size, size)
 }
@@ -189,11 +223,11 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
     if (!map || !mapLoaded) return
 
     // Registrar ícones
-    map.addImage('cto-green',  createCTOIcon('#22c55e'))
-    map.addImage('cto-yellow', createCTOIcon('#eab308'))
-    map.addImage('cto-red',    createCTOIcon('#ef4444'))
-    map.addImage('ce-icon',    createCEIcon('#3b82f6'))
-    map.addImage('cdo-icon',   createCDOIcon('#f59e0b'))
+    map.addImage('cto-green',  createCTOIcon('#16a34a'))
+    map.addImage('cto-yellow', createCTOIcon('#ca8a04'))
+    map.addImage('cto-red',    createCTOIcon('#dc2626'))
+    map.addImage('ce-icon',    createCEIcon('#1d4ed8'))
+    map.addImage('cdo-icon',   createCDOIcon('#7c3aed'))
     map.addImage('poste-icon', createPosteIcon('#94a3b8'))
 
     // Fonte satélite (Esri)
@@ -246,14 +280,14 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
       paint: {
         'line-color': [
           'match', ['get', 'tipo'],
-          'BACKBONE', '#7c3aed',
-          'RAMAL',    '#1f2937',
-          '#f97316',
+          'BACKBONE', '#6366f1',
+          'RAMAL',    '#f97316',
+          '#94a3b8',
         ],
         'line-width': [
           'match', ['get', 'tipo'],
-          'BACKBONE', 6,
-          'RAMAL',    3.5,
+          'BACKBONE', 9,
+          'RAMAL',    4,
           2,
         ],
       },
@@ -266,7 +300,7 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
       filter: ['==', ['get', 'tipo'], 'DROP'],
       paint: {
         'line-color': '#22c55e',
-        'line-width': 2,
+        'line-width': 1.5,
         'line-dasharray': [2, 2],
       },
     })
@@ -287,7 +321,7 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
           ['>=', ['get', 'pct'], 0.7], 'cto-yellow',
           'cto-green',
         ],
-        'icon-size': 0.8,
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.45, 14, 0.65, 17, 0.85],
         'icon-allow-overlap': true,
       },
     })
@@ -301,10 +335,10 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
       id: 'caixas-ce-layer',
       type: 'symbol',
       source: 'caixas',
-      filter: ['==', ['get', 'tipo'], 'ce'],
+      filter: ['==', ['get', 'tipo'], 'CE'],
       layout: {
         'icon-image': 'ce-icon',
-        'icon-size': 0.85,
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 14, 0.7, 17, 0.9],
         'icon-allow-overlap': true,
       },
     })
@@ -312,10 +346,10 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
       id: 'caixas-cdo-layer',
       type: 'symbol',
       source: 'caixas',
-      filter: ['!=', ['get', 'tipo'], 'ce'],
+      filter: ['!=', ['get', 'tipo'], 'CE'],
       layout: {
         'icon-image': 'cdo-icon',
-        'icon-size': 0.85,
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 14, 0.7, 17, 0.9],
         'icon-allow-overlap': true,
       },
     })
