@@ -71,7 +71,7 @@ export async function checkLoginDisponivel(login) {
  * @returns {Promise<{ criado: boolean, mensagem: string }>}
  */
 export async function criarRegistro(data) {
-  const { username, password, email, nome_completo, telefone, empresa } = data ?? {}
+  const { username, password, email, nome_completo, telefone, empresa, plano } = data ?? {}
 
   if (!username?.trim()) throw new Error('username é obrigatório')
   if (!password)         throw new Error('password é obrigatório')
@@ -83,6 +83,8 @@ export async function criarRegistro(data) {
   if (!/^[a-z0-9_.-]+$/.test(normalized)) {
     throw new Error('username deve conter apenas letras minúsculas, números, _ . e -')
   }
+
+  const planoValido = ['starter', 'pro', 'enterprise'].includes(plano) ? plano : 'pro'
 
   await connectDB()
 
@@ -96,11 +98,12 @@ export async function criarRegistro(data) {
   await RegistroPendente.create({
     username:      normalized,
     password_hash: passwordHash,
-    projeto_id:    null, // gerado na aprovação
+    // projeto_id omitido — gerado pelo superadmin na aprovação
     email:         email?.trim()?.toLowerCase() ?? null,
     nome_completo: nome_completo?.trim()         ?? null,
     telefone:      telefone?.trim()              ?? null,
     empresa:       empresa.trim(),
+    plano:         planoValido,
     status:        'pendente',
   })
 
@@ -192,28 +195,36 @@ export async function aprovarRegistro(registroId) {
   }
   const projetoId = slug
 
+  // Mapeia plano escolhido para limites
+  const planoMap = {
+    starter:    { plano: 'basico',     maxCtos: 200,  maxUsuarios: 3,    trialDias: 15 },
+    pro:        { plano: 'basico',     maxCtos: 500,  maxUsuarios: 10,   trialDias: 30 },
+    enterprise: { plano: 'enterprise', maxCtos: null, maxUsuarios: null, trialDias: 30 },
+  }
+  const cfg = planoMap[registro.plano ?? 'pro'] ?? planoMap.pro
+
   // 1. Cria a Empresa
   const empresa = await Empresa.create({
     razao_social:       nomeEmpresa,
     slug,
     status_assinatura:  'trial',
-    trial_expira_em:    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
-    plano:              'basico',
+    trial_expira_em:    new Date(Date.now() + cfg.trialDias * 24 * 60 * 60 * 1000),
+    plano:              cfg.plano,
     email_contato:      registro.email ?? null,
     telefone_contato:   registro.telefone ?? null,
     projetos:           [projetoId],
     is_active:          true,
   })
 
-  // 2. Cria o Projeto com limite de 500 CTOs
+  // 2. Cria o Projeto com limite conforme plano
   await Projeto.create({
     projeto_id: projetoId,
     nome:       nomeEmpresa,
-    plano:      'basico',
+    plano:      cfg.plano,
     ativo:      true,
     config: {
-      maxCtos:              500,
-      maxUsuarios:          null,
+      maxCtos:              cfg.maxCtos,
+      maxUsuarios:          cfg.maxUsuarios,
       registroPublicoAtivo: false,
       autoAprovarRegistro:  false,
       email:                registro.email ?? null,

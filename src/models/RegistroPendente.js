@@ -46,11 +46,15 @@ const RegistroPendenteSchema = new Schema(
 
     // ID do projeto gerado na aprovação (null enquanto pendente)
     projeto_id: {
-      type:      String,
-      required:  false,
-      trim:      true,
-      lowercase: true,
-      default:   null,
+      type:    String,
+      default: null,
+    },
+
+    // Plano escolhido no cadastro
+    plano: {
+      type:    String,
+      enum:    ['starter', 'pro', 'enterprise'],
+      default: 'pro',
     },
 
     // Nome da empresa/ISP ou nome completo do solicitante
@@ -148,7 +152,9 @@ RegistroPendenteSchema.statics.loginEmPendencia = async function (username) {
 };
 
 // ---------------------------------------------------------------------------
-// Export
+// Export — força recompilação em dev para refletir mudanças de schema
 // ---------------------------------------------------------------------------
-export const RegistroPendente =
-  models.RegistroPendente || model("RegistroPendente", RegistroPendenteSchema);
+if (process.env.NODE_ENV === 'development' && models['RegistroPendente']) {
+  delete models['RegistroPendente']
+}
+export const RegistroPendente = model("RegistroPendente", RegistroPendenteSchema);
