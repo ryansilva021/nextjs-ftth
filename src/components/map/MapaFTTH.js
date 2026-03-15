@@ -12,10 +12,10 @@ import { useOfflineQueue } from '@/hooks/useOfflineQueue'
 import BottomSheet   from '@/components/map/BottomSheet'
 import LayerToggles  from '@/components/map/LayerToggles'
 
-import { getCTOs }   from '@/actions/ctos'
-import { getCaixas } from '@/actions/caixas'
-import { getRotas }  from '@/actions/rotas'
-import { getPostes } from '@/actions/postes'
+import { getCTOs, upsertCTO }   from '@/actions/ctos'
+import { getCaixas, upsertCaixa } from '@/actions/caixas'
+import { getRotas, upsertRota }  from '@/actions/rotas'
+import { getPostes, upsertPoste } from '@/actions/postes'
 
 // ---------------------------------------------------------------------------
 // Constantes
@@ -64,6 +64,15 @@ export default function MapaFTTH({
   const [selectedElement, setSelectedElement] = useState(null)
   const [layerToggles, setLayerToggles]       = useState(DEFAULT_LAYER_TOGGLES)
 
+  // ---- Modo de adição de elementos no mapa ----
+  const [addMode, setAddMode]           = useState(null) // null | 'cto' | 'caixa' | 'poste' | 'rota'
+  const [addCoords, setAddCoords]       = useState(null) // { lng, lat } para ponto
+  const [addRoutePoints, setAddRoutePoints] = useState([]) // [[lng,lat]...] para rota
+  const [addForm, setAddForm]           = useState({})
+  const [addFabOpen, setAddFabOpen]     = useState(false)
+  const [addSaving, setAddSaving]       = useState(false)
+  const [addErro, setAddErro]           = useState(null)
+
   // ---- Hooks do mapa ----
   const { map, mapLoaded } = useMap(containerRef, {
     center: [-46.633308, -23.55052],
@@ -72,12 +81,25 @@ export default function MapaFTTH({
 
   useMapLayers(map, mapLoaded, { ctos, caixas, rotas, postes }, layerToggles)
 
+  const addModeRef = useRef(addMode)
+  addModeRef.current = addMode
+
   const eventCallbacks = {
     onElementClick: useCallback(({ type, data }) => {
+      if (addModeRef.current) return // ignora cliques em elementos durante add mode
       setSelectedElement({ type, data })
     }, []),
-    onMapClick: useCallback(() => {
-      setSelectedElement(null)
+    onMapClick: useCallback((lngLat) => {
+      const mode = addModeRef.current
+      if (!mode) {
+        setSelectedElement(null)
+        return
+      }
+      if (mode === 'rota') {
+        setAddRoutePoints((prev) => [...prev, [lngLat.lng, lngLat.lat]])
+      } else {
+        setAddCoords(lngLat)
+      }
     }, []),
   }
   useMapEvents(map, mapLoaded, eventCallbacks)
@@ -159,13 +181,90 @@ export default function MapaFTTH({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapLoaded])
 
-  // ---- Recarregar dados quando componente monta (se não veio com dados iniciais) ----
+  // ---- Recarregar dados do servidor ao montar (garante dados frescos após mutações) ----
   useEffect(() => {
-    if (!initialCTOs.length && !initialCaixas.length) {
-      reloadData()
-    }
+    reloadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ---- Cursor crosshair durante add mode (no container, não no canvas) ----
+  // useMapEvents controla o cursor do canvas diretamente; aqui usamos o containerDiv
+  // como fallback: quando canvas.cursor='', herda 'crosshair' do pai.
+  useEffect(() => {
+    if (!containerRef.current) return
+    containerRef.current.style.cursor = addMode ? 'crosshair' : ''
+  }, [addMode])
+
+  // ---- Funções de add mode ----
+  function enterAddMode(type) {
+    setAddMode(type)
+    setAddCoords(null)
+    setAddRoutePoints([])
+    setAddForm({ tipo: type === 'caixa' ? 'CDO' : undefined, capacidade: 16, tipoRota: 'RAMAL' })
+    setAddErro(null)
+    setAddFabOpen(false)
+    setSelectedElement(null)
+  }
+
+  function cancelarAddMode() {
+    setAddMode(null)
+    setAddCoords(null)
+    setAddRoutePoints([])
+    setAddForm({})
+    setAddErro(null)
+  }
+
+  async function salvarAddElement() {
+    if (!addForm.id?.trim()) { setAddErro('ID obrigatório'); return }
+    const projetoId = session?.user?.projeto_id
+    setAddSaving(true)
+    setAddErro(null)
+    try {
+      if (addMode === 'cto') {
+        await upsertCTO({
+          cto_id: addForm.id.trim(),
+          projeto_id: projetoId,
+          lat: addCoords.lat,
+          lng: addCoords.lng,
+          nome: addForm.nome || null,
+          capacidade: addForm.capacidade || 16,
+        })
+      } else if (addMode === 'caixa') {
+        await upsertCaixa({
+          ce_id: addForm.id.trim(),
+          projeto_id: projetoId,
+          lat: addCoords.lat,
+          lng: addCoords.lng,
+          nome: addForm.nome || null,
+          tipo: addForm.tipo || 'CDO',
+        })
+      } else if (addMode === 'poste') {
+        await upsertPoste({
+          poste_id: addForm.id.trim(),
+          projeto_id: projetoId,
+          lat: addCoords.lat,
+          lng: addCoords.lng,
+          nome: addForm.nome || null,
+          tipo: 'simples',
+          status: 'ativo',
+        })
+      } else if (addMode === 'rota') {
+        await upsertRota({
+          rota_id: addForm.id.trim(),
+          projeto_id: projetoId,
+          nome: addForm.nome || null,
+          tipo: addForm.tipoRota || 'RAMAL',
+          coordinates: addRoutePoints,
+        })
+      }
+      await reloadData()
+      cancelarAddMode()
+    } catch (e) {
+      setAddErro(e.message)
+    } finally {
+      setAddSaving(false)
+    }
+  }
 
   return (
     <div className="relative w-full h-full bg-[#0b1220]" style={{ minHeight: '100dvh' }}>
@@ -283,12 +382,170 @@ export default function MapaFTTH({
       </div>
 
       {/* Bottom sheet de elemento selecionado */}
-      <BottomSheet
-        element={selectedElement}
-        onClose={handleCloseSheet}
-        session={session}
-        onAction={handleAction}
-      />
+      {!addMode && (
+        <BottomSheet
+          element={selectedElement}
+          onClose={handleCloseSheet}
+          session={session}
+          onAction={handleAction}
+        />
+      )}
+
+      {/* FAB de adição — só para admin/superadmin */}
+      {(session?.user?.role === 'admin' || session?.user?.role === 'superadmin') && !addMode && (
+        <div className="absolute bottom-36 right-3 z-40 flex flex-col items-end gap-2 pointer-events-auto">
+          {addFabOpen && (
+            <div className="flex flex-col gap-1.5 mb-1">
+              {[
+                { type: 'cto',   label: 'CTO',    color: '#0284c7' },
+                { type: 'caixa', label: 'CE/CDO',  color: '#7c3aed' },
+                { type: 'poste', label: 'Poste',   color: '#d97706' },
+                { type: 'rota',  label: 'Rota',    color: '#059669' },
+              ].map(({ type, label, color }) => (
+                <button
+                  key={type}
+                  onClick={() => enterAddMode(type)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold text-white shadow-lg"
+                  style={{ backgroundColor: color }}
+                >
+                  + {label}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setAddFabOpen((v) => !v)}
+            aria-label="Adicionar elemento no mapa"
+            className="w-12 h-12 flex items-center justify-center rounded-full shadow-xl text-white text-xl font-bold transition-all"
+            style={{ backgroundColor: addFabOpen ? '#475569' : '#0284c7', border: '2px solid rgba(255,255,255,0.2)' }}
+          >
+            {addFabOpen ? '✕' : '+'}
+          </button>
+        </div>
+      )}
+
+      {/* Banner de instrução durante add mode */}
+      {addMode && (
+        <div
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-semibold text-white shadow-lg flex items-center gap-3"
+          style={{ backgroundColor: 'rgba(2,132,199,0.95)', border: '1px solid #0369a1' }}
+        >
+          {addMode === 'rota'
+            ? `🗺️ Clique no mapa para traçar a rota • ${addRoutePoints.length} pontos`
+            : addCoords
+            ? '✓ Local selecionado — preencha os dados abaixo'
+            : '📍 Clique no mapa para posicionar'}
+          <button onClick={cancelarAddMode} className="ml-2 opacity-70 hover:opacity-100">✕</button>
+        </div>
+      )}
+
+      {/* Painel de formulário add mode */}
+      {addMode && (addCoords || (addMode === 'rota' && addRoutePoints.length >= 2)) && (
+        <div
+          className="absolute bottom-0 left-0 right-0 z-50 p-4 rounded-t-2xl shadow-2xl"
+          style={{ backgroundColor: '#111827', borderTop: '1px solid #1f2937' }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-white font-semibold text-sm">
+              {{ cto: 'Nova CTO', caixa: 'Nova CE/CDO', poste: 'Novo Poste', rota: 'Nova Rota' }[addMode]}
+            </h3>
+            <button onClick={cancelarAddMode} className="text-slate-400 hover:text-white text-lg leading-none">✕</button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400 uppercase">ID *</label>
+              <input
+                value={addForm.id ?? ''}
+                onChange={(e) => setAddForm((p) => ({ ...p, id: e.target.value }))}
+                placeholder={addMode === 'cto' ? 'ex: CTO-001' : addMode === 'caixa' ? 'ex: CDO-001' : addMode === 'poste' ? 'ex: PT-001' : 'ex: RT-001'}
+                className="rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                style={{ backgroundColor: '#0b1220', border: '1px solid #1f2937' }}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400 uppercase">Nome</label>
+              <input
+                value={addForm.nome ?? ''}
+                onChange={(e) => setAddForm((p) => ({ ...p, nome: e.target.value }))}
+                placeholder="Opcional"
+                className="rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                style={{ backgroundColor: '#0b1220', border: '1px solid #1f2937' }}
+              />
+            </div>
+
+            {addMode === 'cto' && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-400 uppercase">Capacidade</label>
+                <select
+                  value={addForm.capacidade ?? 16}
+                  onChange={(e) => setAddForm((p) => ({ ...p, capacidade: parseInt(e.target.value) }))}
+                  className="rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  style={{ backgroundColor: '#0b1220', border: '1px solid #1f2937' }}
+                >
+                  {[8,16,24,32,48,64].map((c) => <option key={c} value={c}>{c} portas</option>)}
+                </select>
+              </div>
+            )}
+
+            {addMode === 'caixa' && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-400 uppercase">Tipo</label>
+                <select
+                  value={addForm.tipo ?? 'CDO'}
+                  onChange={(e) => setAddForm((p) => ({ ...p, tipo: e.target.value }))}
+                  className="rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  style={{ backgroundColor: '#0b1220', border: '1px solid #1f2937' }}
+                >
+                  <option value="CDO">CDO</option>
+                  <option value="CE">CE</option>
+                </select>
+              </div>
+            )}
+
+            {addMode === 'rota' && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-400 uppercase">Tipo</label>
+                <select
+                  value={addForm.tipoRota ?? 'RAMAL'}
+                  onChange={(e) => setAddForm((p) => ({ ...p, tipoRota: e.target.value }))}
+                  className="rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  style={{ backgroundColor: '#0b1220', border: '1px solid #1f2937' }}
+                >
+                  <option value="BACKBONE">BACKBONE</option>
+                  <option value="RAMAL">RAMAL</option>
+                  <option value="DROP">DROP</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {addErro && (
+            <p className="text-xs text-red-400 mb-3">{addErro}</p>
+          )}
+
+          <div className="flex gap-3">
+            {addMode === 'rota' && (
+              <button
+                onClick={() => setAddRoutePoints((p) => p.slice(0, -1))}
+                disabled={addRoutePoints.length === 0}
+                className="flex-1 py-2 rounded-lg text-sm text-slate-300 disabled:opacity-40"
+                style={{ border: '1px solid #1f2937' }}
+              >
+                Desfazer ponto
+              </button>
+            )}
+            <button
+              onClick={salvarAddElement}
+              disabled={addSaving}
+              className="flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+              style={{ backgroundColor: '#0284c7' }}
+            >
+              {addSaving ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

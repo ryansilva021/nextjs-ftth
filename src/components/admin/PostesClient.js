@@ -1,7 +1,17 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import dynamic from 'next/dynamic'
 import { upsertPoste, deletePoste } from '@/actions/postes'
+
+const LocationPicker = dynamic(() => import('@/components/map/LocationPicker'), {
+  ssr: false,
+  loading: () => (
+    <div style={{ height: 220, backgroundColor: '#0d1526', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ color: '#475569', fontSize: 13 }}>Carregando mapa...</span>
+    </div>
+  ),
+})
 
 const cardStyle = {
   backgroundColor: '#111827',
@@ -38,6 +48,8 @@ export default function PostesClient({ postesIniciais, projetoId, userRole }) {
   const [erro, setErro] = useState(null)
   const [sucesso, setSucesso] = useState(null)
   const [isPending, startTransition] = useTransition()
+  const [mostrarMapa, setMostrarMapa] = useState(false)
+  const [gpsCarregando, setGpsCarregando] = useState(false)
 
   const [form, setForm] = useState({
     poste_id: '',
@@ -88,6 +100,30 @@ export default function PostesClient({ postesIniciais, projetoId, userRole }) {
     setModalAberto(false)
     setPosteEditando(null)
     setErro(null)
+    setMostrarMapa(false)
+  }
+
+  function usarGPS() {
+    if (!navigator.geolocation) {
+      setErro('Geolocalização não suportada neste dispositivo.')
+      return
+    }
+    setGpsCarregando(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setForm((prev) => ({
+          ...prev,
+          lat: pos.coords.latitude.toFixed(7),
+          lng: pos.coords.longitude.toFixed(7),
+        }))
+        setGpsCarregando(false)
+      },
+      () => {
+        setErro('Não foi possível obter a localização GPS.')
+        setGpsCarregando(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
   }
 
   function handleFormChange(e) {
@@ -296,31 +332,64 @@ export default function PostesClient({ postesIniciais, projetoId, userRole }) {
                   ))}
                 </select>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">Latitude *</label>
-                <input
-                  name="lat"
-                  value={form.lat}
-                  onChange={handleFormChange}
-                  placeholder="-23.550520"
-                  type="number"
-                  step="any"
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 uppercase tracking-wider">Longitude *</label>
-                <input
-                  name="lng"
-                  value={form.lng}
-                  onChange={handleFormChange}
-                  placeholder="-46.633309"
-                  type="number"
-                  step="any"
-                  style={inputStyle}
-                  className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
+              <div className="flex flex-col gap-1 col-span-2">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-slate-400 uppercase tracking-wider">Localização *</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={usarGPS}
+                      disabled={gpsCarregando}
+                      className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+                      style={{ backgroundColor: '#0c2340', border: '1px solid #0369a1', color: '#38bdf8' }}
+                    >
+                      {gpsCarregando ? '...' : '📍 GPS'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMostrarMapa((v) => !v)}
+                      className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg transition-colors"
+                      style={{ backgroundColor: mostrarMapa ? '#0c2340' : '#111827', border: '1px solid #1f2937', color: '#94a3b8' }}
+                    >
+                      🗺️ {mostrarMapa ? 'Ocultar mapa' : 'Escolher no mapa'}
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    name="lat"
+                    value={form.lat}
+                    onChange={handleFormChange}
+                    placeholder="Latitude"
+                    type="number"
+                    step="any"
+                    style={inputStyle}
+                    className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                  <input
+                    name="lng"
+                    value={form.lng}
+                    onChange={handleFormChange}
+                    placeholder="Longitude"
+                    type="number"
+                    step="any"
+                    style={inputStyle}
+                    className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+                {mostrarMapa && (
+                  <LocationPicker
+                    lat={form.lat ? parseFloat(form.lat) : null}
+                    lng={form.lng ? parseFloat(form.lng) : null}
+                    onChange={({ lat, lng }) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        lat: lat.toFixed(7),
+                        lng: lng.toFixed(7),
+                      }))
+                    }
+                  />
+                )}
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-slate-400 uppercase tracking-wider">Altura</label>
