@@ -66,11 +66,10 @@ export async function upsertOLT(data) {
   const session = await requireActiveEmpresa(WRITE_ROLES)
   const { role, projeto_id: userProjeto } = session.user
 
-  const { olt_id, projeto_id, lat, lng, nome, modelo, portas_pon, ip } = data ?? {}
+  const { olt_id, projeto_id, lat, lng, nome, modelo, portas_pon, ip, status } = data ?? {}
 
   if (!olt_id?.trim()) throw new Error('olt_id é obrigatório')
-  if (lat == null)     throw new Error('lat é obrigatório')
-  if (lng == null)     throw new Error('lng é obrigatório')
+  if (!nome?.trim())   throw new Error('nome é obrigatório')
 
   const targetProjeto = role === 'superadmin' ? projeto_id : userProjeto
   if (!targetProjeto) throw new Error('projeto_id é obrigatório')
@@ -78,22 +77,24 @@ export async function upsertOLT(data) {
   await connectDB()
 
   const update = {
-    lat:        Number(lat),
-    lng:        Number(lng),
-    nome:       nome?.trim()   ?? null,
-    modelo:     modelo?.trim() ?? null,
-    portas_pon: portas_pon != null ? Number(portas_pon) : 0,
-    ip:         ip?.trim()     ?? null,
+    nome:       nome.trim(),
+    lat:        lat != null ? Number(lat) : null,
+    lng:        lng != null ? Number(lng) : null,
+    modelo:     modelo?.trim()  ?? null,
+    portas_pon: portas_pon != null ? Number(portas_pon) : 16,
+    ip:         ip?.trim()      ?? null,
+    status:     status          ?? 'ativo',
   }
 
   const olt = await OLT.findOneAndUpdate(
-    { projeto_id: targetProjeto, olt_id: olt_id.trim() },
-    { $set: update },
-    { upsert: true, new: true, runValidators: true }
+    { projeto_id: targetProjeto, id: olt_id.trim() },
+    { $set: { ...update, id: olt_id.trim() } },
+    { upsert: true, new: true }
   ).lean()
 
   revalidatePath('/')
   revalidatePath('/admin/olts')
+  revalidatePath('/admin/diagramas')
 
   return { ...olt, _id: olt._id.toString() }
 }
@@ -121,7 +122,7 @@ export async function deleteOLT(oltId, projetoId) {
 
   await connectDB()
 
-  const result = await OLT.deleteOne({ projeto_id: targetProjeto, olt_id: oltId })
+  const result = await OLT.deleteOne({ projeto_id: targetProjeto, id: oltId })
 
   revalidatePath('/')
   revalidatePath('/admin/olts')
