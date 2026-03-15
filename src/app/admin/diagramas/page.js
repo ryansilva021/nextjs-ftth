@@ -1,17 +1,15 @@
 /**
- * src/app/(admin)/diagramas/page.js
- * Página de gerenciamento de diagramas ópticos (CTOs e CE/CDOs).
- * Server Component — carrega dados e passa para DiagramasClient.
+ * src/app/admin/diagramas/page.js
+ * Página de gerenciamento de diagramas ópticos (CTOs, CE/CDOs e OLTs).
  */
 
 import { auth } from '@/lib/auth'
 import { getCTOs } from '@/actions/ctos'
 import { getCaixas } from '@/actions/caixas'
+import { getOLTs } from '@/actions/olts'
 import DiagramasClient from '@/components/admin/DiagramasClient'
 
-export const metadata = {
-  title: 'Diagramas | FiberOps',
-}
+export const metadata = { title: 'Diagramas | FiberOps' }
 
 export default async function DiagramasPage() {
   const session = await auth()
@@ -19,12 +17,14 @@ export default async function DiagramasPage() {
 
   let ctos   = []
   let caixas = []
+  let olts   = []
   let erroCarregamento = null
 
   try {
-    ;[ctos, caixas] = await Promise.all([
+    ;[ctos, caixas, olts] = await Promise.all([
       getCTOs(projetoId),
       getCaixas(projetoId),
+      getOLTs(projetoId),
     ])
   } catch (e) {
     erroCarregamento = e.message
@@ -32,21 +32,18 @@ export default async function DiagramasPage() {
 
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-white">Diagramas Ópticos</h1>
           <p className="text-sm text-slate-400 mt-0.5">
-            Mapeamento de portas e conexões — {ctos.length} CTOs · {caixas.length} CE/CDOs
+            {ctos.length} CTOs · {caixas.length} CE/CDOs · {olts.length} OLTs
           </p>
         </div>
       </div>
 
       {erroCarregamento && (
-        <div
-          style={{ backgroundColor: '#450a0a', border: '1px solid #7f1d1d' }}
-          className="rounded-lg px-4 py-3 text-sm text-red-400 mb-4"
-        >
+        <div style={{ backgroundColor: '#450a0a', border: '1px solid #7f1d1d' }}
+          className="rounded-lg px-4 py-3 text-sm text-red-400 mb-4">
           Erro ao carregar dados: {erroCarregamento}
         </div>
       )}
@@ -54,6 +51,7 @@ export default async function DiagramasPage() {
       <DiagramasClient
         ctos={ctos}
         caixas={caixas}
+        olts={olts}
         projetoId={projetoId}
       />
     </div>
