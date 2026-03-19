@@ -253,14 +253,14 @@ function AbaBandejas({ bandejas, onChange }) {
 // ─── Aba Splitters ────────────────────────────────────────────────────────────
 function AbaSplitters({ splitters, onChange }) {
   function addSplitter() {
-    const saidas = Array.from({ length: 8 }, (_, i) => ({ porta: i + 1, cto_id: '', obs: '' }))
+    const saidas = Array.from({ length: 8 }, (_, i) => ({ porta: i + 1, tipo: 'cto', cto_id: '', obs: '' }))
     onChange([...splitters, { id: uid(), nome: `Splitter ${splitters.length + 1}`, tipo: '1x8', entrada: { tubo: 1, fibra: 1 }, saidas }])
   }
   function remSplitter(id) { onChange(splitters.filter(s => s.id !== id)) }
   function upSplitter(id, p) { onChange(splitters.map(s => s.id === id ? { ...s, ...p } : s)) }
   function changeTipo(id, tipo) {
     const qtd = parseInt(tipo.split('x')[1])
-    upSplitter(id, { tipo, saidas: Array.from({ length: qtd }, (_, i) => ({ porta: i + 1, cto_id: '', obs: '' })) })
+    upSplitter(id, { tipo, saidas: Array.from({ length: qtd }, (_, i) => ({ porta: i + 1, tipo: 'cto', cto_id: '', obs: '' })) })
   }
   function upSaida(sId, porta, p) {
     const s = splitters.find(s => s.id === sId)
@@ -281,7 +281,7 @@ function AbaSplitters({ splitters, onChange }) {
       )}
 
       {splitters.map((s, si) => {
-        const ligadas = s.saidas.filter(sd => sd.cto_id.trim()).length
+        const ligadas = s.saidas.filter(sd => sd.cto_id?.trim()).length
         const corEnt = ABNT.find(a => a.idx === s.entrada.fibra)
         return (
           <div key={s.id} style={{ ...S.sec, borderLeft: '3px solid #e3b341' }}>
@@ -315,14 +315,25 @@ function AbaSplitters({ splitters, onChange }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))', gap: 6 }}>
               {s.saidas.map(sd => (
                 <div key={sd.porta} style={{
-                  backgroundColor: sd.cto_id.trim() ? 'rgba(63,185,80,0.08)' : BG3,
-                  border: `1px solid ${sd.cto_id.trim() ? 'rgba(63,185,80,0.3)' : BORDER}`,
+                  backgroundColor: sd.cto_id?.trim() ? 'rgba(63,185,80,0.08)' : BG3,
+                  border: `1px solid ${sd.cto_id?.trim() ? 'rgba(63,185,80,0.3)' : BORDER}`,
                   borderRadius: 7, padding: '7px 9px',
                 }}>
-                  <p style={{ ...S.lbl, color: sd.cto_id.trim() ? '#3fb950' : '#484f58', marginBottom: 4 }}>S{sd.porta}</p>
-                  <input value={sd.cto_id} onChange={e => upSaida(s.id, sd.porta, { cto_id: e.target.value })}
-                    placeholder="ID CTO" style={{ ...S.inp, marginBottom: 3, padding: '3px 7px', fontSize: 12 }} />
-                  <input value={sd.obs} onChange={e => upSaida(s.id, sd.porta, { obs: e.target.value })}
+                  <p style={{ ...S.lbl, color: sd.cto_id?.trim() ? '#3fb950' : '#484f58', marginBottom: 4 }}>S{sd.porta}</p>
+                  <select
+                    value={sd.tipo ?? 'cto'}
+                    onChange={e => upSaida(s.id, sd.porta, { tipo: e.target.value, cto_id: '' })}
+                    style={{ ...S.inp, marginBottom: 4, padding: '3px 6px', fontSize: 11 }}
+                  >
+                    <option value="cto">CTO</option>
+                    <option value="pon">PON</option>
+                    <option value="cdo">CDO/CEO</option>
+                    <option value="passagem">Passagem</option>
+                  </select>
+                  <input value={sd.cto_id ?? ''} onChange={e => upSaida(s.id, sd.porta, { cto_id: e.target.value })}
+                    placeholder={sd.tipo === 'pon' ? 'ID PON' : sd.tipo === 'cdo' ? 'ID CDO' : sd.tipo === 'passagem' ? 'ID/Nome' : 'ID CTO'}
+                    style={{ ...S.inp, marginBottom: 3, padding: '3px 7px', fontSize: 12 }} />
+                  <input value={sd.obs ?? ''} onChange={e => upSaida(s.id, sd.porta, { obs: e.target.value })}
                     placeholder="Obs" style={{ ...S.inp, padding: '3px 7px', fontSize: 11 }} />
                 </div>
               ))}

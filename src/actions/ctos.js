@@ -232,6 +232,19 @@ export async function saveDiagramaCTO(data) {
 
   await connectDB();
 
+  // Bloquear cliente duplicado dentro da mesma CTO
+  if (diagrama.portas && typeof diagrama.portas === 'object') {
+    const clientesMap = {}
+    for (const [porta, info] of Object.entries(diagrama.portas)) {
+      const nome = info?.cliente?.trim().toLowerCase()
+      if (!nome) continue
+      if (clientesMap[nome] != null) {
+        throw new Error(`Cliente duplicado: "${info.cliente.trim()}" já está na porta ${clientesMap[nome]}.`)
+      }
+      clientesMap[nome] = porta
+    }
+  }
+
   // Propaga vínculos de topologia do diagrama para os campos do modelo
   const topologiaUpdate = {}
   if (diagrama.entrada) {

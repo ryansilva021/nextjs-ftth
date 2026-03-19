@@ -83,17 +83,21 @@ export async function upsertCaixa(data) {
 
   await connectDB()
 
+  // Só sobrescreve olt_id/porta_olt se foram explicitamente enviados no payload
+  const hasOltId    = 'olt_id'    in (data ?? {})
+  const hasPortaOlt = 'porta_olt' in (data ?? {})
+
   const update = {
     lat:          Number(lat),
     lng:          Number(lng),
     nome:         nome?.trim()         ?? null,
     tipo:         tipo?.trim()         ?? 'CDO',
-    olt_id:       olt_id               ?? null,
-    porta_olt:    porta_olt != null ? Number(porta_olt) : null,
     splitter_cdo: splitter_cdo?.trim() ?? null,
     rua:          rua?.trim()          ?? null,
     bairro:       bairro?.trim()       ?? null,
     obs:          obs?.trim()          ?? null,
+    ...(hasOltId    ? { olt_id:    olt_id    ?? null }                              : {}),
+    ...(hasPortaOlt ? { porta_olt: porta_olt != null ? Number(porta_olt) : null }  : {}),
   }
 
   // O modelo CaixaEmendaCDO usa 'id' como campo identificador (não 'ce_id')
@@ -196,11 +200,14 @@ export async function saveDiagramaCaixa(data) {
 
   await connectDB()
 
-  // Propaga vínculos de topologia do diagrama para os campos do modelo
+  // Propaga vínculos de topologia — só sobrescreve se o campo vier preenchido,
+  // evitando apagar o olt_id ao salvar fusões sem re-preencher a aba PON/OLT
   const topologiaUpdate = {}
-  if (diagrama.entrada) {
-    topologiaUpdate.olt_id    = diagrama.entrada.olt_id?.trim() || null
-    topologiaUpdate.porta_olt = diagrama.entrada.porta_olt ? (Number(diagrama.entrada.porta_olt) || null) : null
+  if (diagrama.entrada?.olt_id?.trim()) {
+    topologiaUpdate.olt_id = diagrama.entrada.olt_id.trim()
+  }
+  if (diagrama.entrada?.porta_olt != null) {
+    topologiaUpdate.porta_olt = Number(diagrama.entrada.porta_olt) || null
   }
 
   const result = await CaixaEmendaCDO.updateOne(

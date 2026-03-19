@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 
 const DiagramaTopologia = dynamic(
-  () => import('@/components/admin/DiagramaTopologia'),
+  () => import('@/components/map/DiagramaTopologiaFlow'),
   {
     ssr: false,
     loading: () => (
@@ -22,8 +22,8 @@ export default function ModalTopologia({ projetoId, onClose }) {
       onClick={(e) => e.target === e.currentTarget && onClose?.()}
     >
       <div
-        className="rounded-t-2xl sm:rounded-2xl w-full sm:max-w-4xl overflow-hidden"
-        style={{ backgroundColor: 'rgba(6,10,22,0.99)', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+        className="rounded-t-2xl sm:rounded-2xl w-full sm:max-w-6xl overflow-hidden"
+        style={{ backgroundColor: 'rgba(6,10,22,0.99)', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '94vh', height: '94vh', display: 'flex', flexDirection: 'column' }}
       >
         {/* Header */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -44,8 +44,8 @@ export default function ModalTopologia({ projetoId, onClose }) {
         </div>
 
         {/* Conteúdo */}
-        <div style={{ overflowY: 'auto', flex: 1, padding: '16px' }}>
-          <DiagramaTopologia projetoId={projetoId} altura={500} />
+        <div style={{ flex: 1, overflow: 'hidden', padding: '12px' }}>
+          <DiagramaTopologia projetoId={projetoId} altura="100%" />
         </div>
       </div>
     </div>

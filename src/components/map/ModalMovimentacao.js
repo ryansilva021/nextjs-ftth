@@ -70,6 +70,20 @@ export default function ModalMovimentacao({ ctoData, projetoId, onClose, onSaved
   async function salvarCliente(num, nome) {
     setSaving(true)
     setErro(null)
+
+    // Bloquear cliente duplicado na mesma CTO
+    if (nome) {
+      const nomeNorm = nome.trim().toLowerCase()
+      const duplicata = Object.entries(portas).find(
+        ([key, val]) => key !== String(num) && val?.cliente?.trim().toLowerCase() === nomeNorm
+      )
+      if (duplicata) {
+        setErro(`Cliente "${nome.trim()}" já está na porta ${duplicata[0]} desta CTO.`)
+        setSaving(false)
+        return
+      }
+    }
+
     try {
       const novasPortas = { ...portas, [String(num)]: { cliente: nome || null } }
       // Remove keys com cliente null para manter o objeto limpo

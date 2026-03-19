@@ -118,7 +118,7 @@ export default function MapaFTTH({
   const eventCallbacks = {
     onElementClick: useCallback(({ type, data }) => {
       if (addModeRef.current) return
-      if (reposicionandoRef.current) return // ignora cliques em elementos durante reposicionamento
+      if (reposicionandoRef.current) return
       setSelectedElement({ type, data })
     }, []),
     onMapClick: useCallback(async (lngLat) => {
@@ -227,12 +227,14 @@ export default function MapaFTTH({
       }
       setSelectedElement(null)
     } else if (action === 'diagrama_abnt') {
-      const id = data?.ce_id ?? data?.id ?? ''
-      if ((userRole === 'admin' || userRole === 'superadmin') && id) {
-        router.push(`/admin/diagramas?tab=cdos&id=${encodeURIComponent(id)}`)
-      } else {
-        setDiagramaCDOEl(data)
-      }
+      setDiagramaCDOEl(data)
+      setSelectedElement(null)
+    } else if (action === 'fusoes') {
+      const id = type === 'cto'
+        ? (data?.cto_id ?? data?.id ?? '')
+        : (data?.ce_id ?? data?.id ?? '')
+      const tipo = type === 'cto' ? 'cto' : 'cdo'
+      router.push(`/admin/diagramas?tipo=${tipo}&id=${encodeURIComponent(id)}`)
       setSelectedElement(null)
     } else if (action === 'topologia') {
       setMostrarTopologia(true)
@@ -268,6 +270,28 @@ export default function MapaFTTH({
     reloadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ---- GPS pelo menu lateral (evento global) ----
+  useEffect(() => {
+    function handleGPSCenter() {
+      startTracking()
+      setFollowMode(true)
+    }
+    window.addEventListener('fiberops:gps-center', handleGPSCenter)
+    return () => window.removeEventListener('fiberops:gps-center', handleGPSCenter)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startTracking, setFollowMode])
+
+  // ---- Fly-to por busca de cliente no sidebar ----
+  useEffect(() => {
+    function handleFlyTo(e) {
+      const { lat, lng } = e.detail ?? {}
+      if (lat == null || lng == null || !map) return
+      map.flyTo({ center: [lng, lat], zoom: 17, duration: 1200 })
+    }
+    window.addEventListener('fiberops:fly-to', handleFlyTo)
+    return () => window.removeEventListener('fiberops:fly-to', handleFlyTo)
+  }, [map])
 
   // ---- Cursor crosshair durante add mode ou reposicionamento ----
   useEffect(() => {
@@ -490,51 +514,23 @@ export default function MapaFTTH({
         <LayerToggles toggles={layerToggles} onToggle={handleLayerToggle} />
       </div>
 
-      {/* Botões GPS - canto inferior direito */}
-      <div className="absolute bottom-20 right-3 z-40 flex flex-col gap-2 pointer-events-auto">
-        {/* Follow mode (só visível quando tracking) */}
-        {tracking && (
-          <button
-            onClick={handleFollowToggle}
-            aria-pressed={followMode}
-            aria-label={followMode ? 'Parar de seguir posição' : 'Seguir posição'}
-            className={[
-              'w-10 h-10 flex items-center justify-center rounded-full shadow-lg border transition-all',
-              followMode
-                ? 'bg-blue-600 text-white border-blue-400'
-                : 'bg-zinc-900/90 text-zinc-300 border-zinc-700 hover:border-zinc-500',
-            ].join(' ')}
-          >
-            <FollowIcon />
-          </button>
-        )}
-
-        {/* GPS on/off */}
-        <button
-          onClick={handleGPSToggle}
-          aria-pressed={tracking}
-          aria-label={tracking ? 'Parar rastreamento GPS' : 'Iniciar rastreamento GPS'}
-          className={[
-            'w-10 h-10 flex items-center justify-center rounded-full shadow-lg border transition-all',
-            tracking
-              ? 'bg-blue-600 text-white border-blue-400 animate-pulse'
-              : 'bg-zinc-900/90 text-zinc-300 border-zinc-700 hover:border-zinc-500',
-          ].join(' ')}
-        >
-          <GPSIcon />
-        </button>
-
-        {/* Erro GPS */}
-        {gpsError && (
+      {/* Indicador GPS ativo (discreto, canto superior direito) */}
+      {tracking && (
+        <div className="absolute top-24 right-2.5 z-40 pointer-events-none">
           <div
-            role="alert"
-            className="absolute bottom-full mb-2 right-0 w-48
-                       bg-red-900/90 text-red-200 text-xs px-3 py-2 rounded-lg shadow"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs"
+            style={{ background: 'rgba(37,99,235,0.25)', border: '1px solid rgba(59,130,246,0.4)', color: '#93c5fd' }}
           >
-            {gpsError}
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse inline-block" />
+            GPS
           </div>
-        )}
-      </div>
+        </div>
+      )}
+      {gpsError && (
+        <div role="alert" className="absolute top-28 right-2.5 z-40 w-48 bg-red-900/90 text-red-200 text-xs px-3 py-2 rounded-lg shadow">
+          {gpsError}
+        </div>
+      )}
 
       {/* Modal Movimentação de Clientes */}
       {movimentacaoEl && (
@@ -595,9 +591,9 @@ export default function MapaFTTH({
         />
       )}
 
-      {/* FAB de adição — só para admin/superadmin */}
-      {(userRole === 'admin' || userRole === 'superadmin') && !addMode && (
-        <div className="absolute bottom-36 right-3 z-40 flex flex-col items-end gap-2 pointer-events-auto">
+      {/* FAB de adição — canto inferior direito, isolado das ferramentas GPS */}
+      {(userRole === 'admin' || userRole === 'superadmin') && !addMode && !selectedElement && (
+        <div className="absolute bottom-6 right-4 z-40 flex flex-col items-end gap-2 pointer-events-auto">
           {addFabOpen && (
             <div className="flex flex-col gap-1.5 mb-1">
               {[

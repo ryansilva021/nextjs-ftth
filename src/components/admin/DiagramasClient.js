@@ -5,7 +5,7 @@
  * Seletor e orquestrador de diagramas CTO, CE/CDO e gerenciamento de OLTs.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import DiagramaCTOEditor from '@/components/admin/DiagramaCTOEditor'
 import DiagramaCDOEditor from '@/components/admin/DiagramaCDOEditor'
 import { upsertOLT, deleteOLT } from '@/actions/olts'
@@ -350,15 +350,23 @@ export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, ta
   const [ctoSelecionada, setCTOSelecionada]     = useState(null)
   const [caixaSelecionada, setCaixaSelecionada] = useState(null)
 
+  const editorRef = useRef(null)
+
   // Auto-seleciona item se veio via URL (ex: clique no mapa)
   useEffect(() => {
     if (!idInicial) return
     if (tabInicial === 'ctos') {
       const found = ctos.find(c => c.cto_id === idInicial)
-      if (found) setCTOSelecionada(found)
+      if (found) {
+        setCTOSelecionada(found)
+        setTimeout(() => editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+      }
     } else if (tabInicial === 'cdos') {
       const found = caixas.find(c => (c.ce_id ?? c.id) === idInicial)
-      if (found) setCaixaSelecionada(found)
+      if (found) {
+        setCaixaSelecionada(found)
+        setTimeout(() => editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -408,7 +416,7 @@ export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, ta
               ))}</div>
           }
           {ctoSelecionada && (
-            <div>
+            <div ref={editorRef}>
               <p style={{ ...S.sectionTitle, color: '#0284c7', marginBottom: '16px' }}>
                 Editando: {ctoSelecionada.nome ?? ctoSelecionada.cto_id}
               </p>
@@ -435,7 +443,7 @@ export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, ta
               ))}</div>
           }
           {caixaSelecionada && (
-            <div>
+            <div ref={editorRef}>
               <p style={{ ...S.sectionTitle, color: '#0284c7', marginBottom: '16px' }}>
                 Editando: {caixaSelecionada.nome ?? idCaixaSelecionada}
               </p>

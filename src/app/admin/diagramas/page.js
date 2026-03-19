@@ -9,13 +9,20 @@ import { getCaixas } from '@/actions/caixas'
 import { getOLTs } from '@/actions/olts'
 import DiagramasClient from '@/components/admin/DiagramasClient'
 
-export const metadata = { title: 'Diagramas | FiberOps' }
+export const metadata = { title: 'Fusões | FiberOps' }
 
 export default async function DiagramasPage({ searchParams }) {
   const session = await auth()
   const projetoId = session?.user?.projeto_id
-  const tabInicial = searchParams?.tab ?? null
-  const idInicial  = searchParams?.id  ?? null
+
+  const sp = await Promise.resolve(searchParams)
+  const tipo      = sp?.tipo ?? null
+  const idInicial = sp?.id   ?? null
+
+  // Mapeia tipo=cto/cdo → aba interna
+  const tabInicial = tipo === 'cto'  ? 'ctos'
+                   : tipo === 'cdo'  ? 'cdos'
+                   : (sp?.tab ?? null)
 
   let ctos   = []
   let caixas = []
@@ -36,7 +43,7 @@ export default async function DiagramasPage({ searchParams }) {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-white">Diagramas Ópticos</h1>
+          <h1 className="text-xl font-bold text-white">Fusões Ópticas</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             {ctos.length} CTOs · {caixas.length} CE/CDOs · {olts.length} OLTs
           </p>

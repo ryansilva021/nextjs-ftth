@@ -128,7 +128,7 @@ function CTOContent({ data, isAdmin, onAction }) {
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
         <ActBtn onClick={() => onAction('movimentacao')} color="#86efac" bg="rgba(34,197,94,0.12)" border="rgba(34,197,94,0.3)"  icon="👤" label="Clientes" />
-        <ActBtn onClick={() => onAction('diagrama')}     color="#7dd3fc" bg="rgba(14,165,233,0.12)" border="rgba(14,165,233,0.3)" icon="📊" label="Diagrama" />
+        {isAdmin && <ActBtn onClick={() => onAction('fusoes')}       color="#fde68a" bg="rgba(234,179,8,0.12)"  border="rgba(234,179,8,0.3)"   icon="🧩" label="Fusões" />}
         {isAdmin && <ActBtn onClick={() => onAction('reposicionar')} color="#fdba74" bg="rgba(249,115,22,0.12)" border="rgba(249,115,22,0.3)" icon="📍" label="Reposicionar" />}
         {isAdmin && <ActBtn onClick={() => onAction('editar')}       color="#f1f5f9" bg="rgba(255,255,255,0.07)" border="rgba(255,255,255,0.15)" icon="✏️" label="Editar" />}
       </div>
@@ -164,7 +164,7 @@ function CaixaContent({ data, isAdmin, onAction }) {
       </InfoSection>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-        <ActBtn onClick={() => onAction('diagrama_abnt')} color="#c4b5fd" bg="rgba(124,58,237,0.12)" border="rgba(124,58,237,0.3)" icon="🧩" label="Diagrama ABNT" full />
+        {isAdmin && <ActBtn onClick={() => onAction('fusoes')}       color="#fde68a" bg="rgba(234,179,8,0.12)"  border="rgba(234,179,8,0.3)"   icon="🧩" label="Fusões" />}
         {isAdmin && <ActBtn onClick={() => onAction('reposicionar')} color="#fdba74" bg="rgba(249,115,22,0.12)" border="rgba(249,115,22,0.3)" icon="📍" label="Reposicionar" />}
         {isAdmin && <ActBtn onClick={() => onAction('editar')}       color="#f1f5f9" bg="rgba(255,255,255,0.07)" border="rgba(255,255,255,0.15)" icon="✏️" label="Editar" />}
       </div>
@@ -255,10 +255,11 @@ function OLTContent({ data, isAdmin, onAction }) {
         <InfoRow label="Portas PON" value={data.capacidade ? `${data.capacidade} portas` : null} accent="#67e8f9" />
       </InfoSection>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-        <ActBtn onClick={() => onAction('topologia')} color="#67e8f9" bg="rgba(8,145,178,0.12)" border="rgba(8,145,178,0.3)" icon="🌐" label="Ver Topologia" full />
-        {isAdmin && <ActBtn onClick={() => onAction('editar')} color="#f1f5f9" bg="rgba(255,255,255,0.07)" border="rgba(255,255,255,0.15)" icon="✏️" label="Editar OLT" />}
-      </div>
+      {isAdmin && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <ActBtn onClick={() => onAction('editar')} color="#f1f5f9" bg="rgba(255,255,255,0.07)" border="rgba(255,255,255,0.15)" icon="✏️" label="Editar OLT" full />
+        </div>
+      )}
     </div>
   )
 }

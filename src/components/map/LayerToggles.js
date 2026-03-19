@@ -24,7 +24,7 @@ export default function LayerToggles({ toggles = {}, onToggle }) {
               'transition-all duration-150 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50',
               isActive
                 ? activeColor
-                : 'bg-[#0b1220]/80 text-white/40 border-white/10 hover:border-white/20 hover:text-white/60',
+                : 'bg-[#0b1220]/80 text-white border-white/20 hover:border-white/40 hover:bg-white/5',
             ].join(' ')}
           >
             <Icon className="size-3.5" />

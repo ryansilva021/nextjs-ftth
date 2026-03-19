@@ -155,3 +155,58 @@ export async function searchGlobal(query, projetoId) {
 
   return { ctos, caixas, rotas, postes }
 }
+
+// ---------------------------------------------------------------------------
+// buscarClientes — busca clientes instalados em CTOs por nome
+// ---------------------------------------------------------------------------
+
+/**
+ * Busca clientes ativos nas CTOs do projeto.
+ * Retorna lista com nome do cliente, cto_id e coordenadas para fly-to.
+ *
+ * @param {string} query
+ * @param {string} projetoId
+ * @returns {Promise<Array<{ cliente: string, cto_id: string, porta: number|null, lat: number|null, lng: number|null }>>}
+ */
+export async function buscarClientes(query, projetoId) {
+  const session = await requireAuth()
+  const { role, projeto_id: userProjeto } = session.user
+  const targetProjeto = role === 'superadmin' ? projetoId : userProjeto
+
+  if (!targetProjeto) return []
+
+  const term = String(query ?? '').trim()
+  if (term.length < 2) return []
+
+  await connectDB()
+
+  const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+
+  const ctos = await CTO.find(
+    { projeto_id: targetProjeto },
+    'cto_id lat lng diagrama'
+  ).lean()
+
+  const results = []
+  const seen = new Set()
+
+  for (const cto of ctos) {
+    const portas = cto.diagrama?.portas ?? {}
+    for (const [portaNum, portaInfo] of Object.entries(portas)) {
+      const nome = portaInfo?.cliente
+      if (!nome || !regex.test(nome)) continue
+      if (seen.has(nome)) continue
+      seen.add(nome)
+      results.push({
+        cliente: nome,
+        cto_id: cto.cto_id,
+        porta: Number(portaNum) || null,
+        lat: cto.lat ?? null,
+        lng: cto.lng ?? null,
+      })
+      if (results.length >= 10) return results
+    }
+  }
+
+  return results
+}
