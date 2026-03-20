@@ -242,7 +242,7 @@ export default function SidebarLayout({ session, children }) {
             className="w-full text-xs py-2 rounded-lg hover:bg-sky-900/30 transition-colors mb-3 flex items-center justify-center gap-2"
           >
             <span>📍</span>
-            Centralizar na minha localização
+            Minha localização
           </button>
 
           <div className="flex items-center gap-3 mb-3">

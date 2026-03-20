@@ -71,6 +71,7 @@ export async function upsertCaixa(data) {
   const {
     ce_id, projeto_id, lat, lng,
     nome, tipo, olt_id, porta_olt,
+    cdo_pai_id, porta_cdo_pai,
     splitter_cdo, rua, bairro, obs,
   } = data ?? {}
 
@@ -78,14 +79,21 @@ export async function upsertCaixa(data) {
   if (lat == null)    throw new Error('lat é obrigatório')
   if (lng == null)    throw new Error('lng é obrigatório')
 
+  // Prevenir loop: CDO não pode ser pai de si mesma
+  if (cdo_pai_id?.trim() && cdo_pai_id.trim() === ce_id.trim()) {
+    throw new Error('Uma CDO/CE não pode ser pai de si mesma')
+  }
+
   const targetProjeto = role === 'superadmin' ? projeto_id : userProjeto
   if (!targetProjeto) throw new Error('projeto_id é obrigatório')
 
   await connectDB()
 
-  // Só sobrescreve olt_id/porta_olt se foram explicitamente enviados no payload
-  const hasOltId    = 'olt_id'    in (data ?? {})
-  const hasPortaOlt = 'porta_olt' in (data ?? {})
+  // Só sobrescreve campos de topologia se foram explicitamente enviados no payload
+  const hasOltId      = 'olt_id'      in (data ?? {})
+  const hasPortaOlt   = 'porta_olt'   in (data ?? {})
+  const hasCdoPaiId   = 'cdo_pai_id'  in (data ?? {})
+  const hasPortaCdo   = 'porta_cdo_pai' in (data ?? {})
 
   const update = {
     lat:          Number(lat),
@@ -96,8 +104,10 @@ export async function upsertCaixa(data) {
     rua:          rua?.trim()          ?? null,
     bairro:       bairro?.trim()       ?? null,
     obs:          obs?.trim()          ?? null,
-    ...(hasOltId    ? { olt_id:    olt_id    ?? null }                              : {}),
-    ...(hasPortaOlt ? { porta_olt: porta_olt != null ? Number(porta_olt) : null }  : {}),
+    ...(hasOltId    ? { olt_id:    olt_id    ?? null }                                    : {}),
+    ...(hasPortaOlt ? { porta_olt: porta_olt != null ? Number(porta_olt) : null }         : {}),
+    ...(hasCdoPaiId ? { cdo_pai_id: cdo_pai_id?.trim() || null }                          : {}),
+    ...(hasPortaCdo ? { porta_cdo_pai: porta_cdo_pai != null ? Number(porta_cdo_pai) : null } : {}),
   }
 
   // O modelo CaixaEmendaCDO usa 'id' como campo identificador (não 'ce_id')

@@ -126,7 +126,7 @@ const CaixaEmendaCDOSchema = new Schema(
       max:     [180,  "longitude deve estar entre -180 e 180"],
     },
 
-    // Topologia: OLT pai
+    // Topologia: OLT pai (quando alimentado diretamente por OLT)
     olt_id: {
       type:    String, // referência ao id da OLT (string, não ObjectId)
       default: null,
@@ -136,6 +136,18 @@ const CaixaEmendaCDOSchema = new Schema(
       type:    Number,
       default: null,
       min:     [1, "porta_olt deve ser >= 1"],
+    },
+
+    // Topologia: CDO/CE pai (quando alimentado em cascata por outra CDO/CE)
+    cdo_pai_id: {
+      type:    String,
+      default: null,
+    },
+
+    porta_cdo_pai: {
+      type:    Number,
+      default: null,
+      min:     [1, "porta_cdo_pai deve ser >= 1"],
     },
 
     // Configuração do splitter CDO (ex: "1:8", "1:16", "2:16")

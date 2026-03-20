@@ -86,11 +86,11 @@ export function useGPS(map) {
     }
 
     if (firstFixRef.current) {
-      // Primeira posição: voa até o usuário com zoom alto
-      map.flyTo({ center: lngLat, zoom: 18, duration: 1200 })
+      // Primeira posição: voa até o usuário com zoom alto e offset leve para cima
+      map.flyTo({ center: lngLat, zoom: 17, duration: 1200, offset: [0, -80] })
       firstFixRef.current = false
     } else if (followRef.current) {
-      map.easeTo({ center: lngLat, duration: 500 })
+      map.easeTo({ center: lngLat, duration: 800, offset: [0, -60] })
     }
   }, [map, position])
 
@@ -103,23 +103,39 @@ export function useGPS(map) {
 
     setError(null)
     setTracking(true)
-    firstFixRef.current = true // sinaliza que a próxima posição é a primeira
+    firstFixRef.current = true
+
+    function onSuccess(pos) {
+      setPosition({
+        lat:      pos.coords.latitude,
+        lng:      pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+      })
+      setError(null)
+    }
+
+    function onError(err) {
+      // Se timeout com alta precisão, tenta novamente com precisão menor
+      if (err.code === err.TIMEOUT || err.code === 3) {
+        navigator.geolocation.getCurrentPosition(
+          onSuccess,
+          () => setError('Não foi possível obter a localização. Verifique se o GPS está ativo.'),
+          { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 }
+        )
+      } else if (err.code === err.PERMISSION_DENIED || err.code === 1) {
+        setError('Permissão de localização negada. Habilite nas configurações.')
+        setTracking(false)
+      } else {
+        setError('Erro ao obter localização. Tente novamente.')
+      }
+    }
 
     watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        setPosition({
-          lat:      pos.coords.latitude,
-          lng:      pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        })
-        setError(null)
-      },
-      (err) => {
-        setError(err.message)
-      },
+      onSuccess,
+      onError,
       {
         enableHighAccuracy: true,
-        maximumAge:         5000,
+        maximumAge:         0,
         timeout:            15000,
       }
     )

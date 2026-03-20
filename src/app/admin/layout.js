@@ -10,7 +10,7 @@ export default async function AdminLayout({ children }) {
     redirect('/login')
   }
 
-  if (!hasMinRole(session.user.role, 'admin')) {
+  if (!hasMinRole(session.user.role, 'tecnico')) {
     redirect('/')
   }
 

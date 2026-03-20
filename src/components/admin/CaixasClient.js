@@ -76,11 +76,14 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole }) {
 
   const [form, setForm] = useState({
     ce_id: '', nome: '', tipo: 'CDO', lat: '', lng: '',
-    olt_id: '', porta_olt: '', splitter_cdo: '', rua: '', bairro: '', obs: '',
+    parent_tipo: 'olt', // 'olt' | 'cdo'
+    olt_id: '', porta_olt: '',
+    cdo_pai_id: '', porta_cdo_pai: '',
+    splitter_cdo: '', rua: '', bairro: '', obs: '',
   })
 
   function abrirNovo() {
-    setForm({ ce_id: '', nome: '', tipo: 'CDO', lat: '', lng: '', olt_id: '', porta_olt: '', splitter_cdo: '', rua: '', bairro: '', obs: '' })
+    setForm({ ce_id: '', nome: '', tipo: 'CDO', lat: '', lng: '', parent_tipo: 'olt', olt_id: '', porta_olt: '', cdo_pai_id: '', porta_cdo_pai: '', splitter_cdo: '', rua: '', bairro: '', obs: '' })
     setCaixaEditando(null)
     setErro(null)
     setMostrarMapa(false)
@@ -88,14 +91,18 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole }) {
   }
 
   function abrirEditar(caixa) {
+    const hasCdoPai = !!caixa.cdo_pai_id
     setForm({
       ce_id: caixa.id ?? caixa.ce_id ?? '',
       nome: caixa.nome ?? '',
       tipo: caixa.tipo ?? 'CDO',
       lat: caixa.lat != null ? String(caixa.lat) : '',
       lng: caixa.lng != null ? String(caixa.lng) : '',
+      parent_tipo: hasCdoPai ? 'cdo' : 'olt',
       olt_id: caixa.olt_id ?? '',
       porta_olt: caixa.porta_olt != null ? String(caixa.porta_olt) : '',
+      cdo_pai_id: caixa.cdo_pai_id ?? '',
+      porta_cdo_pai: caixa.porta_cdo_pai != null ? String(caixa.porta_cdo_pai) : '',
       splitter_cdo: caixa.splitter_cdo ?? '',
       rua: caixa.rua ?? '',
       bairro: caixa.bairro ?? '',
@@ -143,8 +150,10 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole }) {
           lng: parseFloat(form.lng),
           nome: form.nome || null,
           tipo: form.tipo,
-          olt_id: form.olt_id || null,
-          porta_olt: form.porta_olt ? parseInt(form.porta_olt) : null,
+          olt_id: form.parent_tipo === 'olt' ? (form.olt_id || null) : null,
+          porta_olt: form.parent_tipo === 'olt' && form.porta_olt ? parseInt(form.porta_olt) : null,
+          cdo_pai_id: form.parent_tipo === 'cdo' ? (form.cdo_pai_id || null) : null,
+          porta_cdo_pai: form.parent_tipo === 'cdo' && form.porta_cdo_pai ? parseInt(form.porta_cdo_pai) : null,
           splitter_cdo: form.splitter_cdo || null,
           rua: form.rua || null,
           bairro: form.bairro || null,
@@ -354,15 +363,63 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole }) {
               {/* Grupo: Rede */}
               <div style={fieldGroup}>
                 <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Configuração de Rede</p>
+
+                {/* Toggle: OLT ou CDO pai */}
+                <div>
+                  <label style={labelStyle}>Alimentado por</label>
+                  <div className="flex gap-2">
+                    {[
+                      { v: 'olt', label: '🖥️ OLT', cor: '#0891b2' },
+                      { v: 'cdo', label: '🔌 CDO/CE', cor: '#7c3aed' },
+                    ].map(({ v, label, cor }) => {
+                      const ativo = form.parent_tipo === v
+                      return (
+                        <button key={v} type="button"
+                          onClick={() => setForm((p) => ({ ...p, parent_tipo: v }))}
+                          style={{
+                            backgroundColor: ativo ? `${cor}22` : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${ativo ? cor + '66' : 'rgba(255,255,255,0.10)'}`,
+                            color: ativo ? cor : 'rgba(255,255,255,0.4)',
+                            padding: '6px 16px', borderRadius: 8, fontWeight: 600, fontSize: 12,
+                            transition: 'all .15s', cursor: 'pointer',
+                          }}>
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label style={labelStyle}>OLT vinculada</label>
-                    <input name="olt_id" value={form.olt_id} onChange={handleFormChange} placeholder="ID da OLT" style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Porta OLT</label>
-                    <input name="porta_olt" value={form.porta_olt} onChange={handleFormChange} placeholder="ex: 1" type="number" min={1} style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
-                  </div>
+                  {form.parent_tipo === 'olt' ? (
+                    <>
+                      <div>
+                        <label style={labelStyle}>ID da OLT</label>
+                        <input name="olt_id" value={form.olt_id} onChange={handleFormChange} placeholder="ex: OLT-001" style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Porta OLT</label>
+                        <input name="porta_olt" value={form.porta_olt} onChange={handleFormChange} placeholder="ex: 1" type="number" min={1} style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <label style={labelStyle}>ID da CDO/CE pai</label>
+                        <input name="cdo_pai_id" value={form.cdo_pai_id} onChange={handleFormChange}
+                          placeholder="ex: CDO-001"
+                          style={{ ...fieldInput, borderColor: form.cdo_pai_id && form.cdo_pai_id === form.ce_id ? '#ef4444' : undefined }}
+                          className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500/40" />
+                        {form.cdo_pai_id && form.cdo_pai_id === form.ce_id && (
+                          <p style={{ color: '#f87171', fontSize: 10, marginTop: 2 }}>Não pode ser pai de si mesma</p>
+                        )}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Porta CDO/CE pai</label>
+                        <input name="porta_cdo_pai" value={form.porta_cdo_pai} onChange={handleFormChange} placeholder="ex: 1" type="number" min={1} style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500/40" />
+                      </div>
+                    </>
+                  )}
                   <div className="col-span-2">
                     <label style={labelStyle}>Splitter CDO</label>
                     <input name="splitter_cdo" value={form.splitter_cdo} onChange={handleFormChange} placeholder="ex: 1:8, 1:16, 2:16" style={fieldInput} className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
@@ -387,7 +444,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole }) {
                 className="px-5 py-2.5 rounded-lg text-sm hover:bg-white/5 transition-colors disabled:opacity-40">
                 Cancelar
               </button>
-              <button onClick={handleSalvar} disabled={isPending || !form.ce_id || !form.lat || !form.lng}
+              <button onClick={handleSalvar} disabled={isPending || !form.ce_id || !form.lat || !form.lng || (form.parent_tipo === 'cdo' && form.cdo_pai_id === form.ce_id)}
                 style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#052e16', fontWeight: 700, fontSize: 14 }}
                 className="px-5 py-2.5 rounded-lg transition-opacity hover:opacity-90 disabled:opacity-40">
                 {isPending ? 'Salvando...' : caixaEditando ? 'Salvar alterações' : 'Criar Caixa'}

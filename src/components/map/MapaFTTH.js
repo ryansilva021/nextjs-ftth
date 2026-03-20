@@ -125,21 +125,31 @@ export default function MapaFTTH({
       const mode = addModeRef.current
       const repos = reposicionandoRef.current
 
-      // Reposicionamento: salvar nova posição
+      // Reposicionamento: salvar nova posição (online) ou enfileirar (offline)
       if (repos) {
         const { type, data } = repos
-        try {
+        if (!isOnline) {
           if (type === 'cto') {
-            await upsertCTO({ cto_id: data.cto_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng })
+            enqueue({ type: 'reposicionar_cto', payload: { cto_id: data.cto_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng } })
           } else if (type === 'caixa') {
-            const ce_id = data.id ?? data.ce_id
-            await upsertCaixa({ ce_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng })
+            enqueue({ type: 'reposicionar_caixa', payload: { ce_id: data.id ?? data.ce_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng } })
           } else if (type === 'poste') {
-            await upsertPoste({ poste_id: data.poste_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng })
+            enqueue({ type: 'reposicionar_poste', payload: { poste_id: data.poste_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng } })
           }
-          await reloadData()
-        } catch (err) {
-          console.error('[MapaFTTH] Erro ao reposicionar:', err)
+        } else {
+          try {
+            if (type === 'cto') {
+              await upsertCTO({ cto_id: data.cto_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng })
+            } else if (type === 'caixa') {
+              const ce_id = data.id ?? data.ce_id
+              await upsertCaixa({ ce_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng })
+            } else if (type === 'poste') {
+              await upsertPoste({ poste_id: data.poste_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng })
+            }
+            await reloadData()
+          } catch (err) {
+            console.error('[MapaFTTH] Erro ao reposicionar:', err)
+          }
         }
         setReposicionandoEl(null)
         return
@@ -170,7 +180,17 @@ export default function MapaFTTH({
   } = useGPS(map)
 
   // ---- Offline queue ----
-  const { isOnline, queueSize } = useOfflineQueue()
+  const syncHandler = useCallback(async (op) => {
+    const p = op.payload
+    if (op.type === 'reposicionar_cto')   await upsertCTO(p)
+    else if (op.type === 'reposicionar_caixa') await upsertCaixa(p)
+    else if (op.type === 'reposicionar_poste') await upsertPoste(p)
+    else if (op.type === 'add_cto')   await upsertCTO(p)
+    else if (op.type === 'add_caixa') await upsertCaixa(p)
+    else if (op.type === 'add_poste') await upsertPoste(p)
+    else if (op.type === 'add_rota')  await upsertRota(p)
+  }, [])
+  const { isOnline, queueSize, enqueue } = useOfflineQueue(syncHandler)
 
   // ---- Funções de dados ----
   const reloadData = useCallback(async () => {
@@ -255,15 +275,6 @@ export default function MapaFTTH({
   const handleFollowToggle = useCallback(() => {
     setFollowMode((prev) => !prev)
   }, [setFollowMode])
-
-  // ---- GPS automático: centraliza na localização do usuário ao abrir o mapa ----
-  useEffect(() => {
-    if (mapLoaded && !tracking) {
-      startTracking()
-      setFollowMode(true)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapLoaded])
 
   // ---- Recarregar dados do servidor ao montar (garante dados frescos após mutações) ----
   useEffect(() => {
@@ -392,50 +403,32 @@ export default function MapaFTTH({
     setAddRoutePoints([])
     setAddForm({})
     setAddErro(null)
+    setAddSaving(false)
   }
 
   async function salvarAddElement() {
     if (!addForm.id?.trim()) { setAddErro('ID obrigatório'); return }
     setAddSaving(true)
     setAddErro(null)
+
+    const payloads = {
+      cto:   { cto_id: addForm.id.trim(), projeto_id: projetoId, lat: addCoords.lat, lng: addCoords.lng, nome: addForm.nome || null, capacidade: addForm.capacidade || 16 },
+      caixa: { ce_id: addForm.id.trim(), projeto_id: projetoId, lat: addCoords.lat, lng: addCoords.lng, nome: addForm.nome || null, tipo: addForm.tipo || 'CDO' },
+      poste: { poste_id: addForm.id.trim(), projeto_id: projetoId, lat: addCoords.lat, lng: addCoords.lng, nome: addForm.nome || null, tipo: 'simples', status: 'ativo' },
+      rota:  { rota_id: addForm.id.trim(), projeto_id: projetoId, nome: addForm.nome || null, tipo: addForm.tipoRota || 'RAMAL', coordinates: addRoutePoints },
+    }
+
+    if (!isOnline) {
+      enqueue({ type: `add_${addMode}`, payload: payloads[addMode] })
+      cancelarAddMode()
+      return
+    }
+
     try {
-      if (addMode === 'cto') {
-        await upsertCTO({
-          cto_id: addForm.id.trim(),
-          projeto_id: projetoId,
-          lat: addCoords.lat,
-          lng: addCoords.lng,
-          nome: addForm.nome || null,
-          capacidade: addForm.capacidade || 16,
-        })
-      } else if (addMode === 'caixa') {
-        await upsertCaixa({
-          ce_id: addForm.id.trim(),
-          projeto_id: projetoId,
-          lat: addCoords.lat,
-          lng: addCoords.lng,
-          nome: addForm.nome || null,
-          tipo: addForm.tipo || 'CDO',
-        })
-      } else if (addMode === 'poste') {
-        await upsertPoste({
-          poste_id: addForm.id.trim(),
-          projeto_id: projetoId,
-          lat: addCoords.lat,
-          lng: addCoords.lng,
-          nome: addForm.nome || null,
-          tipo: 'simples',
-          status: 'ativo',
-        })
-      } else if (addMode === 'rota') {
-        await upsertRota({
-          rota_id: addForm.id.trim(),
-          projeto_id: projetoId,
-          nome: addForm.nome || null,
-          tipo: addForm.tipoRota || 'RAMAL',
-          coordinates: addRoutePoints,
-        })
-      }
+      if (addMode === 'cto')   await upsertCTO(payloads.cto)
+      else if (addMode === 'caixa') await upsertCaixa(payloads.caixa)
+      else if (addMode === 'poste') await upsertPoste(payloads.poste)
+      else if (addMode === 'rota')  await upsertRota(payloads.rota)
       await reloadData()
       cancelarAddMode()
     } catch (e) {
@@ -450,20 +443,40 @@ export default function MapaFTTH({
       {/* Container do mapa */}
       <div ref={containerRef} className="absolute inset-0 w-full h-full" aria-label="Mapa FTTH" role="application" />
 
-      {/* Overlay: indicador offline */}
-      {!isOnline && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="absolute top-3 left-1/2 -translate-x-1/2 z-40
-                     flex items-center gap-2 px-3 py-1.5 rounded-full
-                     bg-yellow-500/90 text-yellow-950 text-xs font-semibold shadow"
-        >
-          <span className="w-2 h-2 rounded-full bg-yellow-950/60 inline-block" />
-          Offline
-          {queueSize > 0 && <span className="ml-1">({queueSize} na fila)</span>}
-        </div>
-      )}
+      {/* Status de conexão — sempre visível no mobile */}
+      <div
+        role="status"
+        aria-live="polite"
+        className="absolute top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full shadow-lg pointer-events-none"
+        style={{
+          background:  isOnline ? 'rgba(22,101,52,0.92)' : 'rgba(180,83,9,0.95)',
+          border:      `1px solid ${isOnline ? 'rgba(34,197,94,0.4)' : 'rgba(251,191,36,0.5)'}`,
+          backdropFilter: 'blur(8px)',
+          minWidth: 90,
+          justifyContent: 'center',
+        }}
+      >
+        <span style={{
+          width: 7, height: 7, borderRadius: '50%',
+          backgroundColor: isOnline ? '#4ade80' : '#fbbf24',
+          display: 'inline-block',
+          boxShadow: isOnline ? '0 0 6px #4ade80' : '0 0 6px #fbbf24',
+          animation: !isOnline ? 'gps-pulse 1.5s ease-in-out infinite' : 'none',
+        }} />
+        <span style={{ fontSize: 12, fontWeight: 700, color: isOnline ? '#bbf7d0' : '#fef3c7' }}>
+          {isOnline ? 'Online' : 'Offline'}
+        </span>
+        {!isOnline && queueSize > 0 && (
+          <span style={{
+            fontSize: 10, fontWeight: 700,
+            background: 'rgba(0,0,0,0.3)',
+            color: '#fde68a',
+            padding: '1px 6px', borderRadius: 10,
+          }}>
+            {queueSize} na fila
+          </span>
+        )}
+      </div>
 
       {/* Overlay: loading de dados */}
       {loadingData && (
@@ -514,16 +527,28 @@ export default function MapaFTTH({
         <LayerToggles toggles={layerToggles} onToggle={handleLayerToggle} />
       </div>
 
-      {/* Indicador GPS ativo (discreto, canto superior direito) */}
+      {/* Indicador GPS + botão Seguir */}
       {tracking && (
-        <div className="absolute top-24 right-2.5 z-40 pointer-events-none">
+        <div className="absolute top-24 right-2.5 z-40 pointer-events-auto flex flex-col items-end gap-1">
           <div
             className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs"
             style={{ background: 'rgba(37,99,235,0.25)', border: '1px solid rgba(59,130,246,0.4)', color: '#93c5fd' }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse inline-block" />
-            GPS
+            GPS ativo
           </div>
+          <button
+            onClick={handleFollowToggle}
+            className="px-2 py-1 rounded-full text-xs font-semibold transition-all"
+            style={{
+              background: followMode ? 'rgba(37,99,235,0.75)' : 'rgba(15,23,42,0.8)',
+              border: '1px solid rgba(59,130,246,0.5)',
+              color: followMode ? '#fff' : '#93c5fd',
+              cursor: 'pointer',
+            }}
+          >
+            {followMode ? '📍 Seguindo' : '📍 Seguir'}
+          </button>
         </div>
       )}
       {gpsError && (

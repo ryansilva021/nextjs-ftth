@@ -56,9 +56,10 @@ function parseSplitterRatio(tipo) {
 }
 
 // ── Dimensões dos nodes ─────────────────────────────────────────────────────
-const CDO_HEADER_H  = 44
-const CDO_BANDEJA_H = 50
-const CDO_WIDTH     = 280
+const CDO_HEADER_H     = 44
+const CDO_BANDEJA_BASE = 38   // altura base por bandeja (sem fusões)
+const CDO_FUSAO_H      = 13   // altura por linha de fusão
+const CDO_WIDTH        = 280
 const SPL_HEADER_H  = 44
 const SPL_PORT_H    = 28
 const SPL_WIDTH     = 155
@@ -69,9 +70,14 @@ const CTO_HEIGHT    = 62
 const CE_WIDTH      = 178
 const CE_HEIGHT     = 88
 
-function cdoHeight(splitterCount) {
+function cdoBandejaH(fusoes) {
+  return CDO_BANDEJA_BASE + (fusoes?.length ?? 0) * CDO_FUSAO_H
+}
+function cdoHeight(splitterCount, bandejas = []) {
   if (splitterCount === 0) return CDO_HEADER_H + 44
-  return CDO_HEADER_H + splitterCount * CDO_BANDEJA_H + 12
+  let h = CDO_HEADER_H
+  for (let i = 0; i < splitterCount; i++) h += cdoBandejaH(bandejas[i]?.fusoes)
+  return h + 12
 }
 function splHeight(ratio) {
   return SPL_HEADER_H + ratio * SPL_PORT_H + 12
@@ -82,194 +88,221 @@ function splHeight(ratio) {
 function buildGraphData(topologia) {
   const nodes = []
   const edges = []
-  const seenCTOs = new Set()
+  // seenNodes evita qualquer nó duplicado (CDO top-level + cascade destino)
+  const seenNodes = new Set()
+
+  // Mapa plano de todas as caixas para herança CDO→CDO
+  const caixaById = {}
+  // Mapa de CTOs para CTO-em-cascata
+  const ctoById = {}
+  for (const olt of topologia) {
+    for (const c of (olt.caixas ?? [])) {
+      const id = c.id ?? c._id
+      if (id) caixaById[String(id)] = c
+    }
+    for (const caixa of (olt.caixas ?? [])) {
+      for (const cto of (caixa.ctos ?? [])) {
+        if (cto.cto_id) ctoById[cto.cto_id] = cto
+      }
+    }
+  }
+
+  // ── helpers ────────────────────────────────────────────────────────────────
+
+  function addCDONode(id, caixa, destTipo) {
+    if (seenNodes.has(id)) return
+    seenNodes.add(id)
+    const spls      = caixa?.diagrama?.splitters ?? []
+    const bandejas  = caixa?.diagrama?.bandejas  ?? []
+    const entrada   = caixa?.diagrama?.entrada   ?? {}
+    const splFibras = spls.map((s, i) => s.entrada?.fibra ?? (i * 2 + 1))
+    const isCE      = (caixa?.tipo ?? destTipo ?? 'CDO').toUpperCase() === 'CE'
+    nodes.push({
+      id,
+      type: isCE ? 'ceNode' : 'cdoNode',
+      position: { x: 0, y: 0 },
+      data: {
+        nome:          caixa?.nome ?? id,
+        tipo:          caixa?.tipo ?? (destTipo ?? 'CDO').toUpperCase(),
+        portaOlt:      entrada.porta_olt ?? caixa?.porta_olt ?? null,
+        pon:           entrada.pon ?? null,
+        portCount:     Math.max(12, Math.ceil(spls.length / 2) * 12),
+        splitterCount: spls.length,
+        splFibras,
+        splitters:     spls,
+        bandejas,
+        ctoCount:      (caixa?.ctos ?? []).length,
+      },
+    })
+  }
+
+  function addCTONode(id, cto) {
+    if (seenNodes.has(id)) return
+    seenNodes.add(id)
+    nodes.push({
+      id,
+      type: 'ctoNode',
+      position: { x: 0, y: 0 },
+      data: {
+        nome:       cto?.nome ?? id,
+        ctoId:      cto?.cto_id ?? id,
+        capacidade: cto?.capacidade ?? null,
+        ocupacao:   cto?.ocupacao   ?? 0,
+      },
+    })
+  }
+
+  function addSplitterOutputEdges(splNid, splSaidas, allCaixas, allCTOs) {
+    for (let saIdx = 0; saIdx < splSaidas.length; saIdx++) {
+      const saida    = splSaidas[saIdx]
+      const destId   = saida?.cto_id ?? saida?.id
+      if (!destId) continue
+
+      const destTipo  = saida?.tipo ?? (saida?.cto_id ? 'cto' : 'passagem')
+      const destNid   = `${destTipo}-${destId}`
+      const portNum   = saida.num ?? saida.porta ?? (saIdx + 1)
+      const portColor = fiberColor(portNum)
+
+      if (!seenNodes.has(destNid)) {
+        if (destTipo === 'cto') {
+          const ctoData = allCTOs[destId] ?? null
+          addCTONode(destNid, ctoData)
+        } else if (destTipo === 'cdo' || destTipo === 'ce') {
+          const destCaixa = allCaixas[String(destId)]
+          addCDONode(destNid, destCaixa, destTipo)
+        } else {
+          seenNodes.add(destNid)
+          nodes.push({
+            id: destNid, type: 'passagemNode', position: { x: 0, y: 0 },
+            data: { nome: saida.nome ?? destId, destId, destTipo },
+          })
+        }
+      }
+
+      edges.push({
+        id:           `e-${splNid}-${destNid}-p${portNum}`,
+        source:       splNid,
+        target:       destNid,
+        sourceHandle: `s-out-${saIdx}`,
+        type:         'bezier',
+        label:        `S${portNum}`,
+        style:        { stroke: portColor, strokeWidth: 1.5 },
+        labelStyle:   { fill: portColor, fontSize: 10, fontWeight: 700 },
+        labelBgStyle: { fill: 'rgba(4,12,28,0.85)', rx: 4 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: portColor, width: 9, height: 9 },
+      })
+    }
+  }
+
+  // ── loop principal ─────────────────────────────────────────────────────────
 
   for (const olt of topologia) {
     const oltNid = `olt-${olt.id ?? olt._id}`
-
-    nodes.push({
-      id: oltNid,
-      type: 'oltNode',
-      position: { x: 0, y: 0 },
-      data: {
-        nome:       olt.nome,
-        ip:         olt.ip,
-        modelo:     olt.modelo,
-        capacidade: olt.capacidade ?? 16,
-        status:     olt.status ?? 'ativo',
-      },
-    })
-
-    const caixas = olt.caixas ?? []
-
-    for (const caixa of caixas) {
-      const caixaNid  = `cdo-${caixa.id ?? caixa._id}`
-      const isCE      = caixa.tipo?.toUpperCase() === 'CE'
-      const splitters = caixa.diagrama?.splitters ?? []
-      const entrada   = caixa.diagrama?.entrada   ?? {}
-
-      // Calcula portCount para visualização da grade de fibras
-      const portCount = Math.max(12, Math.ceil(splitters.length / 2) * 12)
-
-      // Fibras de entrada de cada splitter (para posicionar handles no CDO)
-      const splFibras = splitters.map((s, i) => s.entrada?.fibra ?? (i * 2 + 1))
-
+    if (!seenNodes.has(oltNid)) {
+      seenNodes.add(oltNid)
       nodes.push({
-        id: caixaNid,
-        type: isCE ? 'ceNode' : 'cdoNode',
-        position: { x: 0, y: 0 },
+        id: oltNid, type: 'oltNode', position: { x: 0, y: 0 },
         data: {
-          nome:          caixa.nome ?? caixa.id,
-          tipo:          caixa.tipo ?? 'CDO',
-          portaOlt:      entrada.porta_olt ?? caixa.porta_olt ?? null,
-          pon:           entrada.pon       ?? null,
-          portCount,
-          splitterCount: splitters.length,
-          splFibras,
-          splitters,     // dados completos para bandejas
-          ctoCount:      (caixa.ctos ?? []).length,
+          nome: olt.nome, ip: olt.ip, modelo: olt.modelo,
+          capacidade: olt.capacidade ?? 16, status: olt.status ?? 'ativo',
         },
       })
+    }
+
+    for (const caixa of (olt.caixas ?? [])) {
+      const caixaNid = `cdo-${caixa.id ?? caixa._id}`
+      // Adiciona CDO top-level (usa helper que respeita seenNodes)
+      addCDONode(caixaNid, caixa, caixa.tipo ?? 'CDO')
 
       // Edge OLT → CDO
       edges.push({
-        id:     `e-${oltNid}-${caixaNid}`,
-        source: oltNid,
-        target: caixaNid,
-        type:   'bezier',
-        label:  'Backbone',
-        style:  { stroke: '#0891b2', strokeWidth: 2.5 },
-        labelStyle:   { fill: '#67e8f9', fontSize: 10, fontWeight: 700 },
+        id: `e-${oltNid}-${caixaNid}`, source: oltNid, target: caixaNid,
+        type: 'bezier', label: 'Backbone',
+        style: { stroke: '#0891b2', strokeWidth: 2.5 },
+        labelStyle: { fill: '#67e8f9', fontSize: 10, fontWeight: 700 },
         labelBgStyle: { fill: 'rgba(4,12,28,0.9)', rx: 4 },
         markerEnd: { type: MarkerType.ArrowClosed, color: '#0891b2', width: 12, height: 12 },
       })
 
-      // Splitters
+      const splitters = caixa.diagrama?.splitters ?? []
+
       for (let si = 0; si < splitters.length; si++) {
         const spl    = splitters[si]
         const splNid = `spl-${caixaNid}-${si}`
         const ratio  = parseSplitterRatio(spl.tipo)
         const fibra  = spl.entrada?.fibra ?? (si * 2 + 1)
-        const tubeLabel = spl.nome
-          ? spl.nome
-          : `T${Math.ceil(fibra / 12)}:F${((fibra - 1) % 12) + 1}`
+        const tubeLabel = spl.nome ?? `T${Math.ceil(fibra / 12)}:F${((fibra - 1) % 12) + 1}`
         const edgeColor = fiberColor(fibra)
 
-        nodes.push({
-          id:   splNid,
-          type: 'splitterNode',
-          position: { x: 0, y: 0 },
-          data: {
-            nome:        `Splitter ${si + 1}`,
-            tipo:        spl.tipo ?? '1x8',
-            ratio,
-            tubeLabel,
-            colorIn:     edgeColor,
-            saidas:      spl.saidas ?? [],
-          },
-        })
+        if (!seenNodes.has(splNid)) {
+          seenNodes.add(splNid)
+          nodes.push({
+            id: splNid, type: 'splitterNode', position: { x: 0, y: 0 },
+            data: { nome: `Splitter ${si + 1}`, tipo: spl.tipo ?? '1x8', ratio, tubeLabel, colorIn: edgeColor, saidas: spl.saidas ?? [] },
+          })
+        }
 
-        // Edge CDO → Splitter
         edges.push({
-          id:           `e-${caixaNid}-${splNid}`,
-          source:       caixaNid,
-          target:       splNid,
-          sourceHandle: `out-${si}`,
-          type:         'bezier',
-          label:        tubeLabel,
-          style:        { stroke: edgeColor, strokeWidth: 2 },
-          labelStyle:   { fill: edgeColor, fontSize: 10, fontWeight: 700 },
+          id: `e-${caixaNid}-${splNid}`, source: caixaNid, target: splNid,
+          sourceHandle: `out-${si}`, type: 'bezier', label: tubeLabel,
+          style: { stroke: edgeColor, strokeWidth: 2 },
+          labelStyle: { fill: edgeColor, fontSize: 10, fontWeight: 700 },
           labelBgStyle: { fill: 'rgba(4,12,28,0.85)', rx: 4 },
           markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor, width: 10, height: 10 },
         })
 
-        // Saídas do splitter → destinos (CTO, passagem ou outro)
-        const saidas = spl.saidas ?? []
-        for (let saIdx = 0; saIdx < saidas.length; saIdx++) {
-          const saida   = saidas[saIdx]
-          const destId  = saida?.cto_id ?? saida?.id
-          if (!destId) continue
+        addSplitterOutputEdges(splNid, spl.saidas ?? [], caixaById, ctoById)
+      }
 
-          const destTipo = saida?.tipo ?? (saida?.cto_id ? 'cto' : 'passagem')
-          const destNid  = `${destTipo}-${destId}`
-          const portNum  = saida.num ?? saida.porta ?? (saIdx + 1)
-          const portColor = fiberColor(portNum)
-
-          if (!seenCTOs.has(destNid)) {
-            seenCTOs.add(destNid)
-            if (destTipo === 'cto') {
-              const ctoData = (caixa.ctos ?? []).find(
-                c => (c.cto_id ?? c._id) === destId
-              )
-              nodes.push({
-                id:   destNid,
-                type: 'ctoNode',
-                position: { x: 0, y: 0 },
-                data: {
-                  nome:       ctoData?.nome ?? destId,
-                  ctoId:      destId,
-                  capacidade: ctoData?.capacidade ?? null,
-                  ocupacao:   ctoData?.ocupacao   ?? 0,
-                },
-              })
-            } else {
-              // Passagem / outro elemento de rede
-              nodes.push({
-                id:   destNid,
-                type: 'passagemNode',
-                position: { x: 0, y: 0 },
-                data: { nome: saida.nome ?? destId, destId, destTipo },
-              })
-            }
-          }
-
+      // CTOs sem splitter → direto CDO→CTO
+      if (splitters.length === 0) {
+        for (const cto of (caixa.ctos ?? [])) {
+          const ctoNid    = `cto-${cto.cto_id}`
+          const portColor = fiberColor(cto.porta_cdo ?? 1)
+          addCTONode(ctoNid, cto)
           edges.push({
-            id:           `e-${splNid}-${destNid}-p${portNum}`,
-            source:       splNid,
-            target:       destNid,
-            sourceHandle: `s-out-${saIdx}`,
-            type:         'bezier',
-            label:        `S${portNum}`,
-            style:        { stroke: portColor, strokeWidth: 1.5 },
-            labelStyle:   { fill: portColor, fontSize: 10, fontWeight: 700 },
+            id: `e-${caixaNid}-${ctoNid}`, source: caixaNid, target: ctoNid,
+            type: 'bezier', label: cto.porta_cdo != null ? `P${cto.porta_cdo}` : undefined,
+            style: { stroke: portColor, strokeWidth: 1.5 },
+            labelStyle: { fill: portColor, fontSize: 10, fontWeight: 700 },
             labelBgStyle: { fill: 'rgba(4,12,28,0.85)', rx: 4 },
             markerEnd: { type: MarkerType.ArrowClosed, color: portColor, width: 9, height: 9 },
           })
         }
       }
 
-      // CTOs sem splitter → conexão direta CDO→CTO
-      if (splitters.length === 0) {
-        for (const cto of (caixa.ctos ?? [])) {
-          const ctoNid   = `cto-${cto.cto_id}`
-          const portColor = fiberColor(cto.porta_cdo ?? 1)
+      // ── CTO em cascata: CTO com diagrama.splitters → outra CTO ────────────
+      for (const cto of (caixa.ctos ?? [])) {
+        const ctoSpls = cto.diagrama?.splitters ?? []
+        if (ctoSpls.length === 0) continue
+        const ctoNid = `cto-${cto.cto_id}`
+        addCTONode(ctoNid, cto)
 
-          if (!seenCTOs.has(ctoNid)) {
-            seenCTOs.add(ctoNid)
+        for (let ci = 0; ci < ctoSpls.length; ci++) {
+          const cspl    = ctoSpls[ci]
+          const csplNid = `spl-${ctoNid}-${ci}`
+          const ratio   = parseSplitterRatio(cspl.tipo)
+          const fibra   = cspl.entrada?.fibra ?? (ci + 1)
+          const edgeColor = fiberColor(fibra)
+
+          if (!seenNodes.has(csplNid)) {
+            seenNodes.add(csplNid)
             nodes.push({
-              id:   ctoNid,
-              type: 'ctoNode',
-              position: { x: 0, y: 0 },
-              data: {
-                nome:       cto.nome ?? cto.cto_id,
-                ctoId:      cto.cto_id,
-                capacidade: cto.capacidade ?? null,
-                ocupacao:   cto.ocupacao   ?? 0,
-              },
+              id: csplNid, type: 'splitterNode', position: { x: 0, y: 0 },
+              data: { nome: cspl.nome ?? `Splitter ${ci + 1}`, tipo: cspl.tipo ?? '1x8', ratio, tubeLabel: cspl.nome ?? `F${fibra}`, colorIn: edgeColor, saidas: cspl.saidas ?? [] },
             })
           }
 
           edges.push({
-            id:     `e-${caixaNid}-${ctoNid}`,
-            source: caixaNid,
-            target: ctoNid,
-            type:   'bezier',
-            label:  cto.porta_cdo != null ? `P${cto.porta_cdo}` : undefined,
-            style:  { stroke: portColor, strokeWidth: 1.5 },
-            labelStyle:   { fill: portColor, fontSize: 10, fontWeight: 700 },
+            id: `e-${ctoNid}-${csplNid}`, source: ctoNid, target: csplNid,
+            type: 'bezier', label: `Cascata F${fibra}`,
+            style: { stroke: edgeColor, strokeWidth: 1.5 },
+            labelStyle: { fill: edgeColor, fontSize: 9, fontWeight: 700 },
             labelBgStyle: { fill: 'rgba(4,12,28,0.85)', rx: 4 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: portColor, width: 9, height: 9 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor, width: 9, height: 9 },
           })
+
+          addSplitterOutputEdges(csplNid, cspl.saidas ?? [], caixaById, ctoById)
         }
       }
     }
@@ -283,7 +316,7 @@ function buildGraphData(topologia) {
 function getNodeDims(node) {
   switch (node.type) {
     case 'oltNode':     return { w: OLT_WIDTH, h: OLT_HEIGHT }
-    case 'cdoNode':     return { w: CDO_WIDTH, h: cdoHeight(node.data.splitterCount ?? 0) }
+    case 'cdoNode':     return { w: CDO_WIDTH, h: cdoHeight(node.data.splitterCount ?? 0, node.data.bandejas ?? []) }
     case 'ceNode':      return { w: CE_WIDTH,  h: CE_HEIGHT }
     case 'splitterNode':return { w: SPL_WIDTH, h: splHeight(parseSplitterRatio(node.data.tipo)) }
     case 'ctoNode':     return { w: CTO_WIDTH, h: CTO_HEIGHT }
@@ -383,13 +416,15 @@ function applyDagreLayout(nodes, edges) {
     }
     // Reordena dados do CDO para coincidir com a nova ordem dos handles
     if (n.type === 'cdoNode' && dataOrder[n.id]) {
-      const order = dataOrder[n.id]
-      const origFibras = n.data.splFibras ?? []
-      const origSpls   = n.data.splitters ?? []
+      const order    = dataOrder[n.id]
+      const origFibras   = n.data.splFibras  ?? []
+      const origSpls     = n.data.splitters  ?? []
+      const origBandejas = n.data.bandejas   ?? []
       base.data = {
         ...n.data,
         splFibras: order.map(i => origFibras[i] ?? null),
         splitters: order.map(i => ({ ...(origSpls[i] ?? {}), _origIdx: i })),
+        bandejas:  order.map(i => origBandejas[i] ?? {}),
       }
     }
     return base
@@ -483,10 +518,14 @@ const CDONode = memo(({ data }) => {
   const splitterCount = data.splitterCount ?? 0
   const splFibras     = data.splFibras ?? []
   const splitters     = data.splitters ?? []
-  const totalH        = cdoHeight(splitterCount)
+  const bandejas      = data.bandejas  ?? []
+  const totalH        = cdoHeight(splitterCount, bandejas)
 
+  // Computa o offset Y central de cada bandeja para posicionar handles
   function handleTop(si) {
-    return CDO_HEADER_H + si * CDO_BANDEJA_H + CDO_BANDEJA_H / 2
+    let y = CDO_HEADER_H
+    for (let i = 0; i < si; i++) y += cdoBandejaH(bandejas[i]?.fusoes)
+    return y + cdoBandejaH(bandejas[si]?.fusoes) / 2
   }
 
   return (
@@ -542,68 +581,109 @@ const CDONode = memo(({ data }) => {
 
       {/* Bandejas */}
       {splitters.map((spl, si) => {
-        const fibra  = splFibras[si] ?? (si * 2 + 1)
-        const color  = fiberColor(fibra)
-        const ratio  = parseSplitterRatio(spl.tipo)
-        const saidas = spl.saidas ?? []
-        const ligadas = saidas.filter(s => s?.cto_id).length
-        const tubeIdx = Math.floor((fibra - 1) / 12) + 1
+        const fibra    = splFibras[si] ?? (si * 2 + 1)
+        const color    = fiberColor(fibra)
+        const ratio    = parseSplitterRatio(spl.tipo)
+        const saidas   = spl.saidas ?? []
+        const ligadas  = saidas.filter(s => s?.cto_id).length
+        const tubeIdx  = Math.floor((fibra - 1) / 12) + 1
         const fiberIdx = ((fibra - 1) % 12) + 1
         const abntNome = ABNT[fiberIdx - 1]?.nome ?? `F${fiberIdx}`
+        const bandeja  = bandejas[si] ?? {}
+        const fusoes   = bandeja.fusoes ?? []
+        const rowH     = cdoBandejaH(fusoes)
 
         return (
           <div key={si} style={{
-            height:       CDO_BANDEJA_H,
+            height:       rowH,
             borderBottom: si < splitterCount - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-            padding:      '6px 10px 6px 12px',
-            display:      'flex',
-            alignItems:   'center',
-            gap:          7,
             background:   si % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent',
             position:     'relative',
           }}>
-            {/* Bandeja label */}
-            <span style={{
-              fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.25)',
-              fontFamily: 'monospace', minWidth: 20, letterSpacing: '0.04em',
+            {/* Linha de cabeçalho da bandeja */}
+            <div style={{
+              height:    CDO_BANDEJA_BASE,
+              padding:   '0 10px 0 12px',
+              display:   'flex',
+              alignItems:'center',
+              gap:       7,
             }}>
-              B{(spl?._origIdx !== undefined ? spl._origIdx : si) + 1}
-            </span>
+              {/* Bandeja label */}
+              <span style={{
+                fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.25)',
+                fontFamily: 'monospace', minWidth: 20, letterSpacing: '0.04em',
+              }}>
+                B{(spl?._origIdx !== undefined ? spl._origIdx : si) + 1}
+              </span>
 
-            {/* Linha de fibra */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
-              {/* Ponto de fibra ABNT */}
-              <div style={{
-                width: 8, height: 8, borderRadius: '50%',
-                backgroundColor: color,
-                boxShadow: `0 0 5px ${color}88`,
-                flexShrink: 0,
-              }} />
-              {/* Tube:Fiber */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <span style={{ fontSize: 7.5, color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace', lineHeight: 1 }}>
-                  T{tubeIdx}·F{fiberIdx}
+              {/* Linha de fibra */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  backgroundColor: color,
+                  boxShadow: `0 0 5px ${color}88`,
+                  flexShrink: 0,
+                }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <span style={{ fontSize: 7.5, color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace', lineHeight: 1 }}>
+                    T{tubeIdx}·F{fiberIdx}
+                  </span>
+                  <span style={{ fontSize: 7, color: color, lineHeight: 1, fontWeight: 600 }}>
+                    {abntNome}
+                  </span>
+                </div>
+              </div>
+
+              {/* Splitter embutido */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                <span style={{
+                  fontSize: 8, fontWeight: 800, color: '#f97316',
+                  background: 'rgba(249,115,22,0.12)',
+                  border: '1px solid rgba(249,115,22,0.3)',
+                  padding: '1px 5px', borderRadius: 4,
+                }}>
+                  {spl.tipo ?? `1×${ratio}`}
                 </span>
-                <span style={{ fontSize: 7, color: color, lineHeight: 1, fontWeight: 600 }}>
-                  {abntNome}
+                <span style={{ fontSize: 7, color: ligadas > 0 ? '#86efac' : 'rgba(255,255,255,0.2)' }}>
+                  {ligadas}/{ratio} CTOs
                 </span>
               </div>
             </div>
 
-            {/* Splitter embutido */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-              <span style={{
-                fontSize: 8, fontWeight: 800, color: '#f97316',
-                background: 'rgba(249,115,22,0.12)',
-                border: '1px solid rgba(249,115,22,0.3)',
-                padding: '1px 5px', borderRadius: 4,
-              }}>
-                {spl.tipo ?? `1×${ratio}`}
-              </span>
-              <span style={{ fontSize: 7, color: ligadas > 0 ? '#86efac' : 'rgba(255,255,255,0.2)' }}>
-                {ligadas}/{ratio} CTOs
-              </span>
-            </div>
+            {/* Fusões */}
+            {fusoes.map((f, fi) => {
+              const entColor = fiberColor(f.entrada?.fibra)
+              const saiColor = fiberColor(f.saida?.fibra)
+              return (
+                <div key={fi} style={{
+                  height:     CDO_FUSAO_H,
+                  display:    'flex',
+                  alignItems: 'center',
+                  paddingLeft: 32,
+                  paddingRight: 10,
+                  gap:        5,
+                  borderTop:  '1px solid rgba(255,255,255,0.04)',
+                }}>
+                  <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', minWidth: 12 }}>{fi + 1}</span>
+                  {/* Fibra entrada */}
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: entColor, flexShrink: 0 }} />
+                  <span style={{ fontSize: 7, color: entColor, fontFamily: 'monospace', fontWeight: 700 }}>
+                    F{f.entrada?.fibra ?? '?'}
+                  </span>
+                  <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.2)' }}>→</span>
+                  {/* Fibra saída */}
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: saiColor, flexShrink: 0 }} />
+                  <span style={{ fontSize: 7, color: saiColor, fontFamily: 'monospace', fontWeight: 700 }}>
+                    F{f.saida?.fibra ?? '?'}
+                  </span>
+                  {f.obs && (
+                    <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.2)', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 60 }}>
+                      {f.obs}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )
       })}
@@ -615,7 +695,7 @@ const CDONode = memo(({ data }) => {
         </div>
       )}
 
-      {/* Handles de saída — um por bandeja */}
+      {/* Handles de saída — um por bandeja, posicionado no centro da bandeja */}
       {Array.from({ length: splitterCount }, (_, si) => (
         <Handle
           key={si}
