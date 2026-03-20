@@ -19,7 +19,7 @@ import ModalDiagramaCDO   from '@/components/map/ModalDiagramaCDO'
 import ModalTopologia from '@/components/map/ModalTopologia'
 
 import { getCTOs, upsertCTO }   from '@/actions/ctos'
-import { getCaixas, upsertCaixa } from '@/actions/caixas'
+import { getCaixas, upsertCaixa, addCaboToItem } from '@/actions/caixas'
 import { getRotas, upsertRota }  from '@/actions/rotas'
 import { getPostes, upsertPoste } from '@/actions/postes'
 import { getOLTs }               from '@/actions/olts'
@@ -68,6 +68,8 @@ export default function MapaFTTH({
   // Suporta tanto session (legado) quanto projetoId/userRole diretos
   const projetoId = session?.user?.projeto_id ?? projetoIdProp
   const userRole  = session?.user?.role ?? userRoleProp
+  const userRoleRef = useRef(userRole)
+  useEffect(() => { userRoleRef.current = userRole }, [userRole])
 
   // ---- Estado de reposicionamento ----
   const [reposicionandoEl, setReposicionandoEl] = useState(null) // { type, data }
@@ -265,12 +267,13 @@ export default function MapaFTTH({
     // Limpar marcadores anteriores
     editMarkersRef.current.forEach(m => m.remove())
     editMarkersRef.current = []
-    if (!editingRota || !map || !mapLoaded) return
+    const canEdit = userRoleRef.current === 'admin' || userRoleRef.current === 'superadmin'
+    if (!editingRota || !map || !mapLoaded || !canEdit) return
 
     editingRota.coordinates.forEach((coord, i) => {
       const el = document.createElement('div')
       const isEndpoint = i === 0 || i === editingRota.coordinates.length - 1
-      el.style.cssText = `width:${isEndpoint?16:12}px;height:${isEndpoint?16:12}px;background:${isEndpoint?'#f97316':'#6366f1'};border:2px solid white;border-radius:50%;cursor:grab;box-shadow:0 2px 8px rgba(0,0,0,0.5);z-index:10`
+      el.style.cssText = `width:${isEndpoint?16:12}px;height:${isEndpoint?16:12}px;background:${isEndpoint?'#e2e8f0':'#6366f1'};border:2px solid white;border-radius:50%;cursor:grab;box-shadow:0 2px 8px rgba(0,0,0,0.5);z-index:10`
       const marker = new maplibregl.Marker({ element: el, draggable: true })
         .setLngLat(coord)
         .addTo(map)
@@ -456,7 +459,7 @@ export default function MapaFTTH({
     }
 
     const tipoRota = addForm.tipoRota || 'RAMAL'
-    const routeColor = tipoRota === 'BACKBONE' ? '#6366f1' : tipoRota === 'DROP' ? '#22c55e' : '#f97316'
+    const routeColor = tipoRota === 'BACKBONE' ? '#6366f1' : tipoRota === 'DROP' ? '#22c55e' : '#000000'
 
     if (map.getSource(SOURCE)) {
       map.getSource(SOURCE).setData(geojson)
@@ -549,7 +552,29 @@ export default function MapaFTTH({
       if (addMode === 'cto')   await upsertCTO(payloads.cto)
       else if (addMode === 'caixa') await upsertCaixa(payloads.caixa)
       else if (addMode === 'poste') await upsertPoste(payloads.poste)
-      else if (addMode === 'rota')  await upsertRota(payloads.rota)
+      else if (addMode === 'rota') {
+        await upsertRota(payloads.rota)
+        // Sincronizar: registrar cabo nos itens snappados (CDO/CTO)
+        if (addRouteLinks.length > 0) {
+          const rotaId = addForm.id.trim()
+          await Promise.allSettled(
+            addRouteLinks.map((link) =>
+              addCaboToItem({
+                itemType:  link.type === 'cto' ? 'cto' : 'caixa',
+                itemId:    link.id,
+                projetoId,
+                cabo: {
+                  id:     `rota_${rotaId}_${link.id}`,
+                  nome:   `Cabo Rota ${rotaId}`,
+                  tipo:   'DROP',
+                  fibras: 1,
+                  obs:    `rota_id:${rotaId}`,
+                },
+              })
+            )
+          )
+        }
+      }
       await reloadData()
       cancelarAddMode()
     } catch (e) {
@@ -852,7 +877,7 @@ export default function MapaFTTH({
         >
           {addMode === 'rota' && !routeFinalized
             ? <>
-                <span style={{ color: '#f97316' }}>〰️</span>
+                <span style={{ color: '#000000' }}>〰️</span>
                 {addRouteLinks.length > 0 && (
                   <span style={{ color: '#86efac', fontSize: 10 }}>🔗 {addRouteLinks[addRouteLinks.length - 1].nome ?? addRouteLinks[addRouteLinks.length - 1].id}</span>
                 )}
@@ -860,7 +885,7 @@ export default function MapaFTTH({
                 {addRoutePoints.length >= 2 && (
                   <button
                     onClick={() => setRouteFinalized(true)}
-                    style={{ background: '#f97316', color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: '#000000', color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                   >
                     Finalizar
                   </button>
@@ -899,7 +924,7 @@ export default function MapaFTTH({
               <div className="flex gap-2 mb-4">
                 {[
                   { v: 'BACKBONE', cor: '#6366f1', desc: 'Principal' },
-                  { v: 'RAMAL',    cor: '#f97316', desc: 'Distribuição' },
+                  { v: 'RAMAL',    cor: '#000000', desc: 'Distribuição' },
                   { v: 'DROP',     cor: '#22c55e', desc: 'Última milha' },
                 ].map(({ v, cor, desc }) => {
                   const ativo = (addForm.tipoRota ?? 'RAMAL') === v

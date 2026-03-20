@@ -17,6 +17,7 @@ import { connectDB } from '@/lib/db'
 import { WRITE_ROLES, ALL_ROLES } from '@/lib/auth'
 import { requireActiveEmpresa } from '@/lib/tenant-guard'
 import { CaixaEmendaCDO } from '@/models/CaixaEmendaCDO'
+import { CTO } from '@/models/CTO'
 
 // ---------------------------------------------------------------------------
 // GET /api/caixas_emenda_cdo → getCaixas
@@ -229,4 +230,48 @@ export async function saveDiagramaCaixa(data) {
   revalidatePath('/admin/diagramas')
 
   return { saved: result.modifiedCount > 0 }
+}
+
+// ---------------------------------------------------------------------------
+// addCaboToItem — adiciona um cabo ao diagrama.cabos[] de uma CTO ou CDO/CE
+// ---------------------------------------------------------------------------
+
+/**
+ * Adiciona atomicamente um cabo ao array diagrama.cabos de uma CTO ou CDO/CE.
+ * Chamado automaticamente ao salvar uma rota que snapa em um item de mapa.
+ *
+ * @param {Object} data
+ * @param {'cto'|'caixa'} data.itemType  — tipo do item alvo
+ * @param {string} data.itemId           — cto_id ou ce_id do item alvo
+ * @param {string} data.projetoId
+ * @param {Object} data.cabo             — { id, nome, tipo, fibras, obs }
+ * @returns {Promise<{ added: boolean }>}
+ */
+export async function addCaboToItem({ itemType, itemId, projetoId, cabo }) {
+  const session = await requireActiveEmpresa(WRITE_ROLES)
+  const { role, projeto_id: userProjeto } = session.user
+
+  if (!itemType || !itemId || !cabo?.id) throw new Error('itemType, itemId e cabo.id são obrigatórios')
+
+  const targetProjeto = role === 'superadmin' ? projetoId : userProjeto
+  if (!targetProjeto) throw new Error('projetoId é obrigatório')
+
+  await connectDB()
+
+  let result
+  if (itemType === 'cto') {
+    result = await CTO.updateOne(
+      { projeto_id: targetProjeto, cto_id: itemId },
+      { $push: { 'diagrama.cabos': cabo } }
+    )
+  } else {
+    result = await CaixaEmendaCDO.updateOne(
+      { projeto_id: targetProjeto, id: itemId },
+      { $push: { 'diagrama.cabos': cabo } }
+    )
+  }
+
+  revalidatePath('/admin/diagramas')
+
+  return { added: result.modifiedCount > 0 }
 }

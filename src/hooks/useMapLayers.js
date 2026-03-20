@@ -337,7 +337,7 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
         'line-color': [
           'match', ['get', 'tipo'],
           'BACKBONE', '#6366f1',
-          'RAMAL',    '#f97316',
+          'RAMAL',    '#000000',
           '#94a3b8',
         ],
         'line-width': [
