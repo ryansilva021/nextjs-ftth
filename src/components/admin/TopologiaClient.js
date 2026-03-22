@@ -4,24 +4,24 @@ import { useState, useTransition } from 'react'
 import { linkTopologia } from '@/actions/olts'
 
 const cardStyle = {
-  backgroundColor: '#111827',
-  border: '1px solid #1f2937',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
 }
 
 const cardInnerStyle = {
-  backgroundColor: '#0b1220',
-  border: '1px solid #1f2937',
+  backgroundColor: 'var(--background)',
+  border: '1px solid var(--border-color)',
 }
 
 const cardLeafStyle = {
-  backgroundColor: '#0d1526',
-  border: '1px solid #1f2937',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
 }
 
 const inputStyle = {
-  backgroundColor: '#0b1220',
-  border: '1px solid #1f2937',
-  color: '#f1f5f9',
+  backgroundColor: 'var(--inp-bg)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--foreground)',
 }
 
 const modalBgStyle = {
@@ -365,7 +365,7 @@ export default function TopologiaClient({ arvoreInicial, projetoId, userRole }) 
 
             {/* Resumo do vínculo */}
             <div
-              style={{ backgroundColor: '#0b1220', border: '1px solid #1f2937' }}
+              style={{ backgroundColor: 'var(--inp-bg)', border: '1px solid var(--border-color)' }}
               className="rounded-lg px-4 py-3 text-xs text-slate-400 mb-4"
             >
               <span className="font-mono text-sky-400">
@@ -393,7 +393,7 @@ export default function TopologiaClient({ arvoreInicial, projetoId, userRole }) 
               <button
                 onClick={fecharModal}
                 disabled={isPending}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="px-4 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors disabled:opacity-40"
               >
                 Cancelar

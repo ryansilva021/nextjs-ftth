@@ -4,8 +4,8 @@ import { useState, useTransition } from 'react'
 import { aprovarRegistro, rejeitarRegistro } from '@/actions/registros'
 
 const cardStyle = {
-  backgroundColor: '#111827',
-  border: '1px solid #1f2937',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
 }
 
 const modalBgStyle = {
@@ -13,9 +13,9 @@ const modalBgStyle = {
 }
 
 const inputStyle = {
-  backgroundColor: '#0b1220',
-  border: '1px solid #1f2937',
-  color: '#f1f5f9',
+  backgroundColor: 'var(--inp-bg)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--foreground)',
 }
 
 function StatusBadge({ status }) {
@@ -114,9 +114,9 @@ export default function RegistrosClient({ registrosIniciais }) {
             key={f}
             onClick={() => setFiltro(f)}
             style={{
-              backgroundColor: filtro === f ? '#0c2340' : '#111827',
-              border: `1px solid ${filtro === f ? '#0369a1' : '#1f2937'}`,
-              color: filtro === f ? '#38bdf8' : '#94a3b8',
+              backgroundColor: filtro === f ? '#0c2340' : 'var(--card-bg)',
+              border: `1px solid ${filtro === f ? '#0369a1' : 'var(--border-color)'}`,
+              color: filtro === f ? '#38bdf8' : 'var(--text-secondary)',
             }}
             className="px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all"
           >
@@ -141,7 +141,7 @@ export default function RegistrosClient({ registrosIniciais }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid #1f2937', backgroundColor: '#0d1526' }}>
+              <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--sidebar-bg)' }}>
                 {['Empresa', 'Usuário (admin)', 'Projeto gerado', 'Data', 'Status', 'Motivo', 'Ações'].map((h) => (
                   <th key={h} className="text-left text-xs text-slate-400 font-semibold uppercase tracking-wider px-4 py-3">
                     {h}
@@ -160,7 +160,7 @@ export default function RegistrosClient({ registrosIniciais }) {
               {registrosFiltrados.map((r, i) => (
                 <tr
                   key={r._id}
-                  style={{ borderBottom: i < registrosFiltrados.length - 1 ? '1px solid #1f2937' : 'none' }}
+                  style={{ borderBottom: i < registrosFiltrados.length - 1 ? '1px solid var(--border-color)' : 'none' }}
                   className="hover:bg-slate-800/30 transition-colors"
                 >
                   <td className="px-4 py-3 text-slate-200 font-medium">{r.empresa ?? '—'}</td>
@@ -236,7 +236,7 @@ export default function RegistrosClient({ registrosIniciais }) {
             <div className="flex gap-3">
               <button
                 onClick={() => setModalRejeitar(null)}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="flex-1 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors"
               >
                 Cancelar

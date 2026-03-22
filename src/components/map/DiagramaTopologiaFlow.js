@@ -602,6 +602,38 @@ function applyDagreLayout(nodes, edges) {
     })
   }
 
+  // CDO/CTO bandeja → destino direto: alinhar Y do alvo com o handle de origem
+  const bdjOutEdges = {}
+  for (const e of edges) {
+    if (e.sourceHandle?.startsWith('bdj-')) {
+      if (!bdjOutEdges[e.source]) bdjOutEdges[e.source] = []
+      bdjOutEdges[e.source].push(e)
+    }
+  }
+  const nodeById = Object.fromEntries(nodes.map(n => [n.id, n]))
+  for (const [srcId, grp] of Object.entries(bdjOutEdges)) {
+    const srcNode = nodeById[srcId]
+    if (!srcNode) continue
+    const { h: srcH } = getNodeDims(srcNode)
+    const srcTopY = (centerY[srcId] ?? 0) - srcH / 2
+    for (const e of grp) {
+      const m = e.sourceHandle.match(/^bdj-(\d+)-f-(\d+)$/)
+      if (!m) continue
+      const bi = parseInt(m[1], 10)
+      const fi = parseInt(m[2], 10)
+      let handleOffsetY
+      if (srcNode.type === 'cdoNode') {
+        handleOffsetY = cdoBandejaFusaoHandleTop(srcNode.data.splitterCount ?? 0, srcNode.data.bandejas ?? [], bi, fi)
+      } else if (srcNode.type === 'ctoNode') {
+        handleOffsetY = ctoFusaoHandleTop(srcNode.data.bandejas ?? [], bi, fi)
+      } else continue
+      // Só sobrescrever se não foi já definido pela lógica de splitter
+      if (ctoYOverride[e.target] === undefined) {
+        ctoYOverride[e.target] = srcTopY + handleOffsetY
+      }
+    }
+  }
+
   const remappedEdges = edges.map(e => {
     const mapped = handleMap[`${e.source}|${e.sourceHandle}`]
     return mapped ? { ...e, sourceHandle: mapped } : e
@@ -895,7 +927,7 @@ const CDONode = memo(({ data }) => {
                   </span>
                 </div>
                 {/* Fusões */}
-                {!data._mobile && fusoes.map((f, fi) => {
+                {fusoes.map((f, fi) => {
                   const entColor = fiberColor(f.entrada?.fibra)
                   const saiColor = fiberColor(f.saida?.fibra)
                   const tipo = (f.tipo ?? '').toLowerCase()
@@ -1215,7 +1247,7 @@ const CTONode = memo(({ data }) => {
                   </span>
                 </div>
                 {/* Fusões */}
-                {!data._mobile && fusoes.map((f, fi) => {
+                {fusoes.map((f, fi) => {
                   const color   = fiberColor(f.cor)
                   // splitter mostra "SPL-N tipo"; demais contam posições não-splitter
                   const portNum = fusoes.slice(0, fi).filter(x => x.tipo !== 'splitter').length + 1

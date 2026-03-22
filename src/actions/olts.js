@@ -134,6 +134,41 @@ export async function deleteOLT(oltId, projetoId) {
 }
 
 // ---------------------------------------------------------------------------
+// POST /api/olts (dio) → saveOLTDio
+// ---------------------------------------------------------------------------
+
+/**
+ * Salva o mapa DIO de uma OLT (dio_config: { total, mapa }).
+ *
+ * @param {string} oltId
+ * @param {string} projetoId
+ * @param {Object} dioConfig  — { total: number, mapa: [{porta, pon, local}] }
+ * @returns {Promise<{ saved: boolean }>}
+ */
+export async function saveOLTDio(oltId, projetoId, dioConfig) {
+  const session = await requireActiveEmpresa(WRITE_ROLES)
+  const { role, projeto_id: userProjeto } = session.user
+
+  if (!oltId) throw new Error('olt_id é obrigatório')
+
+  const targetProjeto = role === 'superadmin' ? projetoId : userProjeto
+  if (!targetProjeto) throw new Error('projeto_id é obrigatório')
+
+  await connectDB()
+
+  const result = await OLT.updateOne(
+    { projeto_id: targetProjeto, id: oltId },
+    { $set: { dio_config: dioConfig } }
+  )
+
+  revalidatePath('/admin/diagramas')
+  revalidatePath('/admin/topologia')
+  revalidatePath('/admin/calculos')
+
+  return { saved: result.modifiedCount > 0, matched: result.matchedCount > 0 }
+}
+
+// ---------------------------------------------------------------------------
 // GET /api/topologia → getTopologia
 // ---------------------------------------------------------------------------
 

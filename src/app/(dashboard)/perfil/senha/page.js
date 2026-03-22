@@ -6,14 +6,14 @@ import { changePassword } from '@/actions/usuarios'
 export const dynamic = 'force-dynamic'
 
 const inputStyle = {
-  backgroundColor: '#0b1220',
-  border: '1px solid #1f2937',
-  color: '#f1f5f9',
+  backgroundColor: 'var(--inp-bg)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--foreground)',
 }
 
 const cardStyle = {
-  backgroundColor: '#111827',
-  border: '1px solid #1f2937',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
 }
 
 export default function SenhaPage() {
@@ -160,7 +160,7 @@ export default function SenhaPage() {
                       <div
                         key={nivel}
                         style={{
-                          backgroundColor: nivel <= forca ? cor : '#1f2937',
+                          backgroundColor: nivel <= forca ? cor : 'var(--border-color)',
                           width: 28,
                           height: 3,
                           borderRadius: 2,
@@ -255,7 +255,7 @@ export default function SenhaPage() {
 
       {/* Dicas de segurança */}
       <div
-        style={{ backgroundColor: '#0b1220', border: '1px solid #1f2937' }}
+        style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border-color)' }}
         className="rounded-xl px-4 py-3 mt-4"
       >
         <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-2">

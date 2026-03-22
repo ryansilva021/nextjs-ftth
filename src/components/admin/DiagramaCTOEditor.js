@@ -9,6 +9,7 @@
 
 import { useState, useEffect } from 'react'
 import { getDiagramaCTO, saveDiagramaCTO } from '@/actions/ctos'
+import { useTheme } from '@/contexts/ThemeContext'
 
 // ─── ABNT NBR 14721 ───────────────────────────────────────────────────────────
 const ABNT = [
@@ -30,23 +31,32 @@ const SPLITTER_TIPOS = ['1x2', '1x4', '1x8', '1x16', '1x32']
 function uid() { return Math.random().toString(36).slice(2, 9) }
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
-const BG = '#0d1117', BG2 = '#161b22', BG3 = '#1c2333', BR = '#30363d'
+function getStyles(isDark) {
+  const BG    = isDark ? '#0d1117' : '#ffffff'
+  const BG2   = isDark ? '#161b22' : '#f8fafc'
+  const BG3   = isDark ? '#1c2333' : '#f1f5f9'
+  const BR    = isDark ? '#30363d' : '#e2e8f0'
+  const TEXT  = isDark ? '#e6edf3' : '#1e293b'
+  const MUTED = isDark ? '#8b949e' : '#64748b'
 
-const S = {
-  wrap:     { backgroundColor: BG, border: `1px solid ${BR}`, borderRadius: 12, color: '#e6edf3', overflow: 'hidden' },
-  header:   { backgroundColor: BG2, borderBottom: `1px solid ${BR}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 },
-  tabBar:   { backgroundColor: BG2, borderBottom: `1px solid ${BR}`, display: 'flex', overflowX: 'auto' },
-  tabBtn:   (a, c) => ({ padding: '11px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', backgroundColor: 'transparent', border: 'none', borderBottom: a ? `2px solid ${c}` : '2px solid transparent', color: a ? c : '#8b949e', whiteSpace: 'nowrap', transition: 'all .15s' }),
-  body:     { padding: '20px', minHeight: 280 },
-  sec:      { backgroundColor: BG2, border: `1px solid ${BR}`, borderRadius: 10, padding: '14px 16px', marginBottom: 12 },
-  secTitle: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8b949e', margin: 0 },
-  inp:      { backgroundColor: BG3, border: `1px solid ${BR}`, color: '#e6edf3', borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box' },
-  inpSm:   { backgroundColor: BG3, border: `1px solid ${BR}`, color: '#e6edf3', borderRadius: 6, padding: '5px 8px', fontSize: 12, outline: 'none', boxSizing: 'border-box' },
-  lbl:      { fontSize: 10, color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, display: 'block', marginBottom: 3 },
-  btnAdd:   { background: 'linear-gradient(135deg,#238636,#1a7f37)', color: '#fff', fontWeight: 700, fontSize: 11, borderRadius: 6, padding: '5px 12px', cursor: 'pointer', border: 'none', whiteSpace: 'nowrap' },
-  btnDel:   { backgroundColor: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', color: '#f85149', fontSize: 11, borderRadius: 6, padding: '4px 9px', cursor: 'pointer', whiteSpace: 'nowrap' },
-  btnSave:  { background: 'linear-gradient(135deg,#1f6feb,#1158c7)', color: '#fff', fontWeight: 700, fontSize: 14, borderRadius: 8, padding: '9px 24px', cursor: 'pointer', border: 'none' },
-  chip:     (c) => ({ backgroundColor: `${c}18`, border: `1px solid ${c}44`, borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700, color: c }),
+  return {
+    wrap:     { backgroundColor: BG, border: `1px solid ${BR}`, borderRadius: 12, color: TEXT, overflow: 'hidden' },
+    header:   { backgroundColor: BG2, borderBottom: `1px solid ${BR}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 },
+    tabBar:   { backgroundColor: BG2, borderBottom: `1px solid ${BR}`, display: 'flex', overflowX: 'auto' },
+    tabBtn:   (a, c) => ({ padding: '11px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', backgroundColor: 'transparent', border: 'none', borderBottom: a ? `2px solid ${c}` : '2px solid transparent', color: a ? c : MUTED, whiteSpace: 'nowrap', transition: 'all .15s' }),
+    body:     { padding: '20px', minHeight: 280 },
+    sec:      { backgroundColor: BG2, border: `1px solid ${BR}`, borderRadius: 10, padding: '14px 16px', marginBottom: 12 },
+    secTitle: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: MUTED, margin: 0 },
+    inp:      { backgroundColor: BG3, border: `1px solid ${BR}`, color: TEXT, borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box' },
+    inpSm:    { backgroundColor: BG3, border: `1px solid ${BR}`, color: TEXT, borderRadius: 6, padding: '5px 8px', fontSize: 12, outline: 'none', boxSizing: 'border-box' },
+    lbl:      { fontSize: 10, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, display: 'block', marginBottom: 3 },
+    btnAdd:   { background: 'linear-gradient(135deg,#238636,#1a7f37)', color: '#fff', fontWeight: 700, fontSize: 11, borderRadius: 6, padding: '5px 12px', cursor: 'pointer', border: 'none', whiteSpace: 'nowrap' },
+    btnDel:   { backgroundColor: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', color: '#f85149', fontSize: 11, borderRadius: 6, padding: '4px 9px', cursor: 'pointer', whiteSpace: 'nowrap' },
+    btnSave:  { background: 'linear-gradient(135deg,#1f6feb,#1158c7)', color: '#fff', fontWeight: 700, fontSize: 14, borderRadius: 8, padding: '9px 24px', cursor: 'pointer', border: 'none' },
+    chip:     (c) => ({ backgroundColor: `${c}18`, border: `1px solid ${c}44`, borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700, color: c }),
+    // expose palette for inline uses within JSX
+    _BG: BG, _BG2: BG2, _BG3: BG3, _BR: BR, _TEXT: TEXT, _MUTED: MUTED,
+  }
 }
 
 function FibraSelect({ value, onChange }) {
@@ -74,6 +84,11 @@ function buildBandejaPadrao(n = 1) {
 }
 
 export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, initialDiagrama }) {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+  const S = getStyles(isDark)
+  const { _BG: BG, _BG2: BG2, _BG3: BG3, _BR: BR, _TEXT: TEXT, _MUTED: MUTED } = S
+
   const [aba, setAba] = useState('bandejas')
   const [saving, setSaving] = useState(false)
   const [erro, setErro] = useState(null)
@@ -182,7 +197,7 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
 
   if (carregando) return (
     <div style={S.wrap}><div style={S.body}>
-      <p style={{ color: '#8b949e', fontSize: 13 }}>Carregando diagrama...</p>
+      <p style={{ color: MUTED, fontSize: 13 }}>Carregando diagrama...</p>
     </div></div>
   )
 
@@ -191,8 +206,8 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
       {/* Header */}
       <div style={S.header}>
         <div>
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#e6edf3', margin: 0 }}>Diagrama — {ctoId}</p>
-          <p style={{ fontSize: 11, color: '#8b949e', margin: '3px 0 0' }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: TEXT, margin: 0 }}>Diagrama — {ctoId}</p>
+          <p style={{ fontSize: 11, color: MUTED, margin: '3px 0 0' }}>
             {bandejas.length} bandeja(s) · {splitters.length} splitter(s) · {portasOcupadas}/{totalPortas} portas
           </p>
         </div>
@@ -223,13 +238,13 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
               <p style={S.secTitle}>Bandejas de fusão · {bandejas.reduce((s, b) => s + b.fusoes.length, 0)} fusão(ões)</p>
               <button onClick={addBandeja} style={S.btnAdd}>+ Bandeja</button>
             </div>
-            {bandejas.length === 0 && <p style={{ color: '#8b949e', fontSize: 13 }}>Clique em "+ Bandeja" para adicionar.</p>}
+            {bandejas.length === 0 && <p style={{ color: MUTED, fontSize: 13 }}>Clique em "+ Bandeja" para adicionar.</p>}
             {bandejas.map(b => (
               <div key={b.id} style={S.sec}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                   <input value={b.nome} onChange={e => renameBandeja(b.id, e.target.value)}
                     style={{ ...S.inp, width: 140, fontWeight: 700, fontSize: 13 }} />
-                  <span style={{ fontSize: 11, color: '#8b949e' }}>{b.fusoes.length} fusão(ões)</span>
+                  <span style={{ fontSize: 11, color: MUTED }}>{b.fusoes.length} fusão(ões)</span>
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                     <button onClick={() => addFusao(b.id)} style={S.btnAdd}>+ Fusão</button>
                     <button onClick={() => removeBandeja(b.id)} style={S.btnDel}>✕</button>
@@ -238,7 +253,7 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {b.fusoes.map(f => (
                     <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: BG3, border: `1px solid ${BR}`, borderRadius: 7, padding: '8px 10px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 11, color: '#8b949e', minWidth: 22, fontWeight: 700 }}>#{f.pos}</span>
+                      <span style={{ fontSize: 11, color: MUTED, minWidth: 22, fontWeight: 700 }}>#{f.pos}</span>
                       <FibraSelect value={f.cor} onChange={v => updateFusao(b.id, f.id, { cor: v })} />
                       <select value={f.tipo} onChange={e => updateFusao(b.id, f.id, { tipo: e.target.value, ref_id: null })}
                         style={{ ...S.inpSm, width: 135 }}>
@@ -263,7 +278,7 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
                       <button onClick={() => removeFusao(b.id, f.id)} style={{ ...S.btnDel, marginLeft: 'auto' }}>✕</button>
                     </div>
                   ))}
-                  {b.fusoes.length === 0 && <p style={{ color: '#8b949e', fontSize: 12, padding: '4px 0' }}>Nenhuma fusão. Clique em "+ Fusão".</p>}
+                  {b.fusoes.length === 0 && <p style={{ color: MUTED, fontSize: 12, padding: '4px 0' }}>Nenhuma fusão. Clique em "+ Fusão".</p>}
                 </div>
               </div>
             ))}
@@ -277,7 +292,7 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
               <p style={S.secTitle}>{splitters.length} splitter(s)</p>
               <button onClick={addSplitter} style={S.btnAdd}>+ Splitter</button>
             </div>
-            {splitters.length === 0 && <p style={{ color: '#8b949e', fontSize: 13 }}>Clique em "+ Splitter". Cada splitter recebe 1 fusão da bandeja e distribui N portas.</p>}
+            {splitters.length === 0 && <p style={{ color: MUTED, fontSize: 13 }}>Clique em "+ Splitter". Cada splitter recebe 1 fusão da bandeja e distribui N portas.</p>}
             {splitters.map((s, si) => {
               const fusaoInfo = (() => {
                 for (const b of bandejas) {
@@ -309,17 +324,17 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
                     </div>
                     {fusaoInfo && <span style={S.chip('#7c3aed')}>↑ {fusaoInfo}</span>}
                     <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 11, color: ocup > 0 ? '#86efac' : '#8b949e' }}>{ocup}/{s.saidas?.length ?? 0} ocupadas</span>
+                      <span style={{ fontSize: 11, color: ocup > 0 ? '#86efac' : MUTED }}>{ocup}/{s.saidas?.length ?? 0} ocupadas</span>
                       <button onClick={() => removeSplitter(s.id)} style={S.btnDel}>✕ Remover</button>
                     </div>
                   </div>
                   {/* Saídas */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 6 }}>
                     {(s.saidas ?? []).map(sd => (
-                      <div key={sd.num} style={{ backgroundColor: sd.cliente?.trim() ? '#0c1a2e' : BG, border: `1px solid ${sd.cliente?.trim() ? '#2563eb' : BR}`, borderRadius: 7, padding: '8px 10px' }}>
+                      <div key={sd.num} style={{ backgroundColor: sd.cliente?.trim() ? 'var(--card-bg-active)' : BG, border: `1px solid ${sd.cliente?.trim() ? '#2563eb' : BR}`, borderRadius: 7, padding: '8px 10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#7dd3fc' }}>Porta {sd.num}</span>
-                          {sd.cliente?.trim() && <button onClick={() => updateSaida(s.id, sd.num, { cliente: '' })} style={{ fontSize: 10, color: '#8b949e', background: 'none', border: 'none', cursor: 'pointer' }}>Limpar</button>}
+                          {sd.cliente?.trim() && <button onClick={() => updateSaida(s.id, sd.num, { cliente: '' })} style={{ fontSize: 10, color: MUTED, background: 'none', border: 'none', cursor: 'pointer' }}>Limpar</button>}
                         </div>
                         <input value={sd.cliente ?? ''} onChange={e => updateSaida(s.id, sd.num, { cliente: e.target.value })}
                           placeholder="Vaga livre" style={{ ...S.inp, fontSize: 12, borderColor: sd.cliente?.trim() ? '#2563eb' : BR }} />
@@ -336,7 +351,7 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
         {aba === 'portas' && (
           <div>
             <p style={{ ...S.secTitle, marginBottom: 14 }}>Todas as portas — {portasOcupadas}/{totalPortas} ocupadas</p>
-            {splitters.length === 0 && <p style={{ color: '#8b949e', fontSize: 13 }}>Configure splitters primeiro na aba "Splitters".</p>}
+            {splitters.length === 0 && <p style={{ color: MUTED, fontSize: 13 }}>Configure splitters primeiro na aba "Splitters".</p>}
             {splitters.map((s, si) => {
               const fusaoNome = (() => {
                 for (const b of bandejas) {
@@ -353,10 +368,10 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
                   </p>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 6 }}>
                     {(s.saidas ?? []).map(sd => (
-                      <div key={sd.num} style={{ backgroundColor: sd.cliente?.trim() ? '#0c1a2e' : BG, border: `1px solid ${sd.cliente?.trim() ? '#2563eb' : BR}`, borderRadius: 7, padding: '8px 10px' }}>
+                      <div key={sd.num} style={{ backgroundColor: sd.cliente?.trim() ? 'var(--card-bg-active)' : BG, border: `1px solid ${sd.cliente?.trim() ? '#2563eb' : BR}`, borderRadius: 7, padding: '8px 10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#7dd3fc' }}>Splitter {si + 1} · Porta {sd.num}</span>
-                          {sd.cliente?.trim() && <button onClick={() => updateSaida(s.id, sd.num, { cliente: '' })} style={{ fontSize: 10, color: '#8b949e', background: 'none', border: 'none', cursor: 'pointer' }}>Limpar</button>}
+                          {sd.cliente?.trim() && <button onClick={() => updateSaida(s.id, sd.num, { cliente: '' })} style={{ fontSize: 10, color: MUTED, background: 'none', border: 'none', cursor: 'pointer' }}>Limpar</button>}
                         </div>
                         <input value={sd.cliente ?? ''} onChange={e => updateSaida(s.id, sd.num, { cliente: e.target.value })}
                           placeholder="Vaga livre" style={{ ...S.inp, fontSize: 12, borderColor: sd.cliente?.trim() ? '#2563eb' : BR }} />
@@ -401,7 +416,7 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
                 <label style={S.lbl}>Splitter CTO (referência)</label>
                 <input value={entrada.splitter_cto ?? ''} onChange={e => setEntrada(p => ({ ...p, splitter_cto: e.target.value }))} style={S.inp} placeholder="ex: 1:8" />
               </div>
-              <p style={{ fontSize: 11, color: '#8b949e', marginTop: 8 }}>
+              <p style={{ fontSize: 11, color: MUTED, marginTop: 8 }}>
                 ℹ️ Ao salvar, a CTO será automaticamente vinculada ao CDO informado na topologia.
               </p>
             </div>
@@ -422,11 +437,11 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
                   ['Splitters', splitters.length, '#d97706'],
                   ['Total portas', totalPortas, '#16a34a'],
                   ['Ocupadas', portasOcupadas, barColor],
-                  ['Livres', totalPortas - portasOcupadas, '#64748b'],
+                  ['Livres', totalPortas - portasOcupadas, 'var(--text-muted)'],
                 ].map(([label, val, cor]) => (
                   <div key={label} style={{ backgroundColor: BG2, border: `1px solid ${BR}`, borderRadius: 8, padding: '12px', textAlign: 'center' }}>
                     <p style={{ fontSize: 22, fontWeight: 800, color: cor, margin: 0 }}>{val}</p>
-                    <p style={{ fontSize: 11, color: '#8b949e', margin: '4px 0 0' }}>{label}</p>
+                    <p style={{ fontSize: 11, color: MUTED, margin: '4px 0 0' }}>{label}</p>
                   </div>
                 ))}
               </div>
@@ -434,7 +449,7 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
               {totalPortas > 0 && (
                 <div style={{ ...S.sec, marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, color: '#8b949e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ocupação</span>
+                    <span style={{ fontSize: 11, color: MUTED, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ocupação</span>
                     <span style={{ fontSize: 13, fontWeight: 800, color: barColor }}>{portasOcupadas}/{totalPortas} ({pct}%)</span>
                   </div>
                   <div style={{ height: 8, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 4 }}>
@@ -448,7 +463,7 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
                 {entrada.cdo_id && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
                     <span style={S.chip('#0891b2')}>CDO: {entrada.cdo_id} · porta {entrada.porta_cdo || '?'}</span>
-                    <span style={{ color: '#8b949e' }}>→</span>
+                    <span style={{ color: MUTED }}>→</span>
                     <span style={S.chip('#16a34a')}>CTO: {ctoId}</span>
                   </div>
                 )}
@@ -463,12 +478,12 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
                         return (
                           <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 3, backgroundColor: BG3, border: `1px solid ${BR}`, borderRadius: 5, padding: '3px 7px', fontSize: 10 }}>
                             <span style={{ backgroundColor: c?.hex, color: c?.text, borderRadius: 3, padding: '1px 5px', fontWeight: 700 }}>{c?.nome}</span>
-                            <span style={{ color: '#8b949e' }}>→</span>
+                            <span style={{ color: MUTED }}>→</span>
                             {f.tipo === 'splitter' && spl  && <span style={{ color: '#c4b5fd', fontWeight: 700 }}>Spl {splIdx} ({spl.tipo})</span>}
                             {f.tipo === 'splitter' && !spl && <span style={{ color: '#f85149', fontWeight: 700 }}>? splitter</span>}
                             {f.tipo === 'cascata' && <span style={{ color: '#86efac', fontWeight: 700 }}>CTO {f.ref_id || '?'}</span>}
                             {f.tipo === 'direto'  && <span style={{ color: '#7dd3fc', fontWeight: 700 }}>Direta</span>}
-                            {f.tipo === 'livre'   && <span style={{ color: '#8b949e' }}>Livre</span>}
+                            {f.tipo === 'livre'   && <span style={{ color: MUTED }}>Livre</span>}
                           </div>
                         )
                       })}
@@ -482,7 +497,7 @@ export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, 
                       <p style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd', margin: '0 0 6px' }}>Splitter {si + 1} — {s.tipo} &nbsp;·&nbsp; {ocup}/{s.saidas?.length ?? 0}</p>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                         {(s.saidas ?? []).map(sd => (
-                          <span key={sd.num} style={{ fontSize: 10, backgroundColor: sd.cliente?.trim() ? '#0c1a2e' : BG3, border: `1px solid ${sd.cliente?.trim() ? '#2563eb' : BR}`, borderRadius: 4, padding: '2px 7px', color: sd.cliente?.trim() ? '#93c5fd' : '#8b949e', fontWeight: sd.cliente?.trim() ? 600 : 400 }}>
+                          <span key={sd.num} style={{ fontSize: 10, backgroundColor: sd.cliente?.trim() ? 'var(--card-bg-active)' : BG3, border: `1px solid ${sd.cliente?.trim() ? '#2563eb' : BR}`, borderRadius: 4, padding: '2px 7px', color: sd.cliente?.trim() ? '#93c5fd' : MUTED, fontWeight: sd.cliente?.trim() ? 600 : 400 }}>
                             {sd.num}. {sd.cliente?.trim() || '—'}
                           </span>
                         ))}

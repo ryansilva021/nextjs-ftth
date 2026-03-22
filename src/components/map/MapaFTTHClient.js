@@ -6,7 +6,7 @@ const MapaFTTH = dynamic(() => import('@/components/map/MapaFTTH'), {
   ssr: false,
   loading: () => (
     <div
-      style={{ backgroundColor: '#0b1220' }}
+      style={{ backgroundColor: 'var(--background)' }}
       className="flex items-center justify-center h-full w-full"
     >
       <div className="flex flex-col items-center gap-3">

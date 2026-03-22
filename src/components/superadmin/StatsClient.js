@@ -1,8 +1,8 @@
 'use client'
 
 const cardStyle = {
-  backgroundColor: '#1f2937',
-  border: '1px solid #374151',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color-strong)',
 }
 
 const CARDS = [
@@ -104,7 +104,7 @@ export default function StatsClient({ stats }) {
     <>
       {/* Resumo geral */}
       <div
-        style={{ backgroundColor: '#111827', border: '1px solid #1f2937' }}
+        style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
         className="rounded-xl px-5 py-4 mb-6 flex items-center gap-4"
       >
         <div>
@@ -116,7 +116,7 @@ export default function StatsClient({ stats }) {
           </p>
         </div>
         <div
-          style={{ width: 1, backgroundColor: '#1f2937' }}
+          style={{ width: 1, backgroundColor: 'var(--border-color)' }}
           className="self-stretch mx-2"
         />
         <div className="flex flex-wrap gap-x-6 gap-y-1">

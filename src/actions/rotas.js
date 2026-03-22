@@ -79,7 +79,7 @@ export async function upsertRota(data) {
   const session = await requireActiveEmpresa(WRITE_ROLES)
   const { role, projeto_id: userProjeto } = session.user
 
-  const { rota_id, projeto_id, coordinates, geometry_type, nome, tipo, obs } = data ?? {}
+  const { rota_id, projeto_id, coordinates, geometry_type, nome, tipo, obs, snap_ids } = data ?? {}
 
   if (!rota_id?.trim())           throw new Error('rota_id é obrigatório')
   if (!Array.isArray(coordinates) || coordinates.length < 2)
@@ -96,9 +96,10 @@ export async function upsertRota(data) {
       type:        geometry_type ?? 'LineString',
       coordinates,
     },
-    nome:  nome?.trim() ?? null,
-    tipo:  tipo?.trim() ?? null,
-    obs:   obs?.trim()  ?? null,
+    nome:     nome?.trim() ?? null,
+    tipo:     tipo?.trim() ?? null,
+    obs:      obs?.trim()  ?? null,
+    snap_ids: Array.isArray(snap_ids) ? snap_ids.filter(Boolean) : [],
   }
 
   const rota = await Rota.findOneAndUpdate(

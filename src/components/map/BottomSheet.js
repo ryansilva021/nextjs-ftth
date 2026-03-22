@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useTheme } from '@/contexts/ThemeContext'
 
 // ─── Configurações por tipo ────────────────────────────────────────────────────
 const ROTA_TIPO_CONFIG = {
@@ -32,45 +33,45 @@ function Badge({ label, bg, border, color }) {
   )
 }
 
-function InfoSection({ title, children }) {
+function InfoSection({ title, children, isDark }) {
   return (
     <div style={{ marginBottom: 12 }}>
-      <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.25)', marginBottom: 6 }}>{title}</p>
-      <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, overflow: 'hidden' }}>
+      <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: isDark ? 'rgba(255,255,255,0.25)' : '#64748b', marginBottom: 6 }}>{title}</p>
+      <div style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc', border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`, borderRadius: 10, overflow: 'hidden' }}>
         {children}
       </div>
     </div>
   )
 }
 
-function InfoRow({ label, value, mono, accent }) {
+function InfoRow({ label, value, mono, accent, isDark }) {
   if (value == null || value === '' || value === '—' || value === 'null' || value === 'undefined') return null
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{label}</span>
-      <span style={{ fontSize: 12, color: accent ?? '#e2e8f0', fontWeight: 700, fontFamily: mono ? 'monospace' : 'inherit', maxWidth: '60%', textAlign: 'right', wordBreak: 'break-word' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : '#f1f5f9'}` }}>
+      <span style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.4)' : '#64748b', fontWeight: 600 }}>{label}</span>
+      <span style={{ fontSize: 12, color: accent ?? (isDark ? '#e2e8f0' : '#1e293b'), fontWeight: 700, fontFamily: mono ? 'monospace' : 'inherit', maxWidth: '60%', textAlign: 'right', wordBreak: 'break-word' }}>
         {String(value)}
       </span>
     </div>
   )
 }
 
-function OcupacaoBar({ ocupadas = 0, capacidade = 0, accent }) {
+function OcupacaoBar({ ocupadas = 0, capacidade = 0, accent, isDark }) {
   if (!capacidade) return null
   const pct = Math.round((ocupadas / capacidade) * 100)
   const barColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : accent ?? '#22c55e'
   return (
-    <div style={{ padding: '12px 16px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, marginBottom: 12 }}>
+    <div style={{ padding: '12px 16px', backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc', border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : '#e2e8f0'}`, borderRadius: 10, marginBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.35)' }}>Ocupação de Portas</span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isDark ? 'rgba(255,255,255,0.35)' : '#64748b' }}>Ocupação de Portas</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: barColor }}>{ocupadas}/{capacidade} <span style={{ fontSize: 11, fontWeight: 600 }}>({pct}%)</span></span>
       </div>
-      <div style={{ height: 8, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden' }}>
+      <div style={{ height: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: `linear-gradient(90deg, ${barColor}, ${barColor}cc)`, borderRadius: 4, transition: 'width .5s ease' }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>0</span>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>{capacidade}</span>
+        <span style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.25)' : '#94a3b8' }}>0</span>
+        <span style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.25)' : '#94a3b8' }}>{capacidade}</span>
       </div>
     </div>
   )
@@ -105,38 +106,45 @@ function ActBtn({ onClick, color, bg, border, icon, label, full }) {
 
 // ─── Conteúdo por tipo ────────────────────────────────────────────────────────
 
-function CTOContent({ data, isAdmin, onAction }) {
+function CTOContent({ data, isAdmin, isTecnico, onAction, onIrAte, onMedirPotencia, isDark }) {
   const ocupadas = data.ocupacao ?? 0
   const capacidade = data.capacidade ?? 0
   return (
     <div>
-      <OcupacaoBar ocupadas={ocupadas} capacidade={capacidade} accent="#16a34a" />
+      <OcupacaoBar ocupadas={ocupadas} capacidade={capacidade} accent="#16a34a" isDark={isDark} />
 
-      <InfoSection title="Identificação">
-        <InfoRow label="ID"    value={data.cto_id} mono accent="#7dd3fc" />
-        <InfoRow label="Nome"  value={data.nome} />
-        <InfoRow label="Rua"   value={data.rua} />
-        <InfoRow label="Bairro" value={data.bairro} />
+      <InfoSection title="Identificação" isDark={isDark}>
+        <InfoRow label="ID"    value={data.cto_id} mono accent="#7dd3fc" isDark={isDark} />
+        <InfoRow label="Nome"  value={data.nome} isDark={isDark} />
+        <InfoRow label="Rua"   value={data.rua} isDark={isDark} />
+        <InfoRow label="Bairro" value={data.bairro} isDark={isDark} />
       </InfoSection>
 
-      <InfoSection title="Rede Óptica">
-        <InfoRow label="CDO vinculado" value={data.cdo_id}       mono accent="#c4b5fd" />
-        <InfoRow label="Porta CDO"     value={data.porta_cdo} />
-        <InfoRow label="Splitter CTO"  value={data.splitter_cto} />
-        <InfoRow label="Capacidade"    value={data.capacidade ? `${data.capacidade} portas` : null} />
+      <InfoSection title="Rede Óptica" isDark={isDark}>
+        <InfoRow label="CDO vinculado" value={data.cdo_id}       mono accent="#c4b5fd" isDark={isDark} />
+        <InfoRow label="Porta CDO"     value={data.porta_cdo} isDark={isDark} />
+        <InfoRow label="Splitter CTO"  value={data.splitter_cto} isDark={isDark} />
+        <InfoRow label="Capacidade"    value={data.capacidade ? `${data.capacidade} portas` : null} isDark={isDark} />
       </InfoSection>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+        {/* Disponível para todos */}
         <ActBtn onClick={() => onAction('movimentacao')} color="#86efac" bg="rgba(34,197,94,0.12)" border="rgba(34,197,94,0.3)"  icon="👤" label="Clientes" />
+        {onIrAte && <ActBtn onClick={onIrAte}           color="#93c5fd" bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.3)" icon="🧭" label="Ir Até" />}
+        {/* Técnico: medir potência */}
+        {(isTecnico || isAdmin) && onMedirPotencia && (
+          <ActBtn onClick={onMedirPotencia} color="#fde68a" bg="rgba(234,179,8,0.12)" border="rgba(234,179,8,0.3)" icon="📶" label="Medir Sinal" />
+        )}
+        {/* Admin only */}
         {isAdmin && <ActBtn onClick={() => onAction('fusoes')}       color="#fde68a" bg="rgba(234,179,8,0.12)"  border="rgba(234,179,8,0.3)"   icon="🧩" label="Fusões" />}
         {isAdmin && <ActBtn onClick={() => onAction('reposicionar')} color="#fdba74" bg="rgba(249,115,22,0.12)" border="rgba(249,115,22,0.3)" icon="📍" label="Reposicionar" />}
-        {isAdmin && <ActBtn onClick={() => onAction('editar')}       color="#f1f5f9" bg="rgba(255,255,255,0.07)" border="rgba(255,255,255,0.15)" icon="✏️" label="Editar" />}
+        {isAdmin && <ActBtn onClick={() => onAction('editar')}       color={isDark ? '#f1f5f9' : '#475569'} bg={isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9'} border={isDark ? 'rgba(255,255,255,0.15)' : '#e2e8f0'} icon="✏️" label="Editar" />}
       </div>
     </div>
   )
 }
 
-function CaixaContent({ data, isAdmin, onAction }) {
+function CaixaContent({ data, isAdmin, onAction, onIrAte, isDark }) {
   const TIPO_CFG = {
     CE:  { label: 'CE — Caixa de Emenda', bg: 'rgba(37,99,235,0.18)',  border: 'rgba(37,99,235,0.5)',  color: '#93c5fd' },
     CDO: { label: 'CDO — Caixa Divisora', bg: 'rgba(124,58,237,0.18)', border: 'rgba(124,58,237,0.5)', color: '#c4b5fd' },
@@ -150,29 +158,30 @@ function CaixaContent({ data, isAdmin, onAction }) {
         <Badge label={chip.label} {...chip} />
       </div>
 
-      <InfoSection title="Identificação">
-        <InfoRow label="ID"    value={caixaId} mono accent="#c4b5fd" />
-        <InfoRow label="Nome"  value={data.nome} />
-        <InfoRow label="Rua"   value={data.rua} />
-        <InfoRow label="Bairro" value={data.bairro} />
+      <InfoSection title="Identificação" isDark={isDark}>
+        <InfoRow label="ID"    value={caixaId} mono accent="#c4b5fd" isDark={isDark} />
+        <InfoRow label="Nome"  value={data.nome} isDark={isDark} />
+        <InfoRow label="Rua"   value={data.rua} isDark={isDark} />
+        <InfoRow label="Bairro" value={data.bairro} isDark={isDark} />
       </InfoSection>
 
-      <InfoSection title="Conexão Óptica">
-        <InfoRow label="OLT"       value={data.olt_id}    mono accent="#67e8f9" />
-        <InfoRow label="Porta OLT" value={data.porta_olt} />
-        <InfoRow label="Splitter"  value={data.splitter_cdo} />
+      <InfoSection title="Conexão Óptica" isDark={isDark}>
+        <InfoRow label="OLT"       value={data.olt_id}    mono accent="#67e8f9" isDark={isDark} />
+        <InfoRow label="Porta OLT" value={data.porta_olt} isDark={isDark} />
+        <InfoRow label="Splitter"  value={data.splitter_cdo} isDark={isDark} />
       </InfoSection>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+        {onIrAte && <ActBtn onClick={onIrAte} color="#93c5fd" bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.3)" icon="🧭" label="Ir Até" />}
         {isAdmin && <ActBtn onClick={() => onAction('fusoes')}       color="#fde68a" bg="rgba(234,179,8,0.12)"  border="rgba(234,179,8,0.3)"   icon="🧩" label="Fusões" />}
         {isAdmin && <ActBtn onClick={() => onAction('reposicionar')} color="#fdba74" bg="rgba(249,115,22,0.12)" border="rgba(249,115,22,0.3)" icon="📍" label="Reposicionar" />}
-        {isAdmin && <ActBtn onClick={() => onAction('editar')}       color="#f1f5f9" bg="rgba(255,255,255,0.07)" border="rgba(255,255,255,0.15)" icon="✏️" label="Editar" />}
+        {isAdmin && <ActBtn onClick={() => onAction('editar')}       color={isDark ? '#f1f5f9' : '#475569'} bg={isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9'} border={isDark ? 'rgba(255,255,255,0.15)' : '#e2e8f0'} icon="✏️" label="Editar" />}
       </div>
     </div>
   )
 }
 
-function RotaContent({ data, isAdmin, onAction }) {
+function RotaContent({ data, isAdmin, onAction, isDark }) {
   const cfg = ROTA_TIPO_CONFIG[data.tipo] ?? ROTA_TIPO_CONFIG.RAMAL
   const ext = data.extensao_m ? `${Number(data.extensao_m).toFixed(0)} m` : null
   return (
@@ -181,24 +190,24 @@ function RotaContent({ data, isAdmin, onAction }) {
         <Badge label={cfg.label} {...cfg} />
       </div>
 
-      <InfoSection title="Identificação">
-        <InfoRow label="ID"     value={data.rota_id} mono accent="#a5b4fc" />
-        <InfoRow label="Nome"   value={data.nome} />
-        <InfoRow label="Extensão" value={ext} accent="#86efac" />
-        <InfoRow label="Obs"    value={data.obs} />
+      <InfoSection title="Identificação" isDark={isDark}>
+        <InfoRow label="ID"     value={data.rota_id} mono accent="#a5b4fc" isDark={isDark} />
+        <InfoRow label="Nome"   value={data.nome} isDark={isDark} />
+        <InfoRow label="Extensão" value={ext} accent="#86efac" isDark={isDark} />
+        <InfoRow label="Obs"    value={data.obs} isDark={isDark} />
       </InfoSection>
 
       {isAdmin && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
           <ActBtn onClick={() => onAction('editar_pontos')} color="#a5b4fc" bg="rgba(99,102,241,0.12)" border="rgba(99,102,241,0.35)" icon="🖊️" label="Mover pontos" />
-          <ActBtn onClick={() => onAction('editar')} color="#f1f5f9" bg="rgba(255,255,255,0.07)" border="rgba(255,255,255,0.15)" icon="✏️" label="Editar dados" />
+          <ActBtn onClick={() => onAction('editar')} color={isDark ? '#f1f5f9' : '#475569'} bg={isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9'} border={isDark ? 'rgba(255,255,255,0.15)' : '#e2e8f0'} icon="✏️" label="Editar dados" />
         </div>
       )}
     </div>
   )
 }
 
-function PosteContent({ data, isAdmin, onAction }) {
+function PosteContent({ data, isAdmin, onAction, onIrAte, isDark }) {
   const statusCfg = STATUS_CONFIG[data.status] ?? STATUS_CONFIG.ativo
   return (
     <div>
@@ -206,31 +215,30 @@ function PosteContent({ data, isAdmin, onAction }) {
         <Badge label={statusCfg.label} {...statusCfg} />
       </div>
 
-      <InfoSection title="Identificação">
-        <InfoRow label="ID"     value={data.poste_id} mono accent="#fde68a" />
-        <InfoRow label="Tipo"   value={data.tipo} />
-        <InfoRow label="Rua"    value={data.rua} />
-        <InfoRow label="Bairro" value={data.bairro} />
+      <InfoSection title="Identificação" isDark={isDark}>
+        <InfoRow label="ID"     value={data.poste_id} mono accent="#fde68a" isDark={isDark} />
+        <InfoRow label="Tipo"   value={data.tipo} isDark={isDark} />
+        <InfoRow label="Rua"    value={data.rua} isDark={isDark} />
+        <InfoRow label="Bairro" value={data.bairro} isDark={isDark} />
       </InfoSection>
 
-      <InfoSection title="Especificações">
-        <InfoRow label="Altura"       value={data.altura ? `${data.altura} m` : null} />
-        <InfoRow label="Material"     value={data.material} />
-        <InfoRow label="Proprietário" value={data.proprietario} />
-        <InfoRow label="Obs"          value={data.obs} />
+      <InfoSection title="Especificações" isDark={isDark}>
+        <InfoRow label="Altura"       value={data.altura ? `${data.altura} m` : null} isDark={isDark} />
+        <InfoRow label="Material"     value={data.material} isDark={isDark} />
+        <InfoRow label="Proprietário" value={data.proprietario} isDark={isDark} />
+        <InfoRow label="Obs"          value={data.obs} isDark={isDark} />
       </InfoSection>
 
-      {isAdmin && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-          <ActBtn onClick={() => onAction('reposicionar')} color="#fdba74" bg="rgba(249,115,22,0.12)" border="rgba(249,115,22,0.3)" icon="📍" label="Reposicionar" />
-          <ActBtn onClick={() => onAction('editar')}       color="#f1f5f9" bg="rgba(255,255,255,0.07)" border="rgba(255,255,255,0.15)" icon="✏️" label="Editar" />
-        </div>
-      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+        {onIrAte && <ActBtn onClick={onIrAte} color="#93c5fd" bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.3)" icon="🧭" label="Ir Até" />}
+        {isAdmin && <ActBtn onClick={() => onAction('reposicionar')} color="#fdba74" bg="rgba(249,115,22,0.12)" border="rgba(249,115,22,0.3)" icon="📍" label="Reposicionar" />}
+        {isAdmin && <ActBtn onClick={() => onAction('editar')}       color={isDark ? '#f1f5f9' : '#475569'} bg={isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9'} border={isDark ? 'rgba(255,255,255,0.15)' : '#e2e8f0'} icon="✏️" label="Editar" />}
+      </div>
     </div>
   )
 }
 
-function OLTContent({ data, isAdmin, onAction }) {
+function OLTContent({ data, isAdmin, onAction, onIrAte, isDark }) {
   const STATUS_OLT = {
     ativo:         { label: 'Ativo',      bg: 'rgba(34,197,94,0.15)',   border: 'rgba(34,197,94,0.4)',   color: '#86efac' },
     inativo:       { label: 'Inativo',    bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.4)',   color: '#fca5a5' },
@@ -245,22 +253,28 @@ function OLTContent({ data, isAdmin, onAction }) {
         <Badge label={st.label} {...st} />
       </div>
 
-      <InfoSection title="Equipamento">
-        <InfoRow label="ID"     value={oltId}      mono accent="#67e8f9" />
-        <InfoRow label="Nome"   value={data.nome} />
-        <InfoRow label="Modelo" value={data.modelo} />
-        <InfoRow label="IP"     value={data.ip}    mono accent="#86efac" />
+      <InfoSection title="Equipamento" isDark={isDark}>
+        <InfoRow label="ID"     value={oltId}      mono accent="#67e8f9" isDark={isDark} />
+        <InfoRow label="Nome"   value={data.nome} isDark={isDark} />
+        <InfoRow label="Modelo" value={data.modelo} isDark={isDark} />
+        <InfoRow label="IP"     value={data.ip}    mono accent="#86efac" isDark={isDark} />
       </InfoSection>
 
-      <InfoSection title="Capacidade">
-        <InfoRow label="Portas PON" value={data.capacidade ? `${data.capacidade} portas` : null} accent="#67e8f9" />
+      <InfoSection title="Capacidade" isDark={isDark}>
+        <InfoRow label="Portas PON" value={data.capacidade ? `${data.capacidade} portas` : null} accent="#67e8f9" isDark={isDark} />
       </InfoSection>
 
-      {isAdmin && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          <ActBtn onClick={() => onAction('editar')} color="#f1f5f9" bg="rgba(255,255,255,0.07)" border="rgba(255,255,255,0.15)" icon="✏️" label="Editar OLT" full />
-        </div>
-      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+        {onIrAte && (
+          <ActBtn onClick={onIrAte} color="#38bdf8" bg="rgba(14,165,233,0.12)" border="rgba(14,165,233,0.35)" icon="🧭" label="Ir Até" />
+        )}
+        {isAdmin && (
+          <ActBtn onClick={() => onAction('reposicionar')} color="#fbbf24" bg="rgba(251,191,36,0.12)" border="rgba(251,191,36,0.35)" icon="📍" label="Reposicionar" />
+        )}
+        {isAdmin && (
+          <ActBtn onClick={() => onAction('editar')} color={isDark ? '#f1f5f9' : '#475569'} bg={isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9'} border={isDark ? 'rgba(255,255,255,0.15)' : '#e2e8f0'} icon="✏️" label="Editar OLT" />
+        )}
+      </div>
     </div>
   )
 }
@@ -272,8 +286,12 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
   const startYRef = useRef(null)
   const sheetRef  = useRef(null)
 
-  const role    = userRole || session?.user?.role || 'user'
-  const isAdmin = role === 'admin' || role === 'superadmin'
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+
+  const role      = userRole || session?.user?.role || 'user'
+  const isAdmin   = role === 'admin' || role === 'superadmin'
+  const isTecnico = role === 'tecnico'
 
   useEffect(() => {
     if (element) requestAnimationFrame(() => setVisible(true))
@@ -304,6 +322,17 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
   const name            = data?.nome || data?.cto_id || data?.rota_id || data?.poste_id || data?.id || data?.ce_id || '—'
   const handleAction    = (action) => onAction?.({ type, data, action })
 
+  // "Ir Até" — abre navegação nativa para a posição do elemento
+  function irAte() {
+    const lat = data?.lat
+    const lng = data?.lng
+    if (lat == null || lng == null) return
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const temCoordenadas = data?.lat != null && data?.lng != null
+
   return (
     <div
       ref={sheetRef}
@@ -312,10 +341,10 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
       {/* Cabeçalho arrastável */}
       <div
         style={{
-          backgroundColor: 'rgba(6,10,22,0.99)',
+          backgroundColor: isDark ? 'rgba(6,10,22,0.99)' : '#ffffff',
           borderTop: `3px solid ${cfg.accent}`,
-          borderLeft: '1px solid rgba(255,255,255,0.08)',
-          borderRight: '1px solid rgba(255,255,255,0.08)',
+          borderLeft: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`,
+          borderRight: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`,
           borderRadius: '20px 20px 0 0',
           cursor: 'grab', padding: '10px 16px 12px',
           userSelect: 'none',
@@ -329,7 +358,7 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
         onTouchEnd={handleDragEnd}
       >
         {/* Handle bar */}
-        <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)', margin: '0 auto 12px' }} />
+        <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : '#e2e8f0', margin: '0 auto 12px' }} />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -345,8 +374,8 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
               {cfg.emoji}
             </div>
             <div>
-              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 2 }}>{cfg.label}</p>
-              <p style={{ fontSize: 17, fontWeight: 800, color: '#f1f5f9', lineHeight: 1.2, margin: 0 }}>{name}</p>
+              <p style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.35)' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 2 }}>{cfg.label}</p>
+              <p style={{ fontSize: 17, fontWeight: 800, color: isDark ? '#f1f5f9' : '#1e293b', lineHeight: 1.2, margin: 0 }}>{name}</p>
             </div>
           </div>
           <button
@@ -354,9 +383,9 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
             onClick={onClose}
             style={{
               width: 32, height: 32, borderRadius: 8,
-              backgroundColor: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: 'rgba(255,255,255,0.4)', fontSize: 16, lineHeight: 1,
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9',
+              border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`,
+              color: isDark ? 'rgba(255,255,255,0.4)' : '#64748b', fontSize: 16, lineHeight: 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', flexShrink: 0,
             }}
@@ -369,17 +398,17 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
 
       {/* Conteúdo scrollável */}
       <div style={{
-        backgroundColor: 'rgba(6,10,22,0.99)',
-        borderLeft: '1px solid rgba(255,255,255,0.08)',
-        borderRight: '1px solid rgba(255,255,255,0.08)',
+        backgroundColor: isDark ? 'rgba(6,10,22,0.99)' : '#ffffff',
+        borderLeft: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`,
+        borderRight: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`,
         padding: '12px 16px 32px',
         maxHeight: '55vh', overflowY: 'auto',
       }}>
-        {type === 'cto'                       && <CTOContent   data={data} isAdmin={isAdmin} onAction={handleAction} />}
-        {(type === 'cdo' || type === 'caixa') && <CaixaContent data={data} isAdmin={isAdmin} onAction={handleAction} />}
-        {type === 'rota'                       && <RotaContent  data={data} isAdmin={isAdmin} onAction={handleAction} />}
-        {type === 'poste'                      && <PosteContent data={data} isAdmin={isAdmin} onAction={handleAction} />}
-        {type === 'olt'                        && <OLTContent   data={data} isAdmin={isAdmin} onAction={handleAction} />}
+        {type === 'cto'                       && <CTOContent   data={data} isAdmin={isAdmin} isTecnico={isTecnico} onAction={handleAction} onIrAte={temCoordenadas ? irAte : null} onMedirPotencia={() => handleAction('medir_potencia')} isDark={isDark} />}
+        {(type === 'cdo' || type === 'caixa') && <CaixaContent data={data} isAdmin={isAdmin} onAction={handleAction} onIrAte={temCoordenadas ? irAte : null} isDark={isDark} />}
+        {type === 'rota'                       && <RotaContent  data={data} isAdmin={isAdmin} onAction={handleAction} isDark={isDark} />}
+        {type === 'poste'                      && <PosteContent data={data} isAdmin={isAdmin} onAction={handleAction} onIrAte={temCoordenadas ? irAte : null} isDark={isDark} />}
+        {type === 'olt'                        && <OLTContent   data={data} isAdmin={isAdmin} onAction={handleAction} onIrAte={temCoordenadas ? irAte : null} isDark={isDark} />}
       </div>
     </div>
   )

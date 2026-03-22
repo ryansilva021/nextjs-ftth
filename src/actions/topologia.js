@@ -54,12 +54,26 @@ function abntFibra(porta) {
   return { n: porta, cor: ABNT_CORES[idx], hex: ABNT_HEX[idx] }
 }
 
-/** Encontra rota cujo obs menciona ambos os IDs */
+/**
+ * Encontra rota que conecta dois itens da topologia.
+ * 1ª tentativa: snap_ids[] contém entradas com ambos os IDs (match exato)
+ * 2ª tentativa: obs menciona ambos os IDs (compatibilidade com rotas antigas)
+ */
 function findRota(rotas, id1, id2) {
   if (!id1 || !id2) return null
+  const lo1 = id1.toLowerCase()
+  const lo2 = id2.toLowerCase()
+  // Tenta match por snap_ids (novo campo — mais confiável)
+  const bySnap = rotas.find(r =>
+    Array.isArray(r.snap_ids) && r.snap_ids.length >= 2 &&
+    r.snap_ids.some(s => s.toLowerCase().includes(lo1)) &&
+    r.snap_ids.some(s => s.toLowerCase().includes(lo2))
+  )
+  if (bySnap) return bySnap
+  // Fallback: match por obs (rotas criadas antes do campo snap_ids)
   return rotas.find(r => {
     const obs = (r.obs || '').toLowerCase()
-    return obs.includes(id1.toLowerCase()) && obs.includes(id2.toLowerCase())
+    return obs.includes(lo1) && obs.includes(lo2)
   }) ?? null
 }
 
@@ -138,7 +152,7 @@ export async function getCaminhoPotencia(projetoId, ctoId) {
     : null
 
   // ── 4. Rotas (para calcular distância real) ─────────────────────────────────
-  const rotas = await Rota.find({ projeto_id: tp }, 'rota_id obs geojson comprimento_m').lean()
+  const rotas = await Rota.find({ projeto_id: tp }, 'rota_id obs snap_ids geojson comprimento_m').lean()
 
   const rotaOltCdo = olt && cdo ? findRota(rotas, olt.id, cdo.id) : null
   const rotaCdoCto = cdo ? findRota(rotas, cdo.id, ctoId) : null

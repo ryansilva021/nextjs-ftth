@@ -54,7 +54,7 @@ export default function CampoClient({
         {/* Tabs */}
         <div
           className="flex gap-1 p-1 rounded-xl overflow-x-auto"
-          style={{ backgroundColor: '#0d1526', border: '1px solid #1f2937', flex: 1 }}
+          style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', flex: 1 }}
         >
             {TABS.map((tab) => {
             const ativo = tab.id === abaAtiva
@@ -65,7 +65,7 @@ export default function CampoClient({
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
                 style={{
                   backgroundColor: ativo ? tab.color + '22' : 'transparent',
-                  color: ativo ? tab.color : '#64748b',
+                  color: ativo ? tab.color : 'var(--text-muted)',
                   border: ativo ? `1px solid ${tab.color}44` : '1px solid transparent',
                   minWidth: 80,
                 }}
@@ -115,7 +115,7 @@ export default function CampoClient({
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={() => setLimparEtapa(0)}
-              style={{ padding: '6px 16px', borderRadius: 6, border: '1px solid #475569', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: 13 }}
+              style={{ padding: '6px 16px', borderRadius: 6, border: '1px solid var(--border-color-strong)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }}
             >
               Cancelar
             </button>
@@ -129,7 +129,7 @@ export default function CampoClient({
         </div>
       )}
       {limparEtapa === 2 && (
-        <div style={{ marginBottom: 20, color: '#94a3b8', fontSize: 13 }}>Limpando projeto…</div>
+        <div style={{ marginBottom: 20, color: 'var(--text-secondary)', fontSize: 13 }}>Limpando projeto…</div>
       )}
       {limparEtapa === 3 && limparResult && (
         <div style={{ marginBottom: 20, fontSize: 13 }}>
@@ -144,7 +144,7 @@ export default function CampoClient({
           {' '}
           <button
             onClick={() => { setLimparEtapa(0); setLimparResult(null) }}
-            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 12 }}
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}
           >
             Fechar
           </button>

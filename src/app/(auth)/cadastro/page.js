@@ -166,19 +166,19 @@ export default function CadastroPage() {
 
       {/* Card principal */}
       <div
-        style={{ backgroundColor: '#111827', border: '1px solid #1f2937' }}
+        style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
         className="rounded-2xl overflow-hidden"
       >
         {/* Barra de progresso */}
         {passo <= 4 && (
-          <div style={{ backgroundColor: '#0d1526', borderBottom: '1px solid #1f2937' }} className="px-6 py-4">
+          <div style={{ backgroundColor: 'var(--card-bg-active)', borderBottom: '1px solid var(--border-color)' }} className="px-6 py-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-slate-400 font-medium">
                 {['', 'Escolha o plano', 'Dados da empresa', 'Credenciais de acesso', 'Confirmar'][passo]}
               </span>
               <span className="text-xs text-slate-500">{passo} de 4</span>
             </div>
-            <div className="w-full h-1 rounded-full" style={{ backgroundColor: '#1f2937' }}>
+            <div className="w-full h-1 rounded-full" style={{ backgroundColor: 'var(--border-color)' }}>
               <div
                 className="h-1 rounded-full transition-all duration-500"
                 style={{
@@ -206,8 +206,8 @@ export default function CadastroPage() {
                     key={p.id}
                     onClick={() => setPlano(p.id)}
                     style={{
-                      backgroundColor: plano === p.id ? p.corBg : '#0b1220',
-                      border: `1px solid ${plano === p.id ? p.cor : '#1f2937'}`,
+                      backgroundColor: plano === p.id ? p.corBg : 'var(--background)',
+                      border: `1px solid ${plano === p.id ? p.cor : 'var(--border-color)'}`,
                       boxShadow: plano === p.id ? `0 0 0 1px ${p.cor}40` : 'none',
                     }}
                     className="rounded-xl p-4 text-left transition-all"
@@ -254,7 +254,7 @@ export default function CadastroPage() {
 
               {/* Features do sistema */}
               <div
-                style={{ backgroundColor: '#0b1220', border: '1px solid #1f2937' }}
+                style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border-color)' }}
                 className="rounded-xl p-4 mb-5"
               >
                 <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-3">
@@ -305,7 +305,7 @@ export default function CadastroPage() {
                   value={empresa}
                   onChange={(e) => setEmpresa(e.target.value)}
                   placeholder="Ex: Fibra Rápida Telecom"
-                  style={{ backgroundColor: '#0b1220', border: `1px solid ${empresa ? planoSelecionado.cor + '60' : '#1f2937'}`, color: '#f1f5f9' }}
+                  style={{ backgroundColor: 'var(--inp-bg)', border: `1px solid ${empresa ? planoSelecionado.cor + '60' : 'var(--border-color)'}`, color: 'var(--foreground)' }}
                   className="rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 placeholder-slate-600"
                   autoFocus
                 />
@@ -340,7 +340,7 @@ export default function CadastroPage() {
               <div className="flex gap-3">
                 <button
                   onClick={voltar}
-                  style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                  style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                   className="px-4 hover:bg-slate-800 font-semibold py-3 rounded-xl text-sm transition-colors"
                 >
                   ←
@@ -387,9 +387,9 @@ export default function CadastroPage() {
                       onBlur={(e) => verificarLogin(e.target.value)}
                       placeholder="ex: joao.silva"
                       style={{
-                        backgroundColor: '#0b1220',
-                        border: `1px solid ${loginDisponivel === true ? '#22c55e60' : loginDisponivel === false ? '#ef444460' : '#1f2937'}`,
-                        color: '#f1f5f9',
+                        backgroundColor: 'var(--inp-bg)',
+                        border: `1px solid ${loginDisponivel === true ? '#22c55e60' : loginDisponivel === false ? '#ef444460' : 'var(--border-color)'}`,
+                        color: 'var(--foreground)',
                       }}
                       className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none pr-10 placeholder-slate-600"
                     />
@@ -415,7 +415,7 @@ export default function CadastroPage() {
                       value={senha}
                       onChange={(e) => setSenha(e.target.value)}
                       placeholder="mínimo 6 caracteres"
-                      style={{ backgroundColor: '#0b1220', border: '1px solid #1f2937', color: '#f1f5f9' }}
+                      style={{ backgroundColor: 'var(--inp-bg)', border: '1px solid var(--border-color)', color: 'var(--foreground)' }}
                       className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none pr-12 placeholder-slate-600"
                     />
                     <button
@@ -434,7 +434,7 @@ export default function CadastroPage() {
                           <div
                             key={n}
                             className="flex-1 h-1 rounded-full transition-all"
-                            style={{ backgroundColor: n <= forca ? forcaCor : '#1f2937' }}
+                            style={{ backgroundColor: n <= forca ? forcaCor : 'var(--border-color)' }}
                           />
                         ))}
                       </div>
@@ -454,9 +454,9 @@ export default function CadastroPage() {
                     onChange={(e) => setSenhaConfirm(e.target.value)}
                     placeholder="repita a senha"
                     style={{
-                      backgroundColor: '#0b1220',
-                      border: `1px solid ${senhaConfirm && senha === senhaConfirm ? '#22c55e60' : senhaConfirm ? '#ef444460' : '#1f2937'}`,
-                      color: '#f1f5f9',
+                      backgroundColor: 'var(--inp-bg)',
+                      border: `1px solid ${senhaConfirm && senha === senhaConfirm ? '#22c55e60' : senhaConfirm ? '#ef444460' : 'var(--border-color)'}`,
+                      color: 'var(--foreground)',
                     }}
                     className="rounded-xl px-4 py-3 text-sm focus:outline-none placeholder-slate-600"
                   />
@@ -478,7 +478,7 @@ export default function CadastroPage() {
               <div className="flex gap-3">
                 <button
                   onClick={voltar}
-                  style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                  style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                   className="px-4 hover:bg-slate-800 font-semibold py-3 rounded-xl text-sm transition-colors"
                 >
                   ←
@@ -515,7 +515,7 @@ export default function CadastroPage() {
 
               {/* Resumo */}
               <div
-                style={{ backgroundColor: '#0b1220', border: '1px solid #1f2937' }}
+                style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border-color)' }}
                 className="rounded-xl p-4 mb-4"
               >
                 <div className="flex flex-col gap-3">
@@ -575,7 +575,7 @@ export default function CadastroPage() {
                 <button
                   onClick={voltar}
                   disabled={enviando}
-                  style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                  style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                   className="px-4 hover:bg-slate-800 disabled:opacity-40 font-semibold py-3 rounded-xl text-sm transition-colors"
                 >
                   ←

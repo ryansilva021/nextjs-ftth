@@ -30,7 +30,7 @@ const ABNT = [
 
 // ─── Paleta de cores do tema escuro ─────────────────────────────────────────
 const C = {
-  bg:       '#060a16',
+  bg:       'var(--card-bg-active)',
   card:     '#0d1117',
   card2:    '#161b22',
   border:   '#21262d',
@@ -143,7 +143,7 @@ function OccBar({ ocupacao = 0, capacidade = 0 }) {
 // ─── Conector de árvore (vertical) ───────────────────────────────────────────
 function TreeLine({ isLast, color = '#21262d', height = '100%' }) {
   return (
-    <div style={{
+    <div className="diag-tree-v" style={{
       position: 'absolute', left: 0, top: 0,
       width: 1, height: isLast ? '50%' : height,
       backgroundColor: color, opacity: 0.5,
@@ -182,7 +182,7 @@ function OLTCard({ olt, expanded, onToggle }) {
           <span style={{ fontSize: 18 }}>🖥️</span>
           <div>
             <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: C.oltBdr, marginBottom: 1 }}>OLT</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: C.oltHdr, lineHeight: 1.2 }}>{olt.nome ?? olt.id}</div>
+            <div className="diag-node-title" style={{ fontSize: 15, fontWeight: 800, color: C.oltHdr, lineHeight: 1.2 }}>{olt.nome ?? olt.id}</div>
           </div>
         </div>
         <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>{expanded ? '▲' : '▼'}</span>
@@ -202,7 +202,7 @@ function OLTCard({ olt, expanded, onToggle }) {
             <span style={{ ...S.badge(statusBg, statusColor) }}>{olt.status}</span>
           )}
         </div>
-        <div style={{ fontSize: 10, color: C.muted }}>
+        <div className="diag-secondary" style={{ fontSize: 10, color: C.muted }}>
           {caixasCount === 0 ? 'Nenhuma CE/CDO vinculada' : `${caixasCount} CE/CDO${caixasCount !== 1 ? 's' : ''} vinculada${caixasCount !== 1 ? 's' : ''}`}
         </div>
       </div>
@@ -253,7 +253,7 @@ function CDOCard({ caixa, expanded, onToggle }) {
             <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color, marginBottom: 1 }}>
               {caixa.tipo ?? 'CDO'}
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: hdr, lineHeight: 1.2 }}>
+            <div className="diag-node-title" style={{ fontSize: 13, fontWeight: 700, color: hdr, lineHeight: 1.2 }}>
               {caixa.nome ?? caixa.id}
             </div>
           </div>
@@ -268,13 +268,13 @@ function CDOCard({ caixa, expanded, onToggle }) {
             <span style={{ ...S.badge('#0a1628', '#38bdf8') }}>PON {entrada.pon}</span>
           )}
           {entrada.porta_olt != null && (
-            <span style={{ ...S.badge('#111827', C.muted) }}>Porta OLT: {entrada.porta_olt}</span>
+            <span style={{ ...S.badge('var(--card-bg)', C.muted) }}>Porta OLT: {entrada.porta_olt}</span>
           )}
           {splitterInfo && (
             <span style={{ ...S.badge('#1a0a30', '#a78bfa') }}>Split {splitterInfo}</span>
           )}
         </div>
-        <div style={{ fontSize: 10, color: C.muted }}>
+        <div className="diag-secondary" style={{ fontSize: 10, color: C.muted }}>
           {ctoCount === 0 ? 'Sem CTOs vinculadas' : `${ctoCount} CTO${ctoCount !== 1 ? 's' : ''} conectada${ctoCount !== 1 ? 's' : ''}`}
         </div>
       </div>
@@ -316,17 +316,17 @@ function CTORow({ cto, caixa, isLast, onSelect, selected }) {
       }}>
         {/* Vertical line (only if not last) */}
         {!isLast && (
-          <div style={{
+          <div className="diag-tree-v" style={{
             position: 'absolute', left: 7, top: 0, bottom: 0,
             width: 1, backgroundColor: '#21262d',
           }} />
         )}
         {/* Half vertical + horizontal */}
-        <div style={{
+        <div className="diag-tree-v" style={{
           position: 'absolute', left: 7, top: 0, height: '50%',
           width: 1, backgroundColor: '#21262d',
         }} />
-        <div style={{
+        <div className="diag-tree-h" style={{
           position: 'absolute', left: 7, top: '50%',
           width: 13, height: 1, backgroundColor: '#21262d',
         }} />
@@ -335,7 +335,7 @@ function CTORow({ cto, caixa, isLast, onSelect, selected }) {
       {/* Port label */}
       {porta != null && (
         <span style={{
-          fontSize: 10, fontWeight: 800, color: '#64748b',
+          fontSize: 10, fontWeight: 800, color: 'var(--text-muted)',
           ...S.mono, flexShrink: 0, minWidth: 28,
         }}>
           P.{porta}
@@ -381,7 +381,7 @@ function CTORow({ cto, caixa, isLast, onSelect, selected }) {
 
       {/* Cable */}
       {caboId && (
-        <span style={{ fontSize: 9, color: '#f59e0b', ...S.mono, flexShrink: 0 }}>
+        <span className="diag-secondary" style={{ fontSize: 9, color: '#f59e0b', ...S.mono, flexShrink: 0 }}>
           {caboId}
         </span>
       )}
@@ -786,6 +786,15 @@ export default function DiagramaTopologia({ projetoId, altura = 600 }) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
+    <>
+    <style>{`
+      @media (max-width: 480px) {
+        .diag-tree-v { width: 2px !important; opacity: 0.75 !important; }
+        .diag-tree-h { height: 2px !important; opacity: 0.75 !important; }
+        .diag-secondary { display: none !important; }
+        .diag-node-title { font-size: 16px !important; }
+      }
+    `}</style>
     <div style={{
       backgroundColor: C.bg,
       borderRadius: 12,
@@ -838,5 +847,6 @@ export default function DiagramaTopologia({ projetoId, altura = 600 }) {
         )}
       </div>
     </div>
+    </>
   )
 }

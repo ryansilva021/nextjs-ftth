@@ -228,6 +228,8 @@ export async function saveDiagramaCaixa(data) {
 
   revalidatePath('/')
   revalidatePath('/admin/diagramas')
+  revalidatePath('/admin/topologia')
+  revalidatePath('/admin/calculos')
 
   return { saved: result.modifiedCount > 0 }
 }

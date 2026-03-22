@@ -10,8 +10,8 @@ const DiagramaTopologiaFlow = dynamic(
       <div style={{
         height: '100%', minHeight: 500,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#060a16', borderRadius: 12,
-        color: '#475569', fontSize: 13,
+        background: 'var(--background)', borderRadius: 12,
+        color: 'var(--text-muted)', fontSize: 13,
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{

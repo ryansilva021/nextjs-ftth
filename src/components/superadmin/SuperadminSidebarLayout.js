@@ -16,14 +16,14 @@ export default function SuperadminSidebarLayout({ session, children }) {
   const pathname = usePathname()
 
   const sidebarStyle = {
-    backgroundColor: '#0d1526',
-    borderRight: '1px solid #1f2937',
+    backgroundColor: 'var(--sidebar-bg)',
+    borderRight: '1px solid var(--sidebar-border)',
     width: '260px',
     minWidth: '260px',
   }
 
   return (
-    <div style={{ backgroundColor: '#0b1220', minHeight: '100vh' }} className="flex">
+    <div style={{ backgroundColor: 'var(--background)', minHeight: '100vh' }} className="flex">
       {/* Overlay mobile */}
       {aberta && (
         <div
@@ -45,7 +45,7 @@ export default function SuperadminSidebarLayout({ session, children }) {
       >
         {/* Logo */}
         <div
-          style={{ borderBottom: '1px solid #1f2937' }}
+          style={{ borderBottom: '1px solid var(--sidebar-border)' }}
           className="flex items-center gap-3 px-5 py-4"
         >
           <div
@@ -71,7 +71,7 @@ export default function SuperadminSidebarLayout({ session, children }) {
                 onClick={() => setAberta(false)}
                 style={{
                   backgroundColor: ativa ? '#1e1040' : 'transparent',
-                  color: ativa ? '#a78bfa' : '#94a3b8',
+                  color: ativa ? '#a78bfa' : 'var(--text-secondary)',
                   border: ativa ? '1px solid #5b21b6' : '1px solid transparent',
                 }}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800 hover:text-white"
@@ -85,26 +85,28 @@ export default function SuperadminSidebarLayout({ session, children }) {
 
         {/* Footer */}
         <div
-          style={{ borderTop: '1px solid #1f2937' }}
+          style={{ borderTop: '1px solid var(--sidebar-border)', marginTop: 'auto' }}
           className="px-4 py-4"
         >
-          <div className="flex items-center gap-3 mb-3">
+          <Link href="/perfil"
+            className="flex items-center gap-3 mb-3 rounded-lg px-1 py-1 transition-colors hover:bg-slate-200/20"
+            style={{ textDecoration: 'none' }}>
             <div
               style={{ backgroundColor: '#2e1065' }}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-violet-400 text-xs font-bold uppercase"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-violet-400 text-xs font-bold uppercase flex-shrink-0"
             >
               {session?.user?.username?.[0] ?? '?'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white text-xs font-medium truncate">
+              <p style={{ color: 'var(--foreground)' }} className="text-xs font-medium truncate">
                 {session?.user?.username}
               </p>
               <p className="text-violet-400 text-xs font-semibold">superadmin</p>
             </div>
-          </div>
+          </Link>
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
-            style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+            style={{ border: '1px solid var(--sidebar-border)', color: 'var(--text-secondary)' }}
             className="w-full text-xs py-2 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
           >
             Sair
@@ -116,7 +118,7 @@ export default function SuperadminSidebarLayout({ session, children }) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header mobile */}
         <header
-          style={{ backgroundColor: '#0d1526', borderBottom: '1px solid #1f2937' }}
+          style={{ backgroundColor: 'var(--sidebar-bg)', borderBottom: '1px solid var(--sidebar-border)' }}
           className="flex items-center justify-between px-4 py-3 lg:hidden"
         >
           <button

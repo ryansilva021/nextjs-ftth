@@ -4,8 +4,8 @@ import { useState, useTransition } from 'react'
 import { registrarMovimentacao } from '@/actions/movimentacoes'
 
 const cardStyle = {
-  backgroundColor: '#111827',
-  border: '1px solid #1f2937',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
 }
 
 const modalBgStyle = {
@@ -13,9 +13,9 @@ const modalBgStyle = {
 }
 
 const inputStyle = {
-  backgroundColor: '#0b1220',
-  border: '1px solid #1f2937',
-  color: '#f1f5f9',
+  backgroundColor: 'var(--inp-bg)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--foreground)',
 }
 
 const TIPOS = ['instalacao', 'desinstalacao', 'troca', 'manutencao']
@@ -31,7 +31,7 @@ const TIPO_BG = {
   instalacao: { backgroundColor: '#052e16', border: '1px solid #16a34a' },
   desinstalacao: { backgroundColor: '#450a0a', border: '1px solid #dc2626' },
   troca: { backgroundColor: '#422006', border: '1px solid #d97706' },
-  manutencao: { backgroundColor: '#0c1a2e', border: '1px solid #2563eb' },
+  manutencao: { backgroundColor: 'var(--card-bg-active)', border: '1px solid #2563eb' },
 }
 
 function formatarData(dataStr) {
@@ -136,7 +136,7 @@ export default function MovimentacoesClient({ movimentacoesIniciais, projetoId, 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid #1f2937', backgroundColor: '#0d1526' }}>
+              <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--card-bg)' }}>
                 {['CTO', 'Tipo', 'Cliente', 'Porta', 'Técnico', 'Data/Hora', 'Observação'].map((h) => (
                   <th key={h} className="text-left text-xs text-slate-400 font-semibold uppercase tracking-wider px-4 py-3">
                     {h}
@@ -159,7 +159,7 @@ export default function MovimentacoesClient({ movimentacoesIniciais, projetoId, 
                 return (
                   <tr
                     key={mov._id}
-                    style={{ borderBottom: i < movimentacoes.length - 1 ? '1px solid #1f2937' : 'none' }}
+                    style={{ borderBottom: i < movimentacoes.length - 1 ? '1px solid var(--border-color)' : 'none' }}
                     className="hover:bg-slate-800/30 transition-colors"
                   >
                     <td className="px-4 py-3 font-mono text-xs text-sky-400">{mov.cto_id}</td>
@@ -278,7 +278,7 @@ export default function MovimentacoesClient({ movimentacoesIniciais, projetoId, 
               <button
                 onClick={fecharModal}
                 disabled={isPending}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="px-4 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors disabled:opacity-40"
               >
                 Cancelar

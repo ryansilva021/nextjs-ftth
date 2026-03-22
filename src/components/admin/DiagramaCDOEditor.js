@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { getDiagramaCaixa, saveDiagramaCaixa, getUsadosProjeto } from '@/actions/caixas'
+import { useTheme } from '@/contexts/ThemeContext'
 
 // ─── ABNT NBR 14721 ───────────────────────────────────────────────────────────
 const ABNT = [
@@ -28,33 +29,45 @@ const SPLITTER_TIPOS = ['1x2', '1x4', '1x8', '1x16', '1x32']
 function uid() { return Math.random().toString(36).slice(2, 9) }
 
 // ─── Estilos base ─────────────────────────────────────────────────────────────
+// Dark-mode constants kept at module scope so sub-component inline JSX references remain valid.
 const BG   = '#0d1117'
 const BG2  = '#161b22'
 const BG3  = '#1c2333'
 const BORDER = '#30363d'
 
-const S = {
-  wrap:     { backgroundColor: BG, border: `1px solid ${BORDER}`, borderRadius: 12, color: '#e6edf3', overflow: 'hidden' },
-  header:   { backgroundColor: BG2, borderBottom: `1px solid ${BORDER}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 },
-  tabBar:   { backgroundColor: BG2, borderBottom: `1px solid ${BORDER}`, display: 'flex', gap: 0, overflowX: 'auto' },
-  tabBtn:   (ativa, cor) => ({
-    padding: '11px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-    backgroundColor: 'transparent', border: 'none', borderBottom: ativa ? `2px solid ${cor}` : '2px solid transparent',
-    color: ativa ? cor : '#8b949e', whiteSpace: 'nowrap', transition: 'all .15s',
-  }),
-  body:     { padding: '20px', minHeight: 300 },
-  sec:      { backgroundColor: BG2, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '16px', marginBottom: 14 },
-  secHead:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  secTitle: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8b949e' },
-  inp:      { backgroundColor: BG3, border: `1px solid ${BORDER}`, color: '#e6edf3', borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box' },
-  inpSm:    { backgroundColor: BG3, border: `1px solid ${BORDER}`, color: '#e6edf3', borderRadius: 6, padding: '4px 6px', fontSize: 12, outline: 'none', width: 52, textAlign: 'center', boxSizing: 'border-box' },
-  lbl:      { fontSize: 10, color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, display: 'block', marginBottom: 3 },
-  btnAdd:   { background: 'linear-gradient(135deg,#238636,#1a7f37)', color: '#fff', fontWeight: 700, fontSize: 11, borderRadius: 6, padding: '5px 12px', cursor: 'pointer', border: 'none' },
-  btnDel:   { backgroundColor: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', color: '#f85149', fontSize: 11, borderRadius: 6, padding: '4px 8px', cursor: 'pointer' },
-  btnSave:  { background: 'linear-gradient(135deg,#1f6feb,#1158c7)', color: '#fff', fontWeight: 700, fontSize: 14, borderRadius: 8, padding: '9px 24px', cursor: 'pointer', border: 'none' },
-  tag:      (c) => ({ display:'inline-flex', alignItems:'center', gap:5, backgroundColor:`${c}18`, border:`1px solid ${c}44`, borderRadius:6, padding:'2px 8px', fontSize:11, fontWeight:600, color:c }),
-  card:     { backgroundColor: BG3, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px 14px', marginBottom: 8 },
+function getStyles(isDark) {
+  const bg   = isDark ? '#0d1117' : '#ffffff'
+  const bg2  = isDark ? '#161b22' : '#f8fafc'
+  const bg3  = isDark ? '#1c2333' : '#f1f5f9'
+  const br   = isDark ? '#30363d' : '#e2e8f0'
+  const text = isDark ? '#e6edf3' : '#1e293b'
+  const muted = isDark ? '#8b949e' : '#64748b'
+  return {
+    wrap:     { backgroundColor: bg, border: `1px solid ${br}`, borderRadius: 12, color: text, overflow: 'visible', minWidth: 0 },
+    header:   { backgroundColor: bg2, borderBottom: `1px solid ${br}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 },
+    tabBar:   { backgroundColor: bg2, borderBottom: `1px solid ${br}`, display: 'flex', gap: 0, overflowX: 'auto' },
+    tabBtn:   (ativa, cor) => ({
+      padding: '11px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+      backgroundColor: 'transparent', border: 'none', borderBottom: ativa ? `2px solid ${cor}` : '2px solid transparent',
+      color: ativa ? cor : muted, whiteSpace: 'nowrap', transition: 'all .15s',
+    }),
+    body:     { padding: '16px', minHeight: 300, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto', overflowX: 'auto' },
+    sec:      { backgroundColor: bg2, border: `1px solid ${br}`, borderRadius: 10, padding: '16px', marginBottom: 14 },
+    secHead:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+    secTitle: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: muted },
+    inp:      { backgroundColor: bg3, border: `1px solid ${br}`, color: text, borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box' },
+    inpSm:    { backgroundColor: bg3, border: `1px solid ${br}`, color: text, borderRadius: 6, padding: '4px 6px', fontSize: 12, outline: 'none', width: 52, textAlign: 'center', boxSizing: 'border-box' },
+    lbl:      { fontSize: 10, color: muted, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, display: 'block', marginBottom: 3 },
+    btnAdd:   { background: 'linear-gradient(135deg,#238636,#1a7f37)', color: '#fff', fontWeight: 700, fontSize: 11, borderRadius: 6, padding: '5px 12px', cursor: 'pointer', border: 'none' },
+    btnDel:   { backgroundColor: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', color: '#f85149', fontSize: 11, borderRadius: 6, padding: '4px 8px', cursor: 'pointer' },
+    btnSave:  { background: 'linear-gradient(135deg,#1f6feb,#1158c7)', color: '#fff', fontWeight: 700, fontSize: 14, borderRadius: 8, padding: '9px 24px', cursor: 'pointer', border: 'none' },
+    tag:      (c) => ({ display:'inline-flex', alignItems:'center', gap:5, backgroundColor:`${c}18`, border:`1px solid ${c}44`, borderRadius:6, padding:'2px 8px', fontSize:11, fontWeight:600, color:c }),
+    card:     { backgroundColor: bg3, border: `1px solid ${br}`, borderRadius: 8, padding: '12px 14px', marginBottom: 8 },
+  }
 }
+
+// Module-level S (dark defaults) used by sub-components that cannot access theme context.
+const S = getStyles(true)
 
 // ─── Seletor de fibra como <select> com opções coloridas ─────────────────────
 function FibraSelect({ value, onChange, small }) {
@@ -87,113 +100,170 @@ function FibraSelect({ value, onChange, small }) {
 }
 
 // ─── Aba PON/OLT ─────────────────────────────────────────────────────────────
-function AbaOLT({ entrada, onChange, bandejas }) {
-  const placas = entrada.dio_config?.placas ?? []
+function AbaOLT({ entrada, onChange, olts, splitters, bandejas }) {
+  // OLT vinculada (por id ou olt_id)
+  const oltAtual = (olts ?? []).find(o => o.id === entrada.olt_id || o.olt_id === entrada.olt_id) ?? null
+  const dioMapa  = oltAtual?.dio_config?.mapa ?? []
 
-  function updPlacas(newPlacas) {
-    onChange({ ...entrada, dio_config: { ...(entrada.dio_config ?? {}), placas: newPlacas } })
-  }
-  function addPlaca() {
-    const n = placas.length + 1
-    updPlacas([...placas, { num: n, label: `Placa ${n}`, portas: 16 }])
-  }
-  function remPlaca(num) { updPlacas(placas.filter(p => p.num !== num)) }
-  function updPlaca(num, p) { updPlacas(placas.map(pl => pl.num === num ? { ...pl, ...p } : pl)) }
+  // Porta DIO selecionada atualmente (porta_olt corresponde ao DIO port)
+  const portaSel = entrada.porta_olt ?? null
+  const entradaSel = dioMapa.find(m => m.porta === portaSel) ?? null
 
-  // Compute PON usage per placa from bandejas
-  const ponPorPlaca = {}
+  // CTOs servidas pelos splitters desta CDO/CEO (para display informativo)
+  const ctosServidas = (splitters ?? []).flatMap(s =>
+    (s.saidas ?? []).filter(sd => sd?.cto_id?.trim()).map(sd => sd.cto_id)
+  )
+  // PONs já usadas nas bandejas desta CDO
+  const ponsUsadas = new Set()
   ;(bandejas ?? []).forEach(b => (b.fusoes ?? []).forEach(f => {
-    if (f.tipo === 'pon' && f.pon_placa != null && f.pon_porta != null) {
-      const k = f.pon_placa
-      if (!ponPorPlaca[k]) ponPorPlaca[k] = new Set()
-      ponPorPlaca[k].add(f.pon_porta)
-    }
+    if (f.tipo === 'pon' && f.pon_porta != null) ponsUsadas.add(f.pon_porta)
   }))
+
+  function selecionarOLT(id) {
+    onChange({ ...entrada, olt_id: id, pon: null, porta_olt: null })
+  }
+
+  function selecionarDIO(m) {
+    // Clique na mesma porta → deselecionar
+    if (portaSel === m.porta) {
+      onChange({ ...entrada, porta_olt: null, pon: null })
+    } else {
+      onChange({ ...entrada, porta_olt: m.porta, pon: m.pon ?? null })
+    }
+  }
 
   return (
     <div>
-      {/* Origem OLT */}
+      {/* ── Seleção de OLT ── */}
       <div style={S.sec}>
-        <p style={{ ...S.secTitle, marginBottom: 14 }}>Origem — OLT / PON</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 110px', gap: 12 }}>
+        <p style={{ ...S.secTitle, marginBottom: 12 }}>OLT de Origem</p>
+
+        {(olts ?? []).length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {olts.map(o => {
+              const ativa = entrada.olt_id === o.id
+              return (
+                <div key={o.id} onClick={() => selecionarOLT(ativa ? '' : o.id)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+                    backgroundColor: ativa ? 'rgba(31,111,235,0.12)' : BG3,
+                    border: `1px solid ${ativa ? '#1f6feb' : BORDER}`,
+                    transition: 'all .15s' }}>
+                  <div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: ativa ? '#58a6ff' : '#e6edf3' }}>{o.nome}</span>
+                    <span style={{ fontSize: 11, color: '#8b949e', marginLeft: 8, fontFamily: 'monospace' }}>{o.id}</span>
+                    {o.modelo && <span style={{ fontSize: 10, color: '#484f58', marginLeft: 6 }}>{o.modelo}</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: 10, color: '#7dd3fc' }}>{o.capacidade ?? 16} PONs</span>
+                    {ativa && <span style={{ fontSize: 10, fontWeight: 700, color: '#1f6feb', background: 'rgba(31,111,235,0.15)', borderRadius: 4, padding: '2px 7px' }}>✓ Selecionada</span>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
           <div>
-            <label style={S.lbl}>ID da OLT</label>
+            <label style={S.lbl}>ID da OLT (manual)</label>
             <input value={entrada.olt_id} onChange={e => onChange({ ...entrada, olt_id: e.target.value })}
               placeholder="ex: OLT-01" style={{ ...S.inp, borderColor: entrada.olt_id ? '#1f6feb' : BORDER }} />
-          </div>
-          <div>
-            <label style={S.lbl}>Placa / Slot</label>
-            {placas.length > 0 ? (
-              <select value={entrada.placa ?? ''} onChange={e => onChange({ ...entrada, placa: e.target.value ? +e.target.value : null })}
-                style={S.inp}>
-                <option value="">— Placa —</option>
-                {placas.map(p => <option key={p.num} value={p.num}>{p.label}</option>)}
-              </select>
-            ) : (
-              <input type="number" min={1} value={entrada.placa ?? ''} placeholder="1"
-                onChange={e => onChange({ ...entrada, placa: e.target.value ? +e.target.value : null })}
-                style={S.inp} />
-            )}
-          </div>
-          <div>
-            <label style={S.lbl}>PON Nº</label>
-            <input type="number" min={1} value={entrada.pon ?? ''}
-              onChange={e => onChange({ ...entrada, pon: e.target.value ? +e.target.value : null })}
-              placeholder="1" style={S.inp} />
-          </div>
-          <div>
-            <label style={S.lbl}>Porta OLT</label>
-            <input type="number" min={1} value={entrada.porta_olt ?? ''}
-              onChange={e => onChange({ ...entrada, porta_olt: e.target.value ? +e.target.value : null })}
-              placeholder="1" style={S.inp} />
-          </div>
-        </div>
-        {entrada.olt_id && (
-          <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={S.tag('#1f6feb')}>🖥️ {entrada.olt_id}</span>
-            {entrada.placa != null    && <span style={S.tag('#e3b341')}>Placa {entrada.placa}</span>}
-            {entrada.pon != null      && <span style={S.tag('#8957e5')}>PON {entrada.pon}</span>}
-            {entrada.porta_olt != null && <span style={S.tag('#3fb950')}>Porta {entrada.porta_olt}</span>}
           </div>
         )}
       </div>
 
-      {/* DIO — Configuração de Slots/Placas */}
-      <div style={S.sec}>
-        <div style={S.secHead}>
-          <span style={S.secTitle}>DIO — Slots / Placas</span>
-          <button onClick={addPlaca} style={S.btnAdd}>+ Placa</button>
-        </div>
-        {placas.length === 0 && (
-          <p style={{ color: '#484f58', fontSize: 12 }}>Nenhuma placa configurada. Clique "+ Placa".</p>
-        )}
-        {placas.map(p => {
-          const usadas = ponPorPlaca[p.num]?.size ?? 0
-          const pct    = Math.min(1, usadas / Math.max(1, p.portas))
-          const cor    = pct >= 1 ? '#f85149' : pct >= 0.8 ? '#e3b341' : '#3fb950'
-          return (
-            <div key={p.num} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, padding: '8px 10px',
-              backgroundColor: BG3, border: `1px solid ${pct >= 1 ? '#f85149' : BORDER}`, borderRadius: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#8b949e', minWidth: 22 }}>#{p.num}</span>
-              <input value={p.label} onChange={e => updPlaca(p.num, { label: e.target.value })}
-                style={{ ...S.inp, flex: 1, padding: '4px 8px', fontSize: 12, height: 28 }} />
-              <span style={{ fontSize: 10, color: '#8b949e', whiteSpace: 'nowrap' }}>Portas:</span>
-              <input type="number" min={1} max={128} value={p.portas}
-                onChange={e => updPlaca(p.num, { portas: +e.target.value || 16 })}
-                style={{ ...S.inpSm, width: 52 }} />
-              {/* Usage bar */}
-              <div style={{ width: 80, flexShrink: 0 }}>
-                <div style={{ height: 5, borderRadius: 3, backgroundColor: '#30363d', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${pct * 100}%`, backgroundColor: cor, borderRadius: 3, transition: 'width .3s' }} />
-                </div>
-                <span style={{ fontSize: 9, color: cor, fontWeight: 700 }}>{usadas}/{p.portas} PONs</span>
-                {pct >= 1 && <span style={{ fontSize: 9, color: '#f85149', fontWeight: 700, marginLeft: 4 }}>CHEIO</span>}
-              </div>
-              <button onClick={() => remPlaca(p.num)} style={{ ...S.btnDel, padding: '3px 6px', fontSize: 10 }}>✕</button>
+      {/* ── DIO da OLT selecionada → seleção de porta/PON ── */}
+      {oltAtual && (
+        <div style={S.sec}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
+            <span style={S.secTitle}>Porta DIO — selecione a que alimenta esta CEO/CDO</span>
+            {entradaSel && (
+              <span style={{ fontSize: 10, color: '#3fb950', background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)', borderRadius: 6, padding: '3px 10px', fontWeight: 700 }}>
+                D{entradaSel.porta} → PON {entradaSel.pon ?? '?'} → {entradaSel.local || 'sem local'}
+              </span>
+            )}
+          </div>
+
+          {dioMapa.length === 0 && (
+            <p style={{ fontSize: 12, color: '#484f58' }}>
+              Esta OLT não tem mapa DIO configurado. Configure na aba OLTs.
+            </p>
+          )}
+
+          {dioMapa.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {[...dioMapa].sort((a, b) => a.porta - b.porta).map(m => {
+                const sel   = portaSel === m.porta
+                const ponEm = ponsUsadas.has(m.pon)
+                return (
+                  <div key={m.porta} onClick={() => selecionarDIO(m)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+                      borderRadius: 8, cursor: 'pointer',
+                      backgroundColor: sel ? 'rgba(139,87,229,0.14)' : BG3,
+                      border: `1px solid ${sel ? '#8957e5' : BORDER}`,
+                      transition: 'all .15s' }}>
+                    {/* Badge porta */}
+                    <span style={{ fontSize: 12, fontWeight: 800, color: '#f97316', fontFamily: 'monospace',
+                      background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.3)',
+                      borderRadius: 5, padding: '2px 8px', flexShrink: 0 }}>
+                      D{m.porta}
+                    </span>
+                    {/* PON */}
+                    {m.pon != null && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: ponEm && !sel ? '#f85149' : '#a78bfa',
+                        background: sel ? 'rgba(139,87,229,0.2)' : 'rgba(139,87,229,0.08)',
+                        border: `1px solid ${ponEm && !sel ? 'rgba(248,81,73,0.4)' : 'rgba(139,87,229,0.3)'}`,
+                        borderRadius: 5, padding: '2px 8px', flexShrink: 0 }}>
+                        PON {m.pon}
+                        {ponEm && !sel && ' ⚠'}
+                      </span>
+                    )}
+                    {/* Local */}
+                    <span style={{ fontSize: 12, color: sel ? '#e6edf3' : '#8b949e', flex: 1,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {m.local || <em style={{ color: '#484f58' }}>sem descrição</em>}
+                    </span>
+                    {sel && (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#8957e5', flexShrink: 0 }}>✓ Selecionado</span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
-      </div>
+          )}
+
+          {/* Campo placa manual */}
+          <div style={{ marginTop: 12 }}>
+            <label style={S.lbl}>Placa / Slot (opcional)</label>
+            <input type="number" min={1} value={entrada.placa ?? ''} placeholder="1"
+              onChange={e => onChange({ ...entrada, placa: e.target.value ? +e.target.value : null })}
+              style={{ ...S.inp, maxWidth: 120 }} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Resumo da seleção ── */}
+      {entrada.olt_id && (
+        <div style={{ ...S.sec, borderColor: entradaSel ? '#8957e5' : BORDER }}>
+          <p style={{ ...S.secTitle, marginBottom: 10 }}>Resumo do vínculo</p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={S.tag('#1f6feb')}>🖥 {entrada.olt_id}</span>
+            {entrada.porta_olt != null && <span style={S.tag('#f97316')}>D{entrada.porta_olt}</span>}
+            {entrada.pon != null       && <span style={S.tag('#8957e5')}>PON {entrada.pon}</span>}
+            {entrada.placa != null     && <span style={S.tag('#e3b341')}>Placa {entrada.placa}</span>}
+            {entradaSel?.local         && <span style={S.tag('#58a6ff')}>📍 {entradaSel.local}</span>}
+          </div>
+          {ctosServidas.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <p style={{ ...S.lbl, marginBottom: 6 }}>CTOs alimentadas por esta CDO:</p>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {ctosServidas.map((cid, i) => (
+                  <span key={i} style={S.tag('#3fb950')}>📡 {cid}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -272,114 +342,87 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
           </div>
 
           {b.fusoes.length > 0 && (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table style={{ minWidth: 520, borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                    <th style={{ padding: '5px 6px', width: 28, color: '#484f58', fontWeight: 700, textAlign: 'center' }}>Nº</th>
-                    {/* Entrada */}
-                    <th colSpan={2} style={{ padding: '5px 8px', color: '#58a6ff', fontWeight: 700, borderLeft: '2px solid rgba(88,166,255,0.3)', textAlign: 'center' }}>
-                      🔵 Fibra Entrada
-                    </th>
-                    <th style={{ padding: '5px 4px', color: '#484f58', width: 24, textAlign: 'center' }}>↔</th>
-                    {/* Saída */}
-                    <th colSpan={2} style={{ padding: '5px 8px', color: '#3fb950', fontWeight: 700, borderLeft: '2px solid rgba(63,185,80,0.3)', textAlign: 'center' }}>
-                      🟢 Fibra Saída
-                    </th>
-                    <th style={{ padding: '5px 6px', color: '#f97316', fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap' }}>DIO</th>
-                    <th style={{ padding: '5px 6px', color: '#8b949e', fontWeight: 700, textAlign: 'center' }}>Tipo</th>
-                    <th style={{ padding: '5px 6px', color: '#8b949e', fontWeight: 700, textAlign: 'left', minWidth: 80 }}>Obs / PON</th>
+                    <th style={{ padding: '6px 4px', width: 24, color: '#484f58', fontWeight: 700, textAlign: 'center' }}>#</th>
+                    <th style={{ padding: '6px 8px', color: '#58a6ff', fontWeight: 700, borderLeft: '2px solid rgba(88,166,255,0.3)', textAlign: 'center', whiteSpace: 'nowrap' }}>Ent.</th>
+                    <th style={{ padding: '6px 8px', color: '#3fb950', fontWeight: 700, borderLeft: '2px solid rgba(63,185,80,0.3)', textAlign: 'center', whiteSpace: 'nowrap' }}>Saída</th>
+                    <th style={{ padding: '6px 6px', color: '#f97316', fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap' }}>DIO</th>
+                    <th style={{ padding: '6px 6px', color: '#8b949e', fontWeight: 700, textAlign: 'center' }}>Tipo</th>
+                    <th style={{ padding: '6px 6px', color: '#8b949e', fontWeight: 700, textAlign: 'left' }}>PON / Info</th>
                     <th style={{ width: 28 }} />
                   </tr>
                 </thead>
                 <tbody>
-                  {b.fusoes.map((f, fi) => (
-                    <tr key={f.id} style={{ borderTop: `1px solid ${BORDER}` }}>
-                      <td style={{ padding: '5px 4px', textAlign: 'center', color: '#484f58', fontWeight: 700 }}>{fi + 1}</td>
+                  {b.fusoes.map((f, fi) => {
+                    // PON checks
+                    const placaAtual  = placas.find(p => p.num === f.pon_placa)
+                    const localDup    = f.pon_placa != null && f.pon_porta != null &&
+                      bandejas.some(bx => (bx.fusoes ?? []).some(fx =>
+                        fx.id !== f.id && fx.pon_placa === f.pon_placa && fx.pon_porta === f.pon_porta))
+                    const globalDup   = f.pon_placa != null && f.pon_porta != null &&
+                      (usadosGlobal?.pons ?? new Set()).has(`${f.pon_placa}-${f.pon_porta}`)
+                    const isDup       = localDup || globalDup
+                    // DIO checks
+                    const totalDIO    = placas.length > 0 ? placas.reduce((s, p) => s + (p.portas ?? 0), 0) : 48
+                    const portasOcupadas = new Set([...dioGlobal].filter(p => p !== f.porta_dio))
+                    return (
+                      <tr key={f.id} style={{ borderTop: `1px solid ${BORDER}` }}>
+                        <td style={{ padding: '6px 4px', textAlign: 'center', color: '#484f58', fontWeight: 700, fontSize: 11 }}>{fi + 1}</td>
 
-                      {/* Entrada: fibra select + tubo */}
-                      <td style={{ padding: '5px 4px', borderLeft: '2px solid rgba(88,166,255,0.15)' }}>
-                        <FibraSelect value={f.entrada.fibra} small
-                          onChange={v => upFusao(b.id, f.id, { entrada: { ...f.entrada, fibra: v } })} />
-                      </td>
-                      <td style={{ padding: '5px 4px' }}>
-                        <input type="number" min={1} value={f.entrada.tubo}
-                          onChange={e => upFusao(b.id, f.id, { entrada: { ...f.entrada, tubo: +e.target.value } })}
-                          style={S.inpSm} title="Tubo" />
-                      </td>
+                        {/* Fibra Entrada */}
+                        <td style={{ padding: '5px 4px', borderLeft: '2px solid rgba(88,166,255,0.15)' }}>
+                          <FibraSelect value={f.entrada.fibra} small
+                            onChange={v => upFusao(b.id, f.id, { entrada: { ...f.entrada, fibra: v } })} />
+                        </td>
 
-                      <td style={{ padding: '5px 2px', textAlign: 'center', color: '#484f58' }}>—</td>
+                        {/* Fibra Saída */}
+                        <td style={{ padding: '5px 4px', borderLeft: '2px solid rgba(63,185,80,0.15)' }}>
+                          <FibraSelect value={f.saida.fibra} small
+                            onChange={v => upFusao(b.id, f.id, { saida: { ...f.saida, fibra: v } })} />
+                        </td>
 
-                      {/* Saída: fibra select + tubo */}
-                      <td style={{ padding: '5px 4px', borderLeft: '2px solid rgba(63,185,80,0.15)' }}>
-                        <FibraSelect value={f.saida.fibra} small
-                          onChange={v => upFusao(b.id, f.id, { saida: { ...f.saida, fibra: v } })} />
-                      </td>
-                      <td style={{ padding: '5px 4px' }}>
-                        <input type="number" min={1} value={f.saida.tubo}
-                          onChange={e => upFusao(b.id, f.id, { saida: { ...f.saida, tubo: +e.target.value } })}
-                          style={S.inpSm} title="Tubo" />
-                      </td>
+                        {/* Porta DIO */}
+                        <td style={{ padding: '5px 4px' }}>
+                          <select value={f.porta_dio ?? ''}
+                            onChange={e => upFusao(b.id, f.id, { porta_dio: e.target.value ? +e.target.value : null })}
+                            style={{ ...S.inp, width: 56, padding: '4px 4px', fontSize: 11,
+                              borderColor: f.porta_dio != null ? '#f97316' : BORDER }}>
+                            <option value="">—</option>
+                            {Array.from({ length: totalDIO }, (_, i) => {
+                              const p = i + 1
+                              const occ = portasOcupadas.has(p)
+                              return <option key={p} value={p} disabled={occ}>{p}{occ ? ' [-]' : ''}</option>
+                            })}
+                          </select>
+                        </td>
 
-                      {/* Porta DIO — bloqueio global */}
-                      <td style={{ padding: '5px 4px' }}>
-                        {(() => {
-                          const totalDIO = (placas.length > 0)
-                            ? placas.reduce((s, p) => s + (p.portas ?? 0), 0)
-                            : 48
-                          // Global (projeto inteiro): exclui apenas o valor desta fusão
-                          const portasOcupadas = new Set([...dioGlobal].filter(p => p !== f.porta_dio))
-                          return (
-                            <select
-                              value={f.porta_dio ?? ''}
-                              onChange={e => upFusao(b.id, f.id, { porta_dio: e.target.value ? +e.target.value : null })}
-                              style={{ ...S.inp, width: 58, padding: '3px 5px', fontSize: 11,
-                                borderColor: f.porta_dio != null ? '#f97316' : BORDER }}
-                            >
-                              <option value="">—</option>
-                              {Array.from({ length: totalDIO }, (_, i) => {
-                                const p = i + 1
-                                const occ = portasOcupadas.has(p)
-                                return <option key={p} value={p} disabled={occ}>{p}{occ ? ' [-]' : ''}</option>
-                              })}
-                            </select>
-                          )
-                        })()}
-                      </td>
+                        {/* Tipo */}
+                        <td style={{ padding: '5px 4px' }}>
+                          <select value={f.tipo} onChange={e => upFusao(b.id, f.id, { tipo: e.target.value })}
+                            style={{ ...S.inp, padding: '4px 4px', width: 78, fontSize: 11 }}>
+                            <option value="fusao">Fusão</option>
+                            <option value="pon">PON</option>
+                            <option value="conector">Conector</option>
+                            <option value="passthrough">Passagem</option>
+                          </select>
+                        </td>
 
-                      <td style={{ padding: '5px 4px' }}>
-                        <select value={f.tipo} onChange={e => upFusao(b.id, f.id, { tipo: e.target.value })}
-                          style={{ ...S.inp, padding: '3px 5px', width: 80, fontSize: 11 }}>
-                          <option value="fusao">fusao</option>
-                          <option value="pon">pon</option>
-                          <option value="conector">conector</option>
-                          <option value="passthrough">pass</option>
-                        </select>
-                      </td>
-
-                      <td style={{ padding: '5px 4px', minWidth: f.tipo === 'pon' ? 220 : 80 }}>
-                        {f.tipo === 'pon' ? (() => {
-                          const placaAtual = placas.find(p => p.num === f.pon_placa)
-                          // Duplicate = usado em outra fusão desta caixa OU em outra caixa do projeto
-                          const localDup = f.pon_placa != null && f.pon_porta != null &&
-                            bandejas.some(bx => (bx.fusoes ?? []).some(fx =>
-                              fx.id !== f.id && fx.pon_placa === f.pon_placa && fx.pon_porta === f.pon_porta))
-                          const globalDup = f.pon_placa != null && f.pon_porta != null &&
-                            (usadosGlobal?.pons ?? new Set()).has(`${f.pon_placa}-${f.pon_porta}`)
-                          const isDup = localDup || globalDup
-                          return (
-                            <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-                              {/* Placa */}
+                        {/* PON / Info */}
+                        <td style={{ padding: '5px 4px' }}>
+                          {f.tipo === 'pon' ? (
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'nowrap' }}>
                               <select value={f.pon_placa ?? ''} onChange={e => upFusao(b.id, f.id, { pon_placa: e.target.value ? +e.target.value : null, pon_porta: null })}
-                                style={{ ...S.inp, width: 90, padding: '3px 5px', fontSize: 11, borderColor: '#8957e5' }}>
-                                <option value="">— Placa —</option>
+                                style={{ ...S.inp, width: 76, padding: '4px 4px', fontSize: 11, borderColor: '#8957e5' }}>
+                                <option value="">Placa</option>
                                 {placas.map(p => <option key={p.num} value={p.num}>{p.label}</option>)}
-                                {!placas.length && <option value="1">Placa 1</option>}
+                                {!placas.length && <option value="1">Pl 1</option>}
                               </select>
-                              {/* PON porta — bloqueio global */}
                               <select value={f.pon_porta ?? ''} onChange={e => upFusao(b.id, f.id, { pon_porta: e.target.value ? +e.target.value : null })}
-                                style={{ ...S.inp, width: 62, padding: '3px 5px', fontSize: 11, borderColor: isDup ? '#f85149' : '#8957e5' }}>
-                                <option value="">P</option>
+                                style={{ ...S.inp, width: 56, padding: '4px 4px', fontSize: 11, borderColor: isDup ? '#f85149' : '#8957e5' }}>
+                                <option value="">PON</option>
                                 {Array.from({ length: placaAtual?.portas ?? 16 }, (_, i) => {
                                   const p = i + 1
                                   const k = `${f.pon_placa}-${p}`
@@ -387,7 +430,6 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
                                   return <option key={p} value={p} disabled={occupied}>{p}{occupied ? ' [-]' : ''}</option>
                                 })}
                               </select>
-                              {/* Splitter vinculado */}
                               <select value={f.splitter_id ?? ''} onChange={e => {
                                 const sid = e.target.value || null
                                 upFusao(b.id, f.id, { splitter_id: sid })
@@ -399,30 +441,31 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
                                     pon_porta: f.pon_porta ?? null,
                                   } : s))
                                 }
-                              }} style={{ ...S.inp, width: 90, padding: '3px 5px', fontSize: 11,
+                              }} style={{ ...S.inp, width: 80, padding: '4px 4px', fontSize: 11,
                                 borderColor: f.splitter_id ? '#e3b341' : BORDER }}>
-                                <option value="">↳ Splitter</option>
+                                <option value="">↳ SPL</option>
                                 {(splitters ?? []).map((s, si) => <option key={s.id} value={s.id}>{s.nome || `SPL ${si + 1}`}</option>)}
                               </select>
-                              {isDup && <span title={globalDup ? 'PON já está em uso em outra CDO/CEO do projeto' : 'PON duplicada nesta caixa'} style={{ fontSize: 10, color: '#f85149', fontWeight: 700 }}>⚠{globalDup ? 'PROJ' : 'DUP'}</span>}
-                              {!isDup && f.pon_placa && f.pon_porta && (
-                                <span style={{ fontSize: 9, color: '#8957e5', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                              {isDup && <span title={globalDup ? 'PON em uso em outra CDO/CEO do projeto' : 'PON duplicada nesta caixa'}
+                                style={{ fontSize: 10, color: '#f85149', fontWeight: 700, whiteSpace: 'nowrap' }}>⚠{globalDup ? 'PROJ' : 'DUP'}</span>}
+                              {!isDup && f.pon_placa != null && f.pon_porta != null && (
+                                <span style={{ fontSize: 10, color: '#8957e5', fontFamily: 'monospace', whiteSpace: 'nowrap', fontWeight: 700 }}>
                                   P{f.pon_placa}/{f.pon_porta}
                                 </span>
                               )}
                             </div>
-                          )
-                        })() : (
-                          <input value={f.obs ?? ''} onChange={e => upFusao(b.id, f.id, { obs: e.target.value })}
-                            placeholder="obs..." style={{ ...S.inp, padding: '3px 7px', fontSize: 11, minWidth: 80 }} />
-                        )}
-                      </td>
+                          ) : (
+                            <input value={f.obs ?? ''} onChange={e => upFusao(b.id, f.id, { obs: e.target.value })}
+                              placeholder="obs..." style={{ ...S.inp, padding: '4px 7px', fontSize: 11, minWidth: 90 }} />
+                          )}
+                        </td>
 
-                      <td style={{ padding: '5px 4px' }}>
-                        <button onClick={() => remFusao(b.id, f.id)} style={{ ...S.btnDel, padding: '3px 6px', fontSize: 10 }}>✕</button>
-                      </td>
-                    </tr>
-                  ))}
+                        <td style={{ padding: '5px 4px' }}>
+                          <button onClick={() => remFusao(b.id, f.id)} style={{ ...S.btnDel, padding: '4px 8px', fontSize: 13, minHeight: 32 }}>✕</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -678,14 +721,18 @@ const TABS = [
   { id: 'resumo',    label: 'Resumo',    cor: '#3fb950' },
 ]
 
-export default function DiagramaCDOEditor({ ceId, projetoId, capacidadeSaidas, initialDiagrama }) {
+export default function DiagramaCDOEditor({ ceId, projetoId, capacidadeSaidas, initialDiagrama, olts }) {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+  const S = getStyles(isDark)
+
   const [aba, setAba]           = useState('bandejas')
   const [carregando, setCarregando] = useState(!initialDiagrama)
   const [saving, setSaving]     = useState(false)
   const [sucesso, setSucesso]   = useState(null)
   const [erro, setErro]         = useState(null)
 
-  const [entrada, setEntrada]         = useState({ olt_id: '', pon: null, porta_olt: null, placa: null, dio_config: { placas: [{ num: 1, label: 'Placa 1', portas: 16 }] } })
+  const [entrada, setEntrada]         = useState({ olt_id: '', pon: null, porta_olt: null, placa: null, dio_config: { total: 48, mapa: [], placas: [] } })
   const [bandejas, setBandejas]       = useState([])
   const [splitters, setSplitters]     = useState([])
   const [cabos, setCabos]             = useState([])
@@ -698,7 +745,12 @@ export default function DiagramaCDOEditor({ ceId, projetoId, capacidadeSaidas, i
       pon:        d.entrada?.pon ?? null,
       porta_olt:  d.entrada?.porta_olt ?? null,
       placa:      d.entrada?.placa ?? null,
-      dio_config: d.entrada?.dio_config ?? { placas: [{ num: 1, label: 'Placa 1', portas: 16 }] },
+      dio_config: {
+        total: d.entrada?.dio_config?.total ?? 48,
+        mapa:  d.entrada?.dio_config?.mapa  ?? [],
+        // compatibilidade legado
+        placas: d.entrada?.dio_config?.placas ?? [],
+      },
     })
     setBandejas(d.bandejas   ?? [])
     setSplitters(d.splitters ?? [])
@@ -801,7 +853,7 @@ export default function DiagramaCDOEditor({ ceId, projetoId, capacidadeSaidas, i
 
       {/* Conteúdo */}
       <div style={S.body}>
-        {aba === 'olt'       && <AbaOLT       entrada={entrada}     onChange={setEntrada}  bandejas={bandejas} />}
+        {aba === 'olt'       && <AbaOLT       entrada={entrada}     onChange={setEntrada} olts={olts} splitters={splitters} bandejas={bandejas} />}
         {aba === 'bandejas'  && <AbaBandejas  bandejas={bandejas}   onChange={setBandejas} entrada={entrada} splitters={splitters} onChangeSplitters={setSplitters} usadosGlobal={usadosGlobal} />}
         {aba === 'splitters' && <AbaSplitters splitters={splitters} onChange={setSplitters} bandejas={bandejas} />}
         {aba === 'cabos'     && <AbaCabos     cabos={cabos}         onChange={setCabos}     />}

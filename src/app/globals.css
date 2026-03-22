@@ -4,6 +4,29 @@
 :root {
   --background: #0b1220;
   --foreground: #f1f5f9;
+  --sidebar-bg: #0d1526;
+  --sidebar-border: #1f2937;
+  --card-bg: #111827;
+  --card-bg-active: #0c1a2e;
+  --border-color: #1f2937;
+  --border-color-strong: #374151;
+  --text-muted: #64748b;
+  --text-secondary: #94a3b8;
+  --inp-bg: #0b1220;
+}
+
+[data-theme="light"] {
+  --background: #f0f4f8;
+  --foreground: #1e293b;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e2e8f0;
+  --card-bg: #ffffff;
+  --card-bg-active: #e8f4ff;
+  --border-color: #e2e8f0;
+  --border-color-strong: #cbd5e1;
+  --text-muted: #64748b;
+  --text-secondary: #475569;
+  --inp-bg: #f8fafc;
 }
 
 @theme inline {
@@ -26,3 +49,38 @@ body,
 #__next {
   height: 100%;
 }
+
+/* Inputs e selects seguem a cor do tema */
+input, select, textarea {
+  color: var(--foreground);
+  background-color: var(--inp-bg);
+}
+input::placeholder, textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   TEMA CLARO — overrides de cores Tailwind
+   Botões com color inline (#fff) NÃO são afetados (inline > classe)
+   ============================================================ */
+[data-theme="light"] .text-white { color: var(--foreground) !important; }
+[data-theme="light"] .text-slate-100 { color: #1e293b !important; }
+[data-theme="light"] .text-slate-200 { color: #334155 !important; }
+[data-theme="light"] .text-slate-300 { color: var(--text-secondary) !important; }
+[data-theme="light"] .text-slate-400 { color: var(--text-muted) !important; }
+[data-theme="light"] .text-slate-500 { color: var(--text-muted) !important; }
+[data-theme="light"] .text-zinc-400  { color: var(--text-muted) !important; }
+[data-theme="light"] .text-zinc-300  { color: var(--text-secondary) !important; }
+[data-theme="light"] .text-gray-400  { color: var(--text-muted) !important; }
+[data-theme="light"] .text-gray-300  { color: var(--text-secondary) !important; }
+
+/* Hover escuro → desativa no tema claro */
+[data-theme="light"] .hover\:bg-slate-800:hover { background-color: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] .hover\:bg-slate-800\/30:hover { background-color: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .hover\:text-white:hover { color: var(--foreground) !important; }
+[data-theme="light"] .hover\:text-current:hover { color: inherit !important; }
+
+/* Fundos escuros Tailwind no tema claro */
+[data-theme="light"] .bg-slate-800 { background-color: #f1f5f9 !important; }
+[data-theme="light"] .bg-slate-900 { background-color: #f0f4f8 !important; }
+[data-theme="light"] .bg-slate-800\/30 { background-color: rgba(0,0,0,0.03) !important; }

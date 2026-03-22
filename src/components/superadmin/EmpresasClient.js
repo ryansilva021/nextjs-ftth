@@ -13,14 +13,14 @@ import {
 // ---------------------------------------------------------------------------
 
 const inputStyle = {
-  backgroundColor: '#0b1220',
-  border: '1px solid #1f2937',
-  color: '#f1f5f9',
+  backgroundColor: 'var(--inp-bg)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--foreground)',
 }
 
 const cardStyle = {
-  backgroundColor: '#111827',
-  border: '1px solid #1f2937',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
 }
 
 const modalBgStyle = {
@@ -28,8 +28,8 @@ const modalBgStyle = {
 }
 
 const tableHeaderStyle = {
-  backgroundColor: '#0b1220',
-  color: '#94a3b8',
+  backgroundColor: 'var(--background)',
+  color: 'var(--text-secondary)',
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ const PLANO_LABEL = {
 }
 
 function StatusBadge({ status }) {
-  const cfg = STATUS_BADGE[status] || { bg: '#1f2937', color: '#94a3b8', label: status }
+  const cfg = STATUS_BADGE[status] || { bg: 'var(--border-color)', color: 'var(--text-secondary)', label: status }
   return (
     <span
       style={{ backgroundColor: cfg.bg, color: cfg.color }}
@@ -314,7 +314,7 @@ export default function EmpresasClient({ empresasIniciais }) {
                 <tr
                   key={empresa._id}
                   style={{
-                    borderTop: idx === 0 ? 'none' : '1px solid #1f2937',
+                    borderTop: idx === 0 ? 'none' : '1px solid var(--border-color)',
                   }}
                 >
                   {/* Empresa */}
@@ -359,7 +359,7 @@ export default function EmpresasClient({ empresasIniciais }) {
                       <button
                         onClick={() => abrirEditar(empresa)}
                         disabled={isPending}
-                        style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                        style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                         className="text-xs px-3 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-40"
                       >
                         Editar
@@ -388,7 +388,7 @@ export default function EmpresasClient({ empresasIniciais }) {
                       <button
                         onClick={() => setConfirmDelete(empresa)}
                         disabled={isPending}
-                        style={{ border: '1px solid #374151', color: '#6b7280' }}
+                        style={{ border: '1px solid var(--border-color-strong)', color: 'var(--text-muted)' }}
                         className="text-xs px-3 py-1.5 rounded-lg hover:bg-slate-800 hover:text-red-400 transition-colors disabled:opacity-40"
                       >
                         Excluir
@@ -557,7 +557,7 @@ export default function EmpresasClient({ empresasIniciais }) {
               <button
                 onClick={fecharModal}
                 disabled={isPending}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="px-4 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors disabled:opacity-40"
               >
                 Cancelar
@@ -604,7 +604,7 @@ export default function EmpresasClient({ empresasIniciais }) {
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmBloquear(null)}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="flex-1 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors"
               >
                 Cancelar
@@ -637,7 +637,7 @@ export default function EmpresasClient({ empresasIniciais }) {
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDelete(null)}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="flex-1 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors"
               >
                 Cancelar

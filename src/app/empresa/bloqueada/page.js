@@ -9,7 +9,7 @@ export default function EmpresaBloqueadaPage() {
     <div
       style={{
         minHeight: '100vh',
-        backgroundColor: '#030712',
+        backgroundColor: 'var(--background)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -18,8 +18,8 @@ export default function EmpresaBloqueadaPage() {
     >
       <div
         style={{
-          backgroundColor: '#111827',
-          border: '1px solid #1f2937',
+          backgroundColor: 'var(--card-bg)',
+          border: '1px solid var(--border-color)',
           borderRadius: '1rem',
           padding: '2.5rem',
           maxWidth: '440px',
@@ -47,7 +47,7 @@ export default function EmpresaBloqueadaPage() {
 
         <h1
           style={{
-            color: '#f1f5f9',
+            color: 'var(--foreground)',
             fontWeight: 700,
             fontSize: '1.25rem',
             marginBottom: '0.5rem',
@@ -58,7 +58,7 @@ export default function EmpresaBloqueadaPage() {
 
         <p
           style={{
-            color: '#94a3b8',
+            color: 'var(--text-secondary)',
             fontSize: '0.875rem',
             lineHeight: '1.6',
             marginBottom: '1.5rem',
@@ -70,8 +70,8 @@ export default function EmpresaBloqueadaPage() {
 
         <div
           style={{
-            backgroundColor: '#0b1220',
-            border: '1px solid #1f2937',
+            backgroundColor: 'var(--inp-bg)',
+            border: '1px solid var(--border-color)',
             borderRadius: '0.5rem',
             padding: '1rem',
             marginBottom: '1.5rem',
@@ -80,7 +80,7 @@ export default function EmpresaBloqueadaPage() {
         >
           <p
             style={{
-              color: '#64748b',
+              color: 'var(--text-muted)',
               fontSize: '0.75rem',
               fontWeight: 600,
               textTransform: 'uppercase',
@@ -90,7 +90,7 @@ export default function EmpresaBloqueadaPage() {
           >
             Suporte
           </p>
-          <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
             suporte@fiberops.com.br
           </p>
         </div>
@@ -105,9 +105,9 @@ export default function EmpresaBloqueadaPage() {
             type="submit"
             style={{
               width: '100%',
-              backgroundColor: '#1f2937',
-              border: '1px solid #374151',
-              color: '#94a3b8',
+              backgroundColor: 'var(--border-color)',
+              border: '1px solid var(--border-color-strong)',
+              color: 'var(--text-secondary)',
               borderRadius: '0.5rem',
               padding: '0.625rem 1rem',
               fontSize: '0.875rem',

@@ -4,14 +4,14 @@ import { useState, useTransition } from 'react'
 import { upsertProjeto, deleteProjeto, limparProjeto, toggleProjetoAtivo } from '@/actions/projetos'
 
 const inputStyle = {
-  backgroundColor: '#0b1220',
-  border: '1px solid #1f2937',
-  color: '#f1f5f9',
+  backgroundColor: 'var(--inp-bg)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--foreground)',
 }
 
 const cardStyle = {
-  backgroundColor: '#111827',
-  border: '1px solid #1f2937',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
 }
 
 const modalBgStyle = {
@@ -199,7 +199,7 @@ export default function ProjetosClient({ projetosIniciais }) {
 
             {/* Stats */}
             <div
-              style={{ backgroundColor: '#0b1220', border: '1px solid #1f2937' }}
+              style={{ backgroundColor: 'var(--background)', border: '1px solid var(--border-color)' }}
               className="rounded-lg p-3 grid grid-cols-4 gap-2 text-center"
             >
               <StatChip label="CTOs" value={p.ctos ?? 0} />
@@ -214,8 +214,8 @@ export default function ProjetosClient({ projetosIniciais }) {
                 onClick={() => handleToggleAtivo(p)}
                 disabled={isPending}
                 style={{
-                  border: `1px solid ${p.is_active ? '#166534' : '#1f2937'}`,
-                  color: p.is_active ? '#4ade80' : '#94a3b8',
+                  border: `1px solid ${p.is_active ? '#166534' : 'var(--border-color)'}`,
+                  color: p.is_active ? '#4ade80' : 'var(--text-secondary)',
                 }}
                 className="flex-1 text-xs py-1.5 rounded-lg hover:opacity-80 transition-colors disabled:opacity-40"
               >
@@ -223,21 +223,21 @@ export default function ProjetosClient({ projetosIniciais }) {
               </button>
               <button
                 onClick={() => abrirEditar(p)}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="flex-1 text-xs py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
               >
                 Editar
               </button>
               <button
                 onClick={() => setConfirmLimpar(p)}
-                style={{ border: '1px solid #1f2937', color: '#fbbf24' }}
+                style={{ border: '1px solid var(--border-color)', color: '#fbbf24' }}
                 className="flex-1 text-xs py-1.5 rounded-lg hover:bg-amber-900/20 transition-colors"
               >
                 Limpar
               </button>
               <button
                 onClick={() => setConfirmDelete(p)}
-                style={{ border: '1px solid #1f2937', color: '#f87171' }}
+                style={{ border: '1px solid var(--border-color)', color: '#f87171' }}
                 className="flex-1 text-xs py-1.5 rounded-lg hover:bg-red-900/20 transition-colors"
               >
                 Excluir
@@ -316,7 +316,7 @@ export default function ProjetosClient({ projetosIniciais }) {
               <button
                 onClick={fecharModal}
                 disabled={isPending}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="px-4 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors disabled:opacity-40"
               >
                 Cancelar
@@ -347,7 +347,7 @@ export default function ProjetosClient({ projetosIniciais }) {
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDelete(null)}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="flex-1 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors"
               >
                 Cancelar
@@ -377,7 +377,7 @@ export default function ProjetosClient({ projetosIniciais }) {
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmLimpar(null)}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="flex-1 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors"
               >
                 Cancelar

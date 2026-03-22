@@ -8,7 +8,7 @@ const LocationPicker = dynamic(() => import('@/components/map/LocationPicker'), 
   ssr: false,
   loading: () => (
     <div style={{ height: 220, backgroundColor: '#060d1a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <span style={{ color: '#475569', fontSize: 13 }}>Carregando mapa...</span>
+      <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Carregando mapa...</span>
     </div>
   ),
 })
@@ -19,22 +19,22 @@ const TIPOS = ['CDO', 'CE']
 const modalOverlay = { backgroundColor: 'rgba(0,0,0,0.85)' }
 
 const modalPanel = {
-  backgroundColor: 'rgba(8,13,28,0.98)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
   width: 'min(580px,100%)',
 }
 
 const fieldInput = {
-  backgroundColor: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.10)',
-  color: '#e2e8f0',
+  backgroundColor: 'var(--inp-bg)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--foreground)',
   fontSize: '13px',
   outline: 'none',
 }
 
 const fieldGroup = {
-  backgroundColor: 'rgba(255,255,255,0.025)',
-  border: '1px solid rgba(255,255,255,0.07)',
+  backgroundColor: 'var(--inp-bg)',
+  border: '1px solid var(--border-color)',
   borderRadius: '12px',
   padding: '14px',
   display: 'flex',
@@ -44,7 +44,7 @@ const fieldGroup = {
 
 const labelStyle = {
   fontSize: '10px',
-  color: 'rgba(255,255,255,0.35)',
+  color: 'var(--border-color)',
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
   fontWeight: 600,
@@ -53,8 +53,8 @@ const labelStyle = {
 }
 
 const cardStyle = {
-  backgroundColor: '#111827',
-  border: '1px solid #1f2937',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
 }
 
 // Tipo chip colors
@@ -227,7 +227,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid #1f2937', backgroundColor: '#0d1526' }}>
+              <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--card-bg)' }}>
                 {['ID', 'Nome', 'Tipo', 'Endereço', 'Splitter', 'OLT', 'Ações'].map((h) => (
                   <th key={h} className="text-left text-xs text-slate-400 font-semibold uppercase tracking-wider px-4 py-3">{h}</th>
                 ))}
@@ -240,7 +240,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
               {caixas.map((caixa, i) => {
                 const chip = TIPO_CHIP[caixa.tipo] ?? TIPO_CHIP.CDO
                 return (
-                  <tr key={caixa._id} style={{ borderBottom: i < caixas.length - 1 ? '1px solid #1f2937' : 'none' }} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={caixa._id} style={{ borderBottom: i < caixas.length - 1 ? '1px solid var(--border-color)' : 'none' }} className="hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-sky-400">{getCaixaId(caixa)}</td>
                     <td className="px-4 py-3 text-slate-200">{caixa.nome ?? '—'}</td>
                     <td className="px-4 py-3">
@@ -271,16 +271,16 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" style={modalOverlay} onClick={(e) => e.target === e.currentTarget && fecharModal()}>
           <div style={modalPanel} className="rounded-t-2xl sm:rounded-2xl w-full p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 style={{ color: '#e2e8f0', fontSize: 17, fontWeight: 700 }}>
+              <h2 style={{ color: 'var(--foreground)', fontSize: 17, fontWeight: 700 }}>
                 {caixaEditando ? 'Editar Caixa CE/CDO' : 'Nova Caixa CE/CDO'}
               </h2>
-              <button onClick={fecharModal} style={{ color: 'rgba(255,255,255,0.3)', fontSize: 20, lineHeight: 1 }} className="hover:text-white transition-colors">✕</button>
+              <button onClick={fecharModal} style={{ color: 'var(--border-color)', fontSize: 20, lineHeight: 1 }} className="hover:text-white transition-colors">✕</button>
             </div>
 
             <div className="flex flex-col gap-4">
               {/* Grupo: Identificação */}
               <div style={fieldGroup}>
-                <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Identificação</p>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>Identificação</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label style={labelStyle}>ID da Caixa *</label>
@@ -304,9 +304,9 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
                         return (
                           <button key={t} type="button" onClick={() => setForm((p) => ({ ...p, tipo: t }))}
                             style={{
-                              backgroundColor: ativo ? chip.bg : 'rgba(255,255,255,0.04)',
-                              border: `1px solid ${ativo ? chip.border : 'rgba(255,255,255,0.10)'}`,
-                              color: ativo ? chip.color : 'rgba(255,255,255,0.4)',
+                              backgroundColor: ativo ? chip.bg : 'var(--border-color)',
+                              border: `1px solid ${ativo ? chip.border : 'var(--border-color)'}`,
+                              color: ativo ? chip.color : 'var(--border-color)',
                               padding: '6px 20px', borderRadius: 8, fontWeight: 600, fontSize: 13,
                               transition: 'all .15s',
                             }}>
@@ -322,7 +322,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
               {/* Grupo: Localização */}
               <div style={fieldGroup}>
                 <div className="flex items-center justify-between">
-                  <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Localização *</p>
+                  <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>Localização *</p>
                   <div className="flex gap-2">
                     <button type="button" onClick={usarGPS} disabled={gpsCarregando}
                       style={{ backgroundColor: '#0c2340', border: '1px solid #0369a1', color: '#38bdf8', fontSize: 11, padding: '4px 10px', borderRadius: 8 }}
@@ -330,7 +330,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
                       {gpsCarregando ? '⏳' : '📍'} GPS
                     </button>
                     <button type="button" onClick={() => setMostrarMapa((v) => !v)}
-                      style={{ backgroundColor: mostrarMapa ? '#064e3b' : '#111827', border: `1px solid ${mostrarMapa ? '#065f46' : '#1f2937'}`, color: mostrarMapa ? '#6ee7b7' : '#94a3b8', fontSize: 11, padding: '4px 10px', borderRadius: 8 }}
+                      style={{ backgroundColor: mostrarMapa ? '#064e3b' : 'var(--card-bg)', border: `1px solid ${mostrarMapa ? '#065f46' : 'var(--border-color)'}`, color: mostrarMapa ? '#6ee7b7' : 'var(--text-secondary)', fontSize: 11, padding: '4px 10px', borderRadius: 8 }}
                       className="hover:brightness-110 transition-all">
                       🗺 {mostrarMapa ? 'Fechar' : 'Selecionar'}
                     </button>
@@ -354,7 +354,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
 
               {/* Grupo: Endereço */}
               <div style={fieldGroup}>
-                <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Endereço</p>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>Endereço</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label style={labelStyle}>Rua</label>
@@ -369,7 +369,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
 
               {/* Grupo: Rede */}
               <div style={fieldGroup}>
-                <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Configuração de Rede</p>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>Configuração de Rede</p>
 
                 {/* Toggle: OLT ou CDO pai */}
                 <div>
@@ -384,9 +384,9 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
                         <button key={v} type="button"
                           onClick={() => setForm((p) => ({ ...p, parent_tipo: v }))}
                           style={{
-                            backgroundColor: ativo ? `${cor}22` : 'rgba(255,255,255,0.04)',
-                            border: `1px solid ${ativo ? cor + '66' : 'rgba(255,255,255,0.10)'}`,
-                            color: ativo ? cor : 'rgba(255,255,255,0.4)',
+                            backgroundColor: ativo ? `${cor}22` : 'var(--border-color)',
+                            border: `1px solid ${ativo ? cor + '66' : 'var(--border-color)'}`,
+                            color: ativo ? cor : 'var(--border-color)',
                             padding: '6px 16px', borderRadius: 8, fontWeight: 600, fontSize: 12,
                             transition: 'all .15s', cursor: 'pointer',
                           }}>
@@ -447,7 +447,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
 
             <div className="flex justify-end gap-3 mt-5">
               <button onClick={fecharModal} disabled={isPending}
-                style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--border-color)' }}
                 className="px-5 py-2.5 rounded-lg text-sm hover:bg-white/5 transition-colors disabled:opacity-40">
                 Cancelar
               </button>
@@ -471,7 +471,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
             </p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDelete(null)}
-                style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--border-color)' }}
                 className="flex-1 py-2.5 rounded-lg text-sm hover:bg-white/5 transition-colors">
                 Cancelar
               </button>

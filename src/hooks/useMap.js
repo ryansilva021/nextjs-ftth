@@ -3,87 +3,47 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 
-/**
- * Inicializa e gerencia uma instância do MapLibre GL.
- *
- * @param {React.RefObject} containerRef - ref do elemento DOM que receberá o mapa
- * @param {Object} [options] - opções extras passadas ao construtor do Map
- * @param {number[]} [options.center] - [lng, lat] inicial (padrão: Brasil)
- * @param {number} [options.zoom] - zoom inicial (padrão: 13)
- * @returns {{ mapRef: React.MutableRefObject, mapLoaded: boolean, map: maplibregl.Map | null }}
- */
+// Mapa sempre no estilo claro (positron) independente do tema da UI
+const MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron'
+
 export function useMap(containerRef, options = {}) {
   const mapRef = useRef(null)
   const [mapLoaded, setMapLoaded] = useState(false)
-  const [map, setMap] = useState(null)
+  const [map, setMap]             = useState(null)
 
   useEffect(() => {
     if (!containerRef.current) return
-    if (mapRef.current) return // já inicializado
+    if (mapRef.current) return
 
     const {
       center = [-46.633308, -23.55052],
-      zoom = 13,
+      zoom   = 13,
+      // eslint-disable-next-line no-unused-vars
+      darkMode,
       ...rest
     } = options
 
     const instance = new maplibregl.Map({
       container: containerRef.current,
-      style: {
-        version: 8,
-        name: 'FiberOps Dark',
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-        sources: {
-          'osm-tiles': {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          },
-        },
-        layers: [
-          {
-            id: 'background',
-            type: 'background',
-            paint: { 'background-color': '#0b1220' },
-          },
-          {
-            id: 'osm-layer',
-            type: 'raster',
-            source: 'osm-tiles',
-            paint: {
-              'raster-opacity': 1.0,
-              'raster-brightness-min': 0.05,
-              'raster-brightness-max': 0.9,
-              'raster-saturation': -0.1,
-            },
-          },
-        ],
-      },
+      style: MAP_STYLE,
       center,
       zoom,
       attributionControl: false,
       ...rest,
     })
 
-    instance.addControl(
-      new maplibregl.AttributionControl({ compact: true }),
-      'bottom-right'
-    )
-
-    instance.addControl(
-      new maplibregl.NavigationControl({ showCompass: true }),
-      'top-right'
-    )
-
-    instance.addControl(
-      new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }),
-      'bottom-left'
-    )
-
-    instance.on('load', () => {
-      setMapLoaded(true)
+    instance.on('error', (e) => {
+      if (e?.error?.message?.includes('Failed to fetch') ||
+          e?.error?.message?.includes('404') ||
+          e?.error?.name === 'AbortError') return
+      console.error('[MapLibre]', e?.error ?? e)
     })
+
+    instance.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
+    instance.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right')
+    instance.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-left')
+
+    instance.on('load', () => setMapLoaded(true))
 
     mapRef.current = instance
     setMap(instance)

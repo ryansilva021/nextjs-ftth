@@ -125,7 +125,7 @@ function createPosteIcon(color = '#94a3b8', size = 24) {
   const ctx = canvas.getContext('2d')
   const r = size * 0.35
   ctx.fillStyle = color
-  ctx.strokeStyle = '#ffffff'
+  ctx.strokeStyle = '#000000'
   ctx.lineWidth = size * 0.1
   ctx.beginPath()
   ctx.arc(size / 2, size / 2, r, 0, Math.PI * 2)
@@ -269,9 +269,11 @@ const LAYERS  = [
  * @param {{ ctos: Array, caixas: Array, rotas: Object, postes: Array }} data
  * @param {{ ctos: boolean, caixas: boolean, rotas: boolean, postes: boolean, satellite: boolean }} layerToggles
  */
-export function useMapLayers(map, mapLoaded, data, layerToggles) {
+export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true) {
   const { ctos = [], caixas = [], rotas = null, postes = [], olts = [] } = data ?? {}
   const layersReady = useRef(false)
+  // Mapa sempre claro (positron) — labels sempre escuros, halos brancos
+  const haloColor = '#ffffff'
 
   // ---------- Setup inicial das sources + layers ----------
   useEffect(() => {
@@ -295,16 +297,16 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
       tileSize: 256,
       attribution: 'Esri World Imagery',
     })
-    map.addLayer(
-      {
-        id: SATELLITE_LAYER,
-        type: 'raster',
-        source: SATELLITE_SOURCE,
-        layout: { visibility: 'none' },
-        paint: { 'raster-opacity': 1 },
-      },
-      'osm-layer' // insere logo acima do OSM
-    )
+    // Satellite layer — inserido abaixo de todos os layers do estilo vetorial
+    // para que labels e estradas apareçam sobre a imagem de satélite
+    const firstLayerId = map.getStyle()?.layers?.[0]?.id
+    map.addLayer({
+      id: SATELLITE_LAYER,
+      type: 'raster',
+      source: SATELLITE_SOURCE,
+      layout: { visibility: 'none' },
+      paint: { 'raster-opacity': 1 },
+    }, firstLayerId)
 
     // Source + layer: Postes
     map.addSource('postes', {
@@ -325,11 +327,11 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
         'text-anchor': 'top',
         'text-allow-overlap': false,
         'text-optional': true,
-        'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+        'text-font': ['Noto Sans Regular'],
       },
       paint: {
-        'text-color': '#94a3b8',
-        'text-halo-color': '#0b1220',
+        'text-color': '#475569',
+        'text-halo-color': haloColor,
         'text-halo-width': 1.5,
       },
     })
@@ -397,11 +399,11 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
         'text-anchor': 'top',
         'text-allow-overlap': false,
         'text-optional': true,
-        'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+        'text-font': ['Noto Sans Regular'],
       },
       paint: {
-        'text-color': '#e2e8f0',
-        'text-halo-color': '#0b1220',
+        'text-color': '#1e293b',
+        'text-halo-color': haloColor,
         'text-halo-width': 1.5,
       },
     })
@@ -426,11 +428,11 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
         'text-anchor': 'top',
         'text-allow-overlap': false,
         'text-optional': true,
-        'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+        'text-font': ['Noto Sans Regular'],
       },
       paint: {
-        'text-color': '#e2e8f0',
-        'text-halo-color': '#0b1220',
+        'text-color': '#1e293b',
+        'text-halo-color': haloColor,
         'text-halo-width': 1.5,
       },
     })
@@ -449,11 +451,11 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
         'text-anchor': 'top',
         'text-allow-overlap': false,
         'text-optional': true,
-        'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+        'text-font': ['Noto Sans Regular'],
       },
       paint: {
-        'text-color': '#e2e8f0',
-        'text-halo-color': '#0b1220',
+        'text-color': '#1e293b',
+        'text-halo-color': haloColor,
         'text-halo-width': 1.5,
       },
     })
@@ -477,11 +479,11 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
         'text-anchor': 'top',
         'text-allow-overlap': false,
         'text-optional': true,
-        'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+        'text-font': ['Noto Sans Regular'],
       },
       paint: {
-        'text-color': '#38bdf8',
-        'text-halo-color': '#0b1220',
+        'text-color': '#0369a1',
+        'text-halo-color': haloColor,
         'text-halo-width': 2,
       },
     })
@@ -549,13 +551,14 @@ export function useMapLayers(map, mapLoaded, data, layerToggles) {
       }
     }
 
+    const satelliteOn = layerToggles?.satellite === true
+    setVis(SATELLITE_LAYER, satelliteOn)
     setVis('ctos-layer',       layerToggles?.ctos      !== false)
     setVis('caixas-ce-layer',  layerToggles?.caixas    !== false)
     setVis('caixas-cdo-layer', layerToggles?.caixas    !== false)
     setVis('rotas-layer',      layerToggles?.rotas     !== false)
     setVis('rotas-layer-drop', layerToggles?.rotas     !== false)
     setVis('postes-layer',     layerToggles?.postes    !== false)
-    setVis(SATELLITE_LAYER,    layerToggles?.satellite === true)
-    setVis('olts-layer', layerToggles?.olts !== false)
+    setVis('olts-layer',       layerToggles?.olts      !== false)
   }, [map, mapLoaded, layerToggles])
 }

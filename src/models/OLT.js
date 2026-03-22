@@ -92,6 +92,13 @@ const OLTSchema = new Schema(
       enum:    ["ativo", "inativo", "em_manutencao"],
       default: "ativo",
     },
+
+    // Mapa DIO (Distribution Input/Output): porta física → PON → local alimentado
+    // Formato: { total: 48, mapa: [{ porta, pon, local }], placas: [] }
+    dio_config: {
+      type:    Object,
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },

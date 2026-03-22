@@ -10,19 +10,23 @@ import { useMapLayers }  from '@/hooks/useMapLayers'
 import { useMapEvents, LAYER_TYPE_MAP }  from '@/hooks/useMapEvents'
 import { useGPS }        from '@/hooks/useGPS'
 import { useOfflineQueue } from '@/hooks/useOfflineQueue'
+import { useModoCampo }  from '@/hooks/useModoCampo'
+import { useTheme } from '@/contexts/ThemeContext'
 
 import BottomSheet        from '@/components/map/BottomSheet'
 import LayerToggles       from '@/components/map/LayerToggles'
 import ModalMovimentacao  from '@/components/map/ModalMovimentacao'
 import ModalDiagrama      from '@/components/map/ModalDiagrama'
 import ModalDiagramaCDO   from '@/components/map/ModalDiagramaCDO'
-import ModalTopologia from '@/components/map/ModalTopologia'
+import ModalTopologia     from '@/components/map/ModalTopologia'
+import BuscaMapa          from '@/components/map/BuscaMapa'
+import RegistroPotencia   from '@/components/map/RegistroPotencia'
 
 import { getCTOs, upsertCTO }   from '@/actions/ctos'
 import { getCaixas, upsertCaixa, addCaboToItem } from '@/actions/caixas'
 import { getRotas, upsertRota }  from '@/actions/rotas'
 import { getPostes, upsertPoste } from '@/actions/postes'
-import { getOLTs }               from '@/actions/olts'
+import { getOLTs, upsertOLT }    from '@/actions/olts'
 
 // ---------------------------------------------------------------------------
 // Constantes
@@ -115,13 +119,27 @@ export default function MapaFTTH({
   // ---- Spread de itens sobrepostos (painel React) ----
   const [spreadPanel, setSpreadPanel] = useState(null) // null | { x, y, items: [{type, data, nome, cor, icone}] }
 
+  // ---- AGENT_BUSCA — busca no mapa ----
+  const [buscaAberta, setBuscaAberta]           = useState(false)
+
+  // ---- AGENT_CAMPO — registro de potência ----
+  const [registroPotencia, setRegistroPotencia] = useState(null) // null | { ctoId }
+
+  // ---- AGENT_CAMPO — modo campo mobile ----
+  const { isCampo } = useModoCampo()
+
+  // ---- Tema ----
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+
   // ---- Hooks do mapa ----
   const { map, mapLoaded } = useMap(containerRef, {
     center: [-46.633308, -23.55052],
     zoom:   14,
+    darkMode: theme === 'dark',
   })
 
-  useMapLayers(map, mapLoaded, { ctos, caixas, rotas, postes, olts }, layerToggles)
+  useMapLayers(map, mapLoaded, { ctos, caixas, rotas, postes, olts }, layerToggles, theme === 'dark')
 
   const addModeRef = useRef(addMode)
   addModeRef.current = addMode
@@ -196,6 +214,9 @@ export default function MapaFTTH({
               await upsertCaixa({ ce_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng })
             } else if (type === 'poste') {
               await upsertPoste({ poste_id: data.poste_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng })
+            } else if (type === 'olt') {
+              const olt_id = data.id ?? data.olt_id
+              await upsertOLT({ olt_id, projeto_id: projetoId, lat: lngLat.lat, lng: lngLat.lng, nome: data.nome, modelo: data.modelo, ip: data.ip, status: data.status, portas_pon: data.capacidade })
             }
             await reloadData()
           } catch (err) {
@@ -420,6 +441,13 @@ export default function MapaFTTH({
         })
       }
       setSelectedElement(null)
+    } else if (action === 'medir_potencia') {
+      // AGENT_CAMPO — abre registro de potência para técnico
+      const ctoId = data?.cto_id ?? data?.id
+      if (ctoId) {
+        setRegistroPotencia({ ctoId })
+        setSelectedElement(null)
+      }
     }
   }, [router, rotas])
 
@@ -566,14 +594,13 @@ export default function MapaFTTH({
     setAddSaving(true)
     setAddErro(null)
 
-    const rotaLinks = addRouteLinks.length > 0
-      ? addRouteLinks.map(l => `${l.type}:${l.id ?? l.nome}`).join(', ')
-      : null
+    const rotaSnapIds = addRouteLinks.map(l => `${l.type}:${l.id ?? l.nome}`)
+    const rotaLinks   = rotaSnapIds.length > 0 ? rotaSnapIds.join(', ') : null
     const payloads = {
       cto:   { cto_id: addForm.id.trim(), projeto_id: projetoId, lat: addCoords?.lat, lng: addCoords?.lng, nome: addForm.nome || null, capacidade: addForm.capacidade || 16 },
       caixa: { ce_id: addForm.id.trim(), projeto_id: projetoId, lat: addCoords?.lat, lng: addCoords?.lng, nome: addForm.nome || null, tipo: addForm.tipo || 'CDO' },
       poste: { poste_id: addForm.id.trim(), projeto_id: projetoId, lat: addCoords?.lat, lng: addCoords?.lng, nome: addForm.nome || null, tipo: 'simples', status: 'ativo' },
-      rota:  { rota_id: addForm.id.trim(), projeto_id: projetoId, nome: addForm.nome || null, tipo: addForm.tipoRota || 'RAMAL', coordinates: addRoutePoints, obs: rotaLinks || addForm.obs || null },
+      rota:  { rota_id: addForm.id.trim(), projeto_id: projetoId, nome: addForm.nome || null, tipo: addForm.tipoRota || 'RAMAL', coordinates: addRoutePoints, obs: rotaLinks || addForm.obs || null, snap_ids: rotaSnapIds },
     }
 
     if (!isOnline) {
@@ -619,7 +646,7 @@ export default function MapaFTTH({
   }
 
   return (
-    <div className="relative w-full h-full bg-[#0b1220]">
+    <div className="relative w-full h-full" style={{ background: 'var(--background)' }}>
       {/* Container do mapa */}
       <div ref={containerRef} className="absolute inset-0 w-full h-full" aria-label="Mapa FTTH" role="application" />
 
@@ -668,6 +695,24 @@ export default function MapaFTTH({
         >
           Carregando...
         </div>
+      )}
+
+      {/* AGENT_CAMPO — botão busca rápida no mobile */}
+      {isCampo && !buscaAberta && (
+        <button
+          onClick={() => setBuscaAberta(true)}
+          style={{
+            position: 'absolute', top: 56, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 40, display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 20px', borderRadius: 24,
+            background: 'rgba(8,13,28,0.95)', border: '1px solid rgba(255,255,255,0.1)',
+            color: '#94a3b8', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+          }}
+        >
+          <span>🔍</span>
+          <span>Buscar cliente ou elemento...</span>
+        </button>
       )}
 
       {/* Controles superiores: satélite + recarregar */}
@@ -831,17 +876,35 @@ export default function MapaFTTH({
         />
       )}
 
+      {/* AGENT_BUSCA — overlay de busca */}
+      {buscaAberta && (
+        <BuscaMapa
+          projetoId={projetoId}
+          onFlyTo={({ lat, lng }) => map?.flyTo({ center: [lng, lat], zoom: 17, duration: 1000 })}
+          onClose={() => setBuscaAberta(false)}
+        />
+      )}
+
+      {/* AGENT_CAMPO — registro de potência */}
+      {registroPotencia && (
+        <RegistroPotencia
+          ctoId={registroPotencia.ctoId}
+          projetoId={projetoId}
+          onClose={() => setRegistroPotencia(null)}
+        />
+      )}
+
       {/* FAB unificado — ferramentas + GPS */}
-      {!addMode && !selectedElement && (
-        <div className="absolute bottom-6 right-4 z-40 flex flex-col items-end gap-2 pointer-events-auto">
+      {!addMode && !selectedElement && !buscaAberta && (
+        <div className="absolute bottom-6 right-4 z-40 flex flex-col items-end gap-2 pointer-events-auto" style={{ bottom: 'max(24px, env(safe-area-inset-bottom, 24px))' }}>
           {addFabOpen && (
             <div className="flex flex-col gap-1.5 mb-1"
-              style={{ background: 'rgba(8,13,28,0.96)', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 16, padding: '10px 10px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', minWidth: 160 }}>
+              style={{ background: isDark ? 'rgba(8,13,28,0.96)' : '#ffffff', border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
+                borderRadius: 16, padding: '10px 10px', boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.15)', minWidth: 160 }}>
 
               {/* Ferramentas de adição — só admin/superadmin */}
               {(userRole === 'admin' || userRole === 'superadmin') && (<>
-                <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.25)',
+                <div style={{ fontSize: 9, fontWeight: 700, color: isDark ? 'rgba(255,255,255,0.25)' : '#94a3b8',
                   textTransform: 'uppercase', letterSpacing: '0.1em', padding: '2px 4px' }}>
                   Adicionar
                 </div>
@@ -855,21 +918,37 @@ export default function MapaFTTH({
                     onClick={() => { enterAddMode(type); setAddFabOpen(false) }}
                     style={{ display: 'flex', alignItems: 'center', gap: 8,
                       padding: '8px 10px', borderRadius: 10, border: 'none',
-                      background: 'rgba(255,255,255,0.05)', color: '#e2e8f0',
+                      background: isDark ? 'rgba(255,255,255,0.05)' : 'transparent', color: isDark ? '#e2e8f0' : '#1e293b',
                       fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
                       transition: 'background 0.15s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = color + '33'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                    onMouseEnter={e => e.currentTarget.style.background = color + '22'}
+                    onMouseLeave={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'transparent'}
                   >
                     <span style={{ width: 20, textAlign: 'center' }}>{icon}</span>
                     {label}
                   </button>
                 ))}
-                <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 0' }} />
+                <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.07)' : '#e2e8f0', margin: '4px 0' }} />
               </>)}
 
+              {/* Busca — disponível para todos */}
+              <button
+                onClick={() => { setBuscaAberta(true); setAddFabOpen(false) }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 10px', borderRadius: 10, border: 'none',
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'transparent', color: isDark ? '#c4b5fd' : '#7c3aed',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,58,237,0.12)'}
+                onMouseLeave={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'transparent'}
+              >
+                <span style={{ width: 20, textAlign: 'center', fontSize: 15 }}>🔍</span>
+                Buscar
+              </button>
+
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 0' }} />
+
               {/* GPS */}
-              <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.25)',
+              <div style={{ fontSize: 9, fontWeight: 700, color: isDark ? 'rgba(255,255,255,0.25)' : '#94a3b8',
                 textTransform: 'uppercase', letterSpacing: '0.1em', padding: '2px 4px' }}>
                 GPS
               </div>
@@ -886,10 +965,10 @@ export default function MapaFTTH({
                 }}
                 style={{ display: 'flex', alignItems: 'center', gap: 8,
                   padding: '8px 10px', borderRadius: 10, border: 'none',
-                  background: 'rgba(255,255,255,0.05)', color: '#93c5fd',
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'transparent', color: isDark ? '#93c5fd' : '#2563eb',
                   fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.15)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.12)'}
+                onMouseLeave={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'transparent'}
               >
                 <GPSIcon />
                 Minha localização
@@ -904,11 +983,11 @@ export default function MapaFTTH({
                 }}
                 style={{ display: 'flex', alignItems: 'center', gap: 8,
                   padding: '8px 10px', borderRadius: 10, border: 'none',
-                  background: tracking && followMode ? 'rgba(37,99,235,0.35)' : 'rgba(255,255,255,0.05)',
-                  color: tracking && followMode ? '#fff' : '#93c5fd',
+                  background: tracking && followMode ? 'rgba(37,99,235,0.25)' : (isDark ? 'rgba(255,255,255,0.05)' : 'transparent'),
+                  color: tracking && followMode ? (isDark ? '#fff' : '#1d4ed8') : (isDark ? '#93c5fd' : '#2563eb'),
                   fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-                onMouseEnter={e => e.currentTarget.style.background = tracking && followMode ? 'rgba(37,99,235,0.5)' : 'rgba(59,130,246,0.15)'}
-                onMouseLeave={e => e.currentTarget.style.background = tracking && followMode ? 'rgba(37,99,235,0.35)' : 'rgba(255,255,255,0.05)'}
+                onMouseEnter={e => e.currentTarget.style.background = tracking && followMode ? 'rgba(37,99,235,0.4)' : 'rgba(59,130,246,0.12)'}
+                onMouseLeave={e => e.currentTarget.style.background = tracking && followMode ? 'rgba(37,99,235,0.25)' : (isDark ? 'rgba(255,255,255,0.05)' : 'transparent')}
               >
                 <FollowIcon />
                 <span style={{ flex: 1 }}>{tracking && followMode ? 'Seguindo...' : 'Seguir técnico'}</span>
@@ -922,10 +1001,10 @@ export default function MapaFTTH({
                   onClick={() => map?.flyTo({ center: [gpsPosition.lng, gpsPosition.lat], zoom: 16, duration: 800 })}
                   style={{ display: 'flex', alignItems: 'center', gap: 8,
                     padding: '8px 10px', borderRadius: 10, border: 'none',
-                    background: 'rgba(255,255,255,0.05)', color: '#94a3b8',
+                    background: isDark ? 'rgba(255,255,255,0.05)' : 'transparent', color: isDark ? '#94a3b8' : '#475569',
                     fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(100,116,139,0.2)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(100,116,139,0.12)'}
+                  onMouseLeave={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'transparent'}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="16" y2="14"/>
@@ -936,14 +1015,21 @@ export default function MapaFTTH({
             </div>
           )}
 
-          {/* Botão principal FAB */}
+          {/* Botão principal FAB — maior no modo campo */}
           <button
             onClick={() => setAddFabOpen((v) => !v)}
             aria-label={addFabOpen ? 'Fechar menu' : 'Abrir menu'}
-            className="w-14 h-14 flex items-center justify-center rounded-full shadow-2xl text-white text-2xl font-bold transition-all"
+            className="flex items-center justify-center rounded-full font-bold transition-all"
             style={{
-              backgroundColor: addFabOpen ? '#475569' : '#0284c7',
-              border: '2px solid rgba(255,255,255,0.2)',
+              width: isCampo ? 64 : 56, height: isCampo ? 64 : 56,
+              minWidth: isCampo ? 64 : 56,
+              fontSize: isCampo ? 28 : 24,
+              backgroundColor: isDark
+                ? (addFabOpen ? '#475569' : '#0284c7')
+                : (addFabOpen ? '#e2e8f0' : '#ffffff'),
+              color: isDark ? '#ffffff' : '#0f172a',
+              border: isDark ? '2px solid rgba(255,255,255,0.2)' : '1.5px solid #cbd5e1',
+              boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.5)' : '0 4px 20px rgba(0,0,0,0.18)',
               position: 'relative',
             }}
           >
@@ -951,7 +1037,7 @@ export default function MapaFTTH({
             {/* Indicador GPS ativo */}
             {tracking && !addFabOpen && (
               <span style={{ position: 'absolute', top: 0, right: 0, width: 12, height: 12,
-                background: '#3b82f6', border: '2px solid #0284c7', borderRadius: '50%',
+                background: '#3b82f6', border: isDark ? '2px solid #0284c7' : '2px solid #ffffff', borderRadius: '50%',
                 animation: 'gps-pulse 1.5s ease-in-out infinite' }} />
             )}
           </button>

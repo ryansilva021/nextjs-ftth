@@ -264,14 +264,14 @@ const TIPOS_ROTA  = ['RAMAL', 'BACKBONE', 'DROP']
 
 const S = {
   card: {
-    background:   'rgba(13,21,40,0.9)',
-    border:       '1px solid rgba(255,255,255,0.08)',
+    background:   'var(--card-bg)',
+    border:       '1px solid var(--border-color)',
     borderRadius: 12,
     padding:      20,
   },
   label: {
     fontSize:      11,
-    color:         '#94a3b8',
+    color:         'var(--text-secondary)',
     fontWeight:    600,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
@@ -284,8 +284,8 @@ const S = {
     cursor:       'pointer',
     fontWeight:   600,
     fontSize:     14,
-    background:   ativa ? 'rgba(255,255,255,0.08)' : 'transparent',
-    color:        ativa ? '#e2e8f0' : '#64748b',
+    background:   ativa ? 'var(--card-bg-active)' : 'transparent',
+    color:        ativa ? 'var(--foreground)' : 'var(--text-muted)',
     borderBottom: ativa ? '2px solid #0284c7' : '2px solid transparent',
     transition:   'all .15s',
   }),
@@ -305,10 +305,10 @@ const S = {
 
 const cellStyle = { padding: '4px 6px', verticalAlign: 'middle' }
 const inputStyle = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.12)',
+  background: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
   borderRadius: 5,
-  color: '#e2e8f0',
+  color: 'var(--foreground)',
   fontSize: 12,
   padding: '3px 7px',
   width: '100%',
@@ -325,7 +325,7 @@ function PreviewRow({ item, onChange }) {
   const isRota = item.tipo === 'rota'
 
   return (
-    <tr style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+    <tr style={{ borderTop: '1px solid var(--border-color)' }}>
       {/* Tipo */}
       <td style={cellStyle}>
         {isRota ? (
@@ -358,7 +358,7 @@ function PreviewRow({ item, onChange }) {
         />
       </td>
       {/* Coords */}
-      <td style={{ ...cellStyle, fontFamily: 'monospace', fontSize: 10, color: '#64748b', whiteSpace: 'nowrap' }}>
+      <td style={{ ...cellStyle, fontFamily: 'monospace', fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
         {item.lat != null
           ? `${Number(item.lat).toFixed(5)}, ${Number(item.lng).toFixed(5)}`
           : `${item.coordinates?.length ?? 0} pts`}
@@ -475,7 +475,7 @@ export default function ImportarExportarClient({ ctos, caixas, rotas, postes, pr
   return (
     <div style={{ width: '100%' }}>
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ display: 'flex', gap: 2, marginBottom: 24, borderBottom: '1px solid var(--border-color)' }}>
         {[['exportar', '⬇️ Exportar'], ['importar', '⬆️ Importar']].map(([t, label]) => (
           <button key={t} style={S.tabBtn(aba === t)} onClick={() => { setAba(t); setPreview(null); setParseErro(null); setResultado(null) }}>
             {label}
@@ -487,7 +487,7 @@ export default function ImportarExportarClient({ ctos, caixas, rotas, postes, pr
       {aba === 'exportar' && (
         <div style={S.card}>
           <div style={S.label}>Dados do Projeto</div>
-          <div style={{ color: '#94a3b8', fontSize: 13, marginBottom: 20 }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 20 }}>
             {ctos.length} CTOs · {caixas.length} CDOs · {postes?.length ?? 0} Postes · {rotas?.features?.length ?? 0} Rotas
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
@@ -537,7 +537,7 @@ export default function ImportarExportarClient({ ctos, caixas, rotas, postes, pr
                   ))}
                 </div>
               )}
-              <button onClick={() => setResultado(null)} style={{ ...S.btn('#94a3b8'), fontSize: 12, padding: '6px 14px' }}>
+              <button onClick={() => setResultado(null)} style={{ ...S.btn('var(--text-secondary)'), fontSize: 12, padding: '6px 14px' }}>
                 Nova importação
               </button>
             </div>
@@ -552,7 +552,7 @@ export default function ImportarExportarClient({ ctos, caixas, rotas, postes, pr
                   textAlign:   'center',
                   cursor:      'pointer',
                   borderStyle: 'dashed',
-                  borderColor: 'rgba(255,255,255,0.18)',
+                  borderColor: 'var(--border-color-strong)',
                   padding:     32,
                 }}
                 onClick={() => fileRef.current?.click()}
@@ -564,10 +564,10 @@ export default function ImportarExportarClient({ ctos, caixas, rotas, postes, pr
                 }}
               >
                 <div style={{ fontSize: 36, marginBottom: 10 }}>📂</div>
-                <div style={{ color: '#e2e8f0', fontWeight: 600, marginBottom: 6 }}>
+                <div style={{ color: 'var(--foreground)', fontWeight: 600, marginBottom: 6 }}>
                   Arraste o arquivo ou clique para selecionar
                 </div>
-                <div style={{ color: '#64748b', fontSize: 12 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                   Suportado: KML · GeoJSON · DXF · JSON (exportação FiberOps)
                 </div>
                 <input
@@ -580,15 +580,15 @@ export default function ImportarExportarClient({ ctos, caixas, rotas, postes, pr
               </div>
 
               {/* Dicas de conversão */}
-              <div style={{ ...S.card, background: 'rgba(255,255,255,0.02)', padding: '12px 16px' }}>
-                <div style={{ color: '#475569', fontSize: 11, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              <div style={{ ...S.card, background: 'var(--card-bg)', padding: '12px 16px' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   Dicas de importação
                 </div>
-                <div style={{ color: '#475569', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <span>• <b style={{ color: '#64748b' }}>KML/Google Earth:</b> Placemarks com "CTO", "CDO" ou "POSTE" no nome → elementos; LineStrings → rotas</span>
-                  <span>• <b style={{ color: '#64748b' }}>DXF/AutoCAD:</b> Entidades LINE → rotas; POINT → elementos (tipo pelo nome da layer)</span>
-                  <span>• <b style={{ color: '#64748b' }}>KMZ:</b> Extraia o .kml de dentro do .kmz (é um ZIP) e importe-o</span>
-                  <span>• <b style={{ color: '#64748b' }}>Coordenadas DXF:</b> X = longitude, Y = latitude (WGS84)</span>
+                <div style={{ color: 'var(--text-muted)', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span>• <b style={{ color: 'var(--text-muted)' }}>KML/Google Earth:</b> Placemarks com "CTO", "CDO" ou "POSTE" no nome → elementos; LineStrings → rotas</span>
+                  <span>• <b style={{ color: 'var(--text-muted)' }}>DXF/AutoCAD:</b> Entidades LINE → rotas; POINT → elementos (tipo pelo nome da layer)</span>
+                  <span>• <b style={{ color: 'var(--text-muted)' }}>KMZ:</b> Extraia o .kml de dentro do .kmz (é um ZIP) e importe-o</span>
+                  <span>• <b style={{ color: 'var(--text-muted)' }}>Coordenadas DXF:</b> X = longitude, Y = latitude (WGS84)</span>
                 </div>
               </div>
 
@@ -603,13 +603,13 @@ export default function ImportarExportarClient({ ctos, caixas, rotas, postes, pr
               {preview && (
                 <div style={S.card}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                    <div style={{ color: '#e2e8f0', fontWeight: 700 }}>
+                    <div style={{ color: 'var(--foreground)', fontWeight: 700 }}>
                       {preview.length} item(s) encontrado(s) — revise antes de confirmar
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button
                         onClick={() => setPreview(null)}
-                        style={{ ...S.btn('#94a3b8'), padding: '6px 14px', fontSize: 12 }}
+                        style={{ ...S.btn('var(--text-secondary)'), padding: '6px 14px', fontSize: 12 }}
                       >
                         Cancelar
                       </button>
@@ -626,7 +626,7 @@ export default function ImportarExportarClient({ ctos, caixas, rotas, postes, pr
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                       <thead>
-                        <tr style={{ color: '#475569', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>
+                        <tr style={{ color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>
                           <th style={{ textAlign: 'left', padding: '4px 6px' }}>Tipo</th>
                           <th style={{ textAlign: 'left', padding: '4px 6px' }}>Nome</th>
                           <th style={{ textAlign: 'left', padding: '4px 6px' }}>Coords / Pts</th>

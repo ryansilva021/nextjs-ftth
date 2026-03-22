@@ -57,7 +57,7 @@ function LoginForm() {
 
       {/* Card */}
       <div
-        style={{ backgroundColor: '#111827', border: '1px solid #1f2937' }}
+        style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
         className="rounded-2xl p-8"
       >
         <h2 className="text-lg font-semibold text-white mb-6">Entrar na conta</h2>
@@ -75,9 +75,9 @@ function LoginForm() {
               onChange={(e) => setUsername(e.target.value)}
               placeholder="seu.usuario"
               style={{
-                backgroundColor: '#0b1220',
-                border: '1px solid #1f2937',
-                color: '#f1f5f9',
+                backgroundColor: 'var(--inp-bg)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--foreground)',
               }}
               className="rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder-slate-600"
             />
@@ -95,9 +95,9 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               style={{
-                backgroundColor: '#0b1220',
-                border: '1px solid #1f2937',
-                color: '#f1f5f9',
+                backgroundColor: 'var(--inp-bg)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--foreground)',
               }}
               className="rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder-slate-600"
             />

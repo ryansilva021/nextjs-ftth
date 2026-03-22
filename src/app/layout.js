@@ -1,5 +1,6 @@
 import './globals.css'
 import { SessionProvider } from 'next-auth/react'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 
 export const metadata = {
   title: 'FiberOps FTTH',
@@ -11,7 +12,9 @@ export default function RootLayout({ children }) {
     <html lang="pt-BR">
       <body style={{ fontFamily: 'system-ui, sans-serif' }}>
         <SessionProvider>
-          {children}
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
         </SessionProvider>
       </body>
     </html>

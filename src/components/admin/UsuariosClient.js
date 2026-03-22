@@ -11,14 +11,14 @@ import {
 const ROLES = ['user', 'tecnico', 'admin']
 
 const inputStyle = {
-  backgroundColor: '#0b1220',
-  border: '1px solid #1f2937',
-  color: '#f1f5f9',
+  backgroundColor: 'var(--inp-bg)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--foreground)',
 }
 
 const cardStyle = {
-  backgroundColor: '#111827',
-  border: '1px solid #1f2937',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
 }
 
 const modalBgStyle = {
@@ -211,7 +211,7 @@ export default function UsuariosClient({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid #1f2937', backgroundColor: '#0d1526' }}>
+              <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--card-bg)' }}>
                 {['Usuário', 'Nome', 'Role', 'Status', 'Último login', 'Ações'].map((h) => (
                   <th key={h} className="text-left text-xs text-slate-400 font-semibold uppercase tracking-wider px-4 py-3">
                     {h}
@@ -232,7 +232,7 @@ export default function UsuariosClient({
                 return (
                   <tr
                     key={u._id}
-                    style={{ borderBottom: i < usuarios.length - 1 ? '1px solid #1f2937' : 'none' }}
+                    style={{ borderBottom: i < usuarios.length - 1 ? '1px solid var(--border-color)' : 'none' }}
                     className="hover:bg-slate-800/30 transition-colors"
                   >
                     <td className="px-4 py-3 font-mono text-xs text-sky-400">{u.username}</td>
@@ -384,7 +384,7 @@ export default function UsuariosClient({
               <button
                 onClick={fecharModal}
                 disabled={isPending}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="px-4 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors disabled:opacity-40"
               >
                 Cancelar
@@ -431,7 +431,7 @@ export default function UsuariosClient({
             <div className="flex gap-3">
               <button
                 onClick={() => { setModalSenha(null); setErro(null) }}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="flex-1 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors"
               >
                 Cancelar
@@ -460,7 +460,7 @@ export default function UsuariosClient({
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDelete(null)}
-                style={{ border: '1px solid #1f2937', color: '#94a3b8' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
                 className="flex-1 py-2 rounded-lg text-sm hover:bg-slate-800 transition-colors"
               >
                 Cancelar

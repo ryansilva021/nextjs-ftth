@@ -15,22 +15,22 @@ const TIPO_CONFIG = {
 const modalOverlay = { backgroundColor: 'rgba(0,0,0,0.85)' }
 
 const modalPanel = {
-  backgroundColor: 'rgba(8,13,28,0.98)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
   width: 'min(580px,100%)',
 }
 
 const fieldInput = {
-  backgroundColor: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.10)',
-  color: '#e2e8f0',
+  backgroundColor: 'var(--inp-bg)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--foreground)',
   fontSize: '13px',
   outline: 'none',
 }
 
 const fieldGroup = {
-  backgroundColor: 'rgba(255,255,255,0.025)',
-  border: '1px solid rgba(255,255,255,0.07)',
+  backgroundColor: 'var(--inp-bg)',
+  border: '1px solid var(--border-color)',
   borderRadius: '12px',
   padding: '14px',
   display: 'flex',
@@ -40,7 +40,7 @@ const fieldGroup = {
 
 const labelStyle = {
   fontSize: '10px',
-  color: 'rgba(255,255,255,0.35)',
+  color: 'var(--border-color)',
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
   fontWeight: 600,
@@ -49,8 +49,8 @@ const labelStyle = {
 }
 
 const cardStyle = {
-  backgroundColor: '#111827',
-  border: '1px solid #1f2937',
+  backgroundColor: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
 }
 
 const TIPO_CORES_TABLE = {
@@ -212,7 +212,7 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole, idInic
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid #1f2937', backgroundColor: '#0d1526' }}>
+              <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--card-bg)' }}>
                 {['ID', 'Nome', 'Tipo', 'Pontos', 'Ações'].map((h) => (
                   <th key={h} className="text-left text-xs text-slate-400 font-semibold uppercase tracking-wider px-4 py-3">{h}</th>
                 ))}
@@ -226,7 +226,7 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole, idInic
                 const tipo = getRotaTipo(rota)
                 const cfg = TIPO_CONFIG[tipo]
                 return (
-                  <tr key={(rota.properties ?? rota)._id ?? i} style={{ borderBottom: i < rotas.length - 1 ? '1px solid #1f2937' : 'none' }} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={(rota.properties ?? rota)._id ?? i} style={{ borderBottom: i < rotas.length - 1 ? '1px solid var(--border-color)' : 'none' }} className="hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-sky-400">{getRotaId(rota)}</td>
                     <td className="px-4 py-3 text-slate-200">{getRotaNome(rota)}</td>
                     <td className="px-4 py-3">
@@ -259,16 +259,16 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole, idInic
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" style={modalOverlay} onClick={(e) => e.target === e.currentTarget && fecharModal()}>
           <div style={modalPanel} className="rounded-t-2xl sm:rounded-2xl w-full p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 style={{ color: '#e2e8f0', fontSize: 17, fontWeight: 700 }}>
+              <h2 style={{ color: 'var(--foreground)', fontSize: 17, fontWeight: 700 }}>
                 {rotaEditando ? 'Editar Rota' : 'Nova Rota'}
               </h2>
-              <button onClick={fecharModal} style={{ color: 'rgba(255,255,255,0.3)', fontSize: 20, lineHeight: 1 }} className="hover:text-white transition-colors">✕</button>
+              <button onClick={fecharModal} style={{ color: 'var(--border-color)', fontSize: 20, lineHeight: 1 }} className="hover:text-white transition-colors">✕</button>
             </div>
 
             <div className="flex flex-col gap-4">
               {/* Grupo: Identificação */}
               <div style={fieldGroup}>
-                <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Identificação</p>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>Identificação</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label style={labelStyle}>ID da Rota *</label>
@@ -288,7 +288,7 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole, idInic
 
               {/* Grupo: Tipo — visual chips */}
               <div style={fieldGroup}>
-                <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Tipo de Rota</p>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>Tipo de Rota</p>
                 <div className="grid grid-cols-3 gap-2">
                   {TIPOS.map((t) => {
                     const cfg = TIPO_CONFIG[t]
@@ -296,16 +296,16 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole, idInic
                     return (
                       <button key={t} type="button" onClick={() => setForm((p) => ({ ...p, tipo: t }))}
                         style={{
-                          backgroundColor: ativo ? cfg.bg : 'rgba(255,255,255,0.04)',
-                          border: `1px solid ${ativo ? cfg.border : 'rgba(255,255,255,0.08)'}`,
+                          backgroundColor: ativo ? cfg.bg : 'var(--border-color)',
+                          border: `1px solid ${ativo ? cfg.border : 'var(--border-color)'}`,
                           padding: '10px 8px',
                           borderRadius: 10,
                           transition: 'all .15s',
                         }}
                         className="flex flex-col items-center gap-1"
                       >
-                        <span style={{ color: ativo ? cfg.cor : 'rgba(255,255,255,0.35)', fontWeight: 700, fontSize: 13 }}>{t}</span>
-                        <span style={{ color: ativo ? cfg.cor : 'rgba(255,255,255,0.2)', fontSize: 10 }}>{cfg.desc}</span>
+                        <span style={{ color: ativo ? cfg.cor : 'var(--border-color)', fontWeight: 700, fontSize: 13 }}>{t}</span>
+                        <span style={{ color: ativo ? cfg.cor : 'var(--border-color)', fontSize: 10 }}>{cfg.desc}</span>
                       </button>
                     )
                   })}
@@ -314,7 +314,7 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole, idInic
 
               {/* Grupo: Coordenadas */}
               <div style={fieldGroup}>
-                <p style={{ ...labelStyle, marginBottom: 0, color: 'rgba(255,255,255,0.5)' }}>Coordenadas *</p>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>Coordenadas *</p>
                 <div>
                   <label style={labelStyle}>Array JSON — [[lng, lat], ...]</label>
                   <textarea
@@ -324,7 +324,7 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole, idInic
                     style={{ ...fieldInput, fontFamily: 'monospace', fontSize: '12px', resize: 'vertical' }}
                     className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40"
                   />
-                  <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, marginTop: 4 }}>
+                  <p style={{ color: 'var(--border-color)', fontSize: 11, marginTop: 4 }}>
                     Formato GeoJSON: longitude antes da latitude. Mínimo 2 pontos.
                   </p>
                 </div>
@@ -347,7 +347,7 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole, idInic
 
             <div className="flex justify-end gap-3 mt-5">
               <button onClick={fecharModal} disabled={isPending}
-                style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--border-color)' }}
                 className="px-5 py-2.5 rounded-lg text-sm hover:bg-white/5 transition-colors disabled:opacity-40">
                 Cancelar
               </button>
@@ -371,7 +371,7 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole, idInic
             </p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDelete(null)}
-                style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }}
+                style={{ border: '1px solid var(--border-color)', color: 'var(--border-color)' }}
                 className="flex-1 py-2.5 rounded-lg text-sm hover:bg-white/5 transition-colors">
                 Cancelar
               </button>

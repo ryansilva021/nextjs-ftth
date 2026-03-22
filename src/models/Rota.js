@@ -107,6 +107,13 @@ const RotaSchema = new Schema(
       trim:    true,
       default: null,
     },
+
+    // IDs dos itens snappados nas extremidades da rota (ex: ["cdo:CDO-001", "cto:CTO-001"])
+    // Permite matching confiável de rota por topologia sem depender do texto de obs
+    snap_ids: {
+      type:    [String],
+      default: [],
+    },
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
