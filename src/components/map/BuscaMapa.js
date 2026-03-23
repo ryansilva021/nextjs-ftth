@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { buscarClientes, searchGlobal } from '@/actions/search'
+import { useTheme } from '@/contexts/ThemeContext'
 
 /**
  * AGENT_BUSCA — overlay de busca no mapa.
@@ -9,6 +10,8 @@ import { buscarClientes, searchGlobal } from '@/actions/search'
  * Ao clicar num resultado → callback onFlyTo({ lat, lng }) + onSelect(item)
  */
 export default function BuscaMapa({ projetoId, onFlyTo, onClose }) {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
   const [query, setQuery]       = useState('')
   const [results, setResults]   = useState([])
   const [loading, setLoading]   = useState(false)
@@ -69,15 +72,16 @@ export default function BuscaMapa({ projetoId, onFlyTo, onClose }) {
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
       zIndex: 300, display: 'flex', flexDirection: 'column',
-      background: 'rgba(6,10,22,0.97)',
+      background: isDark ? 'rgba(6,10,22,0.97)' : 'rgba(255,255,255,0.98)',
       backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
     }}>
       {/* Cabeçalho */}
       <div style={{ padding: '16px 16px 0', display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ flex: 1, position: 'relative' }}>
           <span style={{
             position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-            color: '#64748b', fontSize: 16, pointerEvents: 'none',
+            color: isDark ? '#64748b' : '#94a3b8', fontSize: 16, pointerEvents: 'none',
           }}>🔍</span>
           <input
             ref={inputRef}
@@ -86,22 +90,22 @@ export default function BuscaMapa({ projetoId, onFlyTo, onClose }) {
             placeholder="Buscar cliente, CTO, CDO, rota..."
             style={{
               width: '100%', boxSizing: 'border-box',
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.12)',
+              background: isDark ? 'rgba(255,255,255,0.07)' : '#f8fafc',
+              border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid #e2e8f0',
               borderRadius: 12, padding: '13px 16px 13px 40px',
-              color: '#f1f5f9', fontSize: 15, outline: 'none',
+              color: isDark ? '#f1f5f9' : '#0f172a', fontSize: 15, outline: 'none',
             }}
             onKeyDown={e => e.key === 'Escape' && onClose?.()}
           />
           {loading && (
-            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: 12 }}>
+            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: isDark ? '#64748b' : '#94a3b8', fontSize: 12 }}>
               ...
             </span>
           )}
         </div>
         <button onClick={onClose} style={{
-          background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 10, padding: '12px 14px', color: '#94a3b8',
+          background: isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
+          borderRadius: 10, padding: '12px 14px', color: isDark ? '#94a3b8' : '#475569',
           fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
         }}>
           Fechar
@@ -117,8 +121,8 @@ export default function BuscaMapa({ projetoId, onFlyTo, onClose }) {
           <button key={key} onClick={() => setTab(key)} style={{
             padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
             fontSize: 13, fontWeight: 600,
-            background: tab === key ? 'rgba(2,132,199,0.25)' : 'rgba(255,255,255,0.05)',
-            color: tab === key ? '#7dd3fc' : '#64748b',
+            background: tab === key ? 'rgba(2,132,199,0.18)' : (isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9'),
+            color: tab === key ? (isDark ? '#7dd3fc' : '#0284c7') : (isDark ? '#64748b' : '#64748b'),
             transition: 'all 0.15s',
           }}>
             {label}
@@ -129,13 +133,13 @@ export default function BuscaMapa({ projetoId, onFlyTo, onClose }) {
       {/* Resultados */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 32px' }}>
         {query.length < 2 && (
-          <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, textAlign: 'center', marginTop: 40 }}>
+          <p style={{ color: isDark ? 'rgba(255,255,255,0.2)' : '#94a3b8', fontSize: 13, textAlign: 'center', marginTop: 40 }}>
             Digite ao menos 2 caracteres para buscar
           </p>
         )}
 
         {query.length >= 2 && !loading && results.length === 0 && (
-          <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, textAlign: 'center', marginTop: 40 }}>
+          <p style={{ color: isDark ? 'rgba(255,255,255,0.2)' : '#94a3b8', fontSize: 13, textAlign: 'center', marginTop: 40 }}>
             Nenhum resultado encontrado
           </p>
         )}
@@ -156,13 +160,13 @@ export default function BuscaMapa({ projetoId, onFlyTo, onClose }) {
                 width: '100%', textAlign: 'left', display: 'flex',
                 alignItems: 'center', gap: 12,
                 padding: '12px 14px', borderRadius: 12, border: 'none',
-                background: 'rgba(255,255,255,0.04)',
+                background: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc',
                 cursor: hasCoords ? 'pointer' : 'default',
                 marginBottom: 4, transition: 'background 0.1s',
                 opacity: hasCoords ? 1 : 0.5,
               }}
               onMouseEnter={e => { if (hasCoords) e.currentTarget.style.background = 'rgba(2,132,199,0.12)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc' }}
             >
               <div style={{
                 width: 36, height: 36, borderRadius: 10, flexShrink: 0,
@@ -172,16 +176,16 @@ export default function BuscaMapa({ projetoId, onFlyTo, onClose }) {
                 {isCliente ? '👤' : { CTO: '📦', CDO: '🔌', Rota: '〰️', Poste: '🏗️' }[item._tipo] ?? '📍'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: isDark ? '#f1f5f9' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {nome}
                 </div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: isDark ? '#64748b' : '#94a3b8', marginTop: 2 }}>
                   {sub}
                   {!hasCoords && <span style={{ color: '#ef4444', marginLeft: 6 }}>sem coordenadas</span>}
                 </div>
               </div>
               {hasCoords && (
-                <span style={{ fontSize: 16, color: '#64748b', flexShrink: 0 }}>→</span>
+                <span style={{ fontSize: 16, color: isDark ? '#64748b' : '#94a3b8', flexShrink: 0 }}>→</span>
               )}
             </button>
           )

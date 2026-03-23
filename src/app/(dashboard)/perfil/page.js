@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { useTheme } from '@/contexts/ThemeContext'
 
@@ -25,8 +25,17 @@ function getAvatarColor(str = '') {
 
 export default function PerfilPage() {
   const { data: session } = useSession()
-  const { theme }         = useTheme()
+  const { theme, toggleTheme } = useTheme()
   const isDark            = theme === 'dark'
+
+  const [campoMode, setCampoMode] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('pref_campo_mode') === 'true'
+  })
+  function toggleCampo(v) {
+    setCampoMode(v)
+    try { localStorage.setItem('pref_campo_mode', String(v)) } catch {}
+  }
 
   const user     = session?.user ?? {}
   const initials = (user.username ?? '?')[0]?.toUpperCase()
@@ -67,9 +76,19 @@ export default function PerfilPage() {
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 22, fontWeight: 800, color: 'var(--foreground)', margin: 0, lineHeight: 1.2 }}>
-              {user.username ?? '—'}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <p style={{ fontSize: 22, fontWeight: 800, color: 'var(--foreground)', margin: 0, lineHeight: 1.2 }}>
+                {user.username ?? '—'}
+              </p>
+              <Link href="/configuracoes" title="Configurações" style={{
+                fontSize: 18, textDecoration: 'none', opacity: 0.7,
+                padding: '3px 6px', borderRadius: 8, border: '1px solid var(--border-color)',
+                background: 'var(--card-bg-active)', lineHeight: 1,
+                display: 'flex', alignItems: 'center',
+              }}>
+                ⚙️
+              </Link>
+            </div>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
               Projeto: <span style={{ color: 'var(--foreground)', fontWeight: 600 }}>{user.projeto_nome ?? user.projeto_id ?? '—'}</span>
             </p>
@@ -98,7 +117,7 @@ export default function PerfilPage() {
             <span style={S.label}>Projeto</span>
             <span style={S.value}>{user.projeto_nome ?? user.projeto_id ?? '—'}</span>
           </div>
-          <div style={{ ...S.row, borderBottom: 'none' }}>
+          <div style={S.row}>
             <span style={S.label}>Segurança</span>
             <Link href="/perfil/senha" style={{
               fontSize: 13, fontWeight: 600, color: '#0284c7',
@@ -108,6 +127,85 @@ export default function PerfilPage() {
             }}>
               Alterar senha →
             </Link>
+          </div>
+          <div style={{ ...S.row, borderBottom: 'none' }}>
+            <span style={S.label}>Preferências</span>
+            <Link href="/configuracoes" style={{
+              fontSize: 13, fontWeight: 600, color: 'var(--foreground)',
+              textDecoration: 'none', padding: '6px 14px',
+              background: 'var(--card-bg-active)',
+              borderRadius: 8, border: '1px solid var(--border-color)',
+            }}>
+              Configurações →
+            </Link>
+          </div>
+        </div>
+
+        {/* Configurações Rápidas */}
+        <div style={S.card}>
+          <p style={S.title}>Configurações Rápidas</p>
+          <div style={{ ...S.row }}>
+            <span style={S.label}>Tema</span>
+            <button onClick={toggleTheme} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
+              border: '1px solid var(--border-color)',
+              background: 'var(--card-bg-active)',
+              fontSize: 13, fontWeight: 600, color: 'var(--foreground)',
+            }}>
+              {isDark ? '☀️ Claro' : '🌙 Escuro'}
+            </button>
+          </div>
+          <div style={{ ...S.row, borderBottom: 'none' }}>
+            <div>
+              <span style={S.label}>Modo Campo</span>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>Interface simplificada para campo</p>
+            </div>
+            <button
+              onClick={() => toggleCampo(!campoMode)}
+              style={{
+                width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                background: campoMode ? '#0284c7' : 'var(--border-color)',
+                position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+              }}
+              role="switch" aria-checked={campoMode}
+            >
+              <span style={{
+                position: 'absolute', top: 3, left: campoMode ? 23 : 3,
+                width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+              }} />
+            </button>
+          </div>
+        </div>
+
+        {/* Sistema */}
+        <div style={S.card}>
+          <p style={S.title}>Sistema</p>
+          <div style={{ ...S.row }}>
+            <span style={S.label}>Configurações completas</span>
+            <Link href="/configuracoes" style={{
+              fontSize: 13, fontWeight: 600, color: 'var(--foreground)',
+              textDecoration: 'none', padding: '6px 14px',
+              background: 'var(--card-bg-active)',
+              borderRadius: 8, border: '1px solid var(--border-color)',
+            }}>
+              Abrir ⚙️
+            </Link>
+          </div>
+          <div style={{ ...S.row, borderBottom: 'none' }}>
+            <span style={S.label}>Sessão</span>
+            <button
+              onClick={() => signOut({ callbackUrl: '/login' })}
+              style={{
+                fontSize: 13, fontWeight: 600, color: '#ef4444',
+                padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
+                background: isDark ? 'rgba(239,68,68,0.08)' : '#fef2f2',
+                border: '1px solid rgba(239,68,68,0.3)',
+              }}
+            >
+              Sair →
+            </button>
           </div>
         </div>
 

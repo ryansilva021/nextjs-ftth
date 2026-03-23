@@ -121,6 +121,18 @@ export async function upsertCaixa(data) {
   revalidatePath('/')
   revalidatePath('/admin/caixas')
 
+  // Registrar evento
+  try {
+    const { logEvento } = await import('@/actions/eventos')
+    await logEvento({
+      tipo_acao: 'editou',
+      entidade: 'caixa',
+      item_id: caixa.id ?? caixa._id,
+      item_nome: caixa.nome ?? caixa.id ?? '',
+      projeto_id: targetProjeto,
+    })
+  } catch (_) {}
+
   return { ...caixa, _id: caixa._id.toString() }
 }
 
@@ -151,6 +163,18 @@ export async function deleteCaixa(caixaId, projetoId) {
 
   revalidatePath('/')
   revalidatePath('/admin/caixas')
+
+  // Registrar evento
+  try {
+    const { logEvento } = await import('@/actions/eventos')
+    await logEvento({
+      tipo_acao: 'excluiu',
+      entidade: 'caixa',
+      item_id: caixaId,
+      item_nome: caixaId,
+      projeto_id: targetProjeto,
+    })
+  } catch (_) {}
 
   return { deleted: result.deletedCount > 0 }
 }
@@ -225,6 +249,44 @@ export async function saveDiagramaCaixa(data) {
     { projeto_id: targetProjeto, id: ce_id },
     { $set: { diagrama, ...topologiaUpdate } }
   )
+
+  // ── Sincronizar CTOs referenciadas nos splitters e saídas diretas da bandeja ─
+  const ctoLinks = []
+
+  // Via splitters reais (excluindo bypass)
+  for (const spl of (diagrama.splitters ?? [])) {
+    if (spl.id?.startsWith('bypass-')) continue
+    for (const saida of (spl.saidas ?? [])) {
+      if ((saida.tipo === 'cto' || !saida.tipo) && saida.cto_id?.trim()) {
+        ctoLinks.push({ cto_id: saida.cto_id.trim(), cdo_id: ce_id, splitter_cto: spl.nome?.trim() || null })
+      }
+    }
+  }
+
+  // Via saídas diretas nas bandejas (saida_cto)
+  for (const b of (diagrama.bandejas ?? [])) {
+    for (const f of (b.fusoes ?? [])) {
+      if (f.tipo === 'saida_cto' && f.destino_id?.trim()) {
+        ctoLinks.push({ cto_id: f.destino_id.trim(), cdo_id: ce_id, splitter_cto: null })
+      }
+    }
+  }
+
+  if (ctoLinks.length > 0) {
+    await Promise.all(ctoLinks.map(lnk =>
+      CTO.updateOne(
+        { projeto_id: targetProjeto, cto_id: lnk.cto_id },
+        {
+          $set: {
+            cdo_id:                          lnk.cdo_id,
+            splitter_cto:                    lnk.splitter_cto,
+            'diagrama.entrada.cdo_id':       lnk.cdo_id,
+            'diagrama.entrada.splitter_cto': lnk.splitter_cto,
+          },
+        }
+      )
+    ))
+  }
 
   revalidatePath('/')
   revalidatePath('/admin/diagramas')

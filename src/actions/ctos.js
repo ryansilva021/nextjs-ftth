@@ -135,6 +135,19 @@ export async function upsertCTO(data) {
   revalidatePath("/");
   revalidatePath("/admin/ctos");
 
+  // Registrar evento
+  try {
+    const { logEvento } = await import('@/actions/eventos')
+    const isNew = cto.__v === 0
+    await logEvento({
+      tipo_acao: isNew ? 'criou' : 'editou',
+      entidade: 'cto',
+      item_id: cto.cto_id ?? cto._id,
+      item_nome: cto.nome ?? cto.cto_id ?? '',
+      projeto_id: targetProjeto,
+    })
+  } catch (_) {}
+
   return { ...cto, _id: cto._id.toString() };
 }
 
@@ -168,6 +181,18 @@ export async function deleteCTO(ctoId, projetoId) {
 
   revalidatePath("/");
   revalidatePath("/admin/ctos");
+
+  // Registrar evento
+  try {
+    const { logEvento } = await import('@/actions/eventos')
+    await logEvento({
+      tipo_acao: 'excluiu',
+      entidade: 'cto',
+      item_id: ctoId,
+      item_nome: ctoId,
+      projeto_id: targetProjeto,
+    })
+  } catch (_) {}
 
   return { deleted: result.deletedCount > 0 };
 }
@@ -284,6 +309,18 @@ export async function saveDiagramaCTO(data) {
   revalidatePath("/admin/diagramas");
   revalidatePath("/admin/topologia");
   revalidatePath("/admin/calculos");
+
+  // Registrar evento
+  try {
+    const { logEvento } = await import('@/actions/eventos')
+    await logEvento({
+      tipo_acao: 'editou',
+      entidade: 'fusao',
+      item_id: cto_id,
+      item_nome: cto_id,
+      projeto_id: targetProjeto,
+    })
+  } catch (_) {}
 
   return { saved: result.modifiedCount > 0 };
 }

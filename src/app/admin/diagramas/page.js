@@ -4,6 +4,7 @@
  */
 
 import { auth } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 import { getCTOs } from '@/actions/ctos'
 import { getCaixas } from '@/actions/caixas'
 import { getOLTs } from '@/actions/olts'
@@ -11,9 +12,15 @@ import DiagramasClient from '@/components/admin/DiagramasClient'
 
 export const metadata = { title: 'Fusões | FiberOps' }
 
+const ROLE_RANK = { superadmin: 4, admin: 3, tecnico: 2, user: 1 }
+
 export default async function DiagramasPage({ searchParams }) {
   const session = await auth()
   const projetoId = session?.user?.projeto_id
+
+  // Somente admin e superadmin podem acessar Fusões ABNT
+  const userRole = session?.user?.role ?? 'user'
+  if ((ROLE_RANK[userRole] ?? 0) < ROLE_RANK.admin) redirect('/')
 
   const sp = await Promise.resolve(searchParams)
   const tipo      = sp?.tipo ?? null
@@ -43,8 +50,8 @@ export default async function DiagramasPage({ searchParams }) {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-white">Fusões Ópticas</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
+          <h1 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>Fusões Ópticas</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
             {ctos.length} CTOs · {caixas.length} CE/CDOs · {olts.length} OLTs
           </p>
         </div>
@@ -64,6 +71,7 @@ export default async function DiagramasPage({ searchParams }) {
         projetoId={projetoId}
         tabInicial={tabInicial}
         idInicial={idInicial}
+        userRole={userRole}
       />
     </div>
   )

@@ -212,24 +212,40 @@ function CDOFlowNode({ data }) {
   const hdr   = isCascata ? C.casHdr : C.cdoHdr
   const bdrStyle = isCascata ? 'dashed' : 'solid'
 
-  // Achata todas as fusões de todas as bandejas
+  // Bypass splitters são saídas diretas da bandeja — não mostrar como splitter real
+  const realSplitters = (splitters ?? []).filter(s => !s.id?.startsWith('bypass-'))
+  const splCount = realSplitters.length
+
+  // Saídas diretas da bandeja (tipo saida_cto / saida_cdo)
+  const directOuts = useMemo(() => {
+    const out = []
+    for (const b of bandejas ?? []) {
+      for (const f of b.fusoes ?? []) {
+        if ((f.tipo === 'saida_cto' || f.tipo === 'saida_cdo') && f.destino_id?.trim()) {
+          out.push({ ...f, bandejaNome: b.nome })
+        }
+      }
+    }
+    return out
+  }, [bandejas])
+
+  // Fusões regulares (excluindo saídas diretas) para exibir no diagrama
   const fusoes = useMemo(() => {
     const all = []
     if (!bandejas) return all
     for (const bandeja of bandejas) {
       for (const fusao of bandeja.fusoes ?? []) {
+        if (fusao.tipo === 'saida_cto' || fusao.tipo === 'saida_cdo') continue
         all.push({ ...fusao, bandejaNome: bandeja.nome })
       }
     }
-    return all.slice(0, 28)
+    return all.slice(0, 24)
   }, [bandejas])
 
   // Divide em duas colunas: esquerda (inputs) e direita (outputs)
   const half   = Math.ceil(fusoes.length / 2)
   const colA   = fusoes.slice(0, half)
   const colB   = fusoes.slice(half)
-
-  const splCount = splitters?.length ?? 0
 
   return (
     <div
@@ -287,52 +303,73 @@ function CDOFlowNode({ data }) {
         </div>
       )}
 
-      {/* Bandeja visualization */}
+      {/* Bandeja — fusões regulares */}
       {fusoes.length > 0 && (
         <div style={{ padding: '8px 12px', display: 'flex', gap: 8 }}>
-          {/* Coluna A */}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, color: C.muted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Entrada
-            </div>
-            {colA.map((f, i) => (
-              <FibraRow key={f.id ?? i} pos={f.pos ?? (i + 1)} cor={f.cor} />
-            ))}
+            <div style={{ fontSize: 10, color: C.muted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Entrada</div>
+            {colA.map((f, i) => <FibraRow key={f.id ?? i} pos={f.pos ?? (i + 1)} cor={f.cor} />)}
           </div>
-
-          {/* Divisor */}
           <div style={{ width: 1, backgroundColor: C.border, margin: '0 4px' }} />
-
-          {/* Coluna B */}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, color: C.muted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Saída
-            </div>
-            {colB.map((f, i) => (
-              <FibraRow key={f.id ?? i} pos={f.pos ?? (half + i + 1)} cor={f.cor} />
-            ))}
+            <div style={{ fontSize: 10, color: C.muted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Saída</div>
+            {colB.map((f, i) => <FibraRow key={f.id ?? i} pos={f.pos ?? (half + i + 1)} cor={f.cor} />)}
           </div>
+        </div>
+      )}
+
+      {/* Saídas diretas da bandeja — cada uma com handle inline */}
+      {directOuts.length > 0 && (
+        <div style={{
+          borderTop: `1px solid ${C.border}`,
+          padding: '6px 12px 8px',
+        }}>
+          <div style={{ fontSize: 9, color: '#22c55e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5 }}>
+            Saída direta bandeja
+          </div>
+          {directOuts.map((f) => {
+            const fo = ABNT[((f.entrada?.fibra ?? 1) - 1) % ABNT.length]
+            return (
+              <div key={f.id} style={{
+                position: 'relative',
+                display: 'flex', alignItems: 'center', gap: 6,
+                height: 22, paddingRight: 16,
+              }}>
+                {/* FO color dot */}
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                  backgroundColor: fo?.hex ?? '#22c55e',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                }} />
+                {/* Label */}
+                <span style={{ fontSize: 10, color: '#e6edf3', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  FO{f.entrada?.fibra ?? 1} → <span style={{ color: '#4ade80', fontWeight: 700 }}>{f.destino_id}</span>
+                </span>
+                {/* Arrow badge */}
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginRight: 4 }}>→</span>
+                {/* Inline handle at this row */}
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={`direct-${f.id}`}
+                  style={{ ...handleStyle, backgroundColor: '#22c55e', right: -6, top: '50%', transform: 'translateY(-50%)', position: 'absolute' }}
+                />
+              </div>
+            )
+          })}
         </div>
       )}
 
       {/* Splitter count footer */}
       {splCount > 0 && (
-        <div
-          style={{
-            padding: '4px 12px 8px',
-            fontSize: 11,
-            color: C.muted,
-            borderTop: fusoes.length > 0 ? `1px solid ${C.border}` : undefined,
-          }}
-        >
+        <div style={{ padding: '4px 12px 8px', fontSize: 11, color: C.muted, borderTop: `1px solid ${C.border}` }}>
           <span style={{ color: C.splHdr, fontWeight: 700 }}>{splCount}</span> splitter{splCount !== 1 ? 's' : ''}
         </div>
       )}
 
-      {/* Output handles — one per splitter */}
-      {(splitters ?? []).map((spl, idx) => {
+      {/* Output handles — one per real splitter */}
+      {realSplitters.map((spl, idx) => {
         const total = Math.max(splCount, 1)
-        // Distribute handles vertically across the node
         const pct = total === 1 ? 50 : ((idx / (total - 1)) * 80 + 10)
         return (
           <Handle
@@ -340,19 +377,13 @@ function CDOFlowNode({ data }) {
             type="source"
             position={Position.Right}
             id={`spl-${spl.id ?? idx}`}
-            style={{
-              ...handleStyle,
-              backgroundColor: C.splBdr,
-              right: -6,
-              top: `${pct}%`,
-              transform: 'translateY(-50%)',
-            }}
+            style={{ ...handleStyle, backgroundColor: C.splBdr, right: -6, top: `${pct}%`, transform: 'translateY(-50%)' }}
           />
         )
       })}
 
-      {/* Fallback single output handle when no splitters */}
-      {splCount === 0 && (
+      {/* Fallback single output handle when no splitters and no direct outs */}
+      {splCount === 0 && directOuts.length === 0 && (
         <Handle
           type="source"
           position={Position.Right}
@@ -710,8 +741,9 @@ function buildGraphFromTopologia(topologia) {
         labelBgStyle: { fill: '#050f1f', fillOpacity: 0.85 },
       })
 
-      // --- Nós Splitter e arestas CDO → Splitter ---
-      for (const spl of splitters) {
+      // --- Nós Splitter e arestas CDO → Splitter (apenas splitters reais) ---
+      const realSplitters = splitters.filter(s => !s.id?.startsWith('bypass-'))
+      for (const spl of realSplitters) {
         const splNodeId = `spl-${spl.id}`
         const saidas    = spl.saidas ?? []
 
@@ -789,10 +821,58 @@ function buildGraphFromTopologia(topologia) {
         }
       }
 
+      // --- Saídas diretas da bandeja (saida_cto / saida_cdo): aresta CDO → CTO sem splitter ---
+      for (const bandeja of bandejas) {
+        for (const fusao of (bandeja.fusoes ?? [])) {
+          if (fusao.tipo !== 'saida_cto' && fusao.tipo !== 'saida_cdo') continue
+          if (!fusao.destino_id?.trim()) continue
+
+          const destId    = fusao.destino_id.trim()
+          const ctoNodeId = `cto-${destId}`
+          const ctoData   = (cdo.ctos ?? []).find(c => c.cto_id === destId)
+          const fibraHex  = fusao.entrada?.fibra ? abntHex(fusao.entrada.fibra) : '#22c55e'
+          const foLabel   = fusao.entrada?.fibra != null
+            ? `T${fusao.entrada?.tubo ?? 1}:F${fusao.entrada.fibra}`
+            : 'direto'
+
+          if (!ctoNodeSet.has(ctoNodeId)) {
+            ctoNodeSet.add(ctoNodeId)
+            nodes.push({
+              id:   ctoNodeId,
+              type: fusao.tipo === 'saida_cdo' ? 'cdo' : 'cto',
+              position: { x: 0, y: 0 },
+              data: {
+                nome:       ctoData?.nome ?? destId,
+                cto_id:     destId,
+                capacidade: ctoData?.capacidade,
+                ocupacao:   ctoData?.ocupacao,
+              },
+            })
+          }
+
+          edges.push({
+            id:           `e-direct-${cdo.id}-${fusao.id}`,
+            source:       cdoNodeId,
+            target:       ctoNodeId,
+            sourceHandle: `direct-${fusao.id}`,
+            targetHandle: 'in',
+            label:        foLabel,
+            type:         'smoothstep',
+            animated:     false,
+            style:        { stroke: fibraHex, strokeWidth: 2 },
+            labelStyle:   { fill: fibraHex, fontSize: 10, fontWeight: 700 },
+            labelBgStyle: { fill: '#060a16', fillOpacity: 0.85 },
+          })
+        }
+      }
+
       // --- CTOs sem splitter: aresta direta CDO → CTO (gray dashed) ---
-      const ctoIdsComSplitter = new Set(
-        splitters.flatMap((spl) => (spl.saidas ?? []).map((sd) => sd.cto_id).filter(Boolean))
-      )
+      const ctoIdsComSplitter = new Set([
+        ...realSplitters.flatMap(spl => (spl.saidas ?? []).map(sd => sd.cto_id).filter(Boolean)),
+        ...bandejas.flatMap(b => (b.fusoes ?? [])
+          .filter(f => f.tipo === 'saida_cto' && f.destino_id?.trim())
+          .map(f => f.destino_id.trim())),
+      ])
 
       for (const cto of (cdo.ctos ?? [])) {
         if (ctoIdsComSplitter.has(cto.cto_id)) continue

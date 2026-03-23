@@ -100,7 +100,8 @@ function FibraSelect({ value, onChange, small }) {
 }
 
 // ─── Aba PON/OLT ─────────────────────────────────────────────────────────────
-function AbaOLT({ entrada, onChange, olts, splitters, bandejas }) {
+function AbaOLT({ entrada, onChange, olts, splitters, bandejas, isDark }) {
+  const S = getStyles(isDark)
   // OLT vinculada (por id ou olt_id)
   const oltAtual = (olts ?? []).find(o => o.id === entrada.olt_id || o.olt_id === entrada.olt_id) ?? null
   const dioMapa  = oltAtual?.dio_config?.mapa ?? []
@@ -269,7 +270,8 @@ function AbaOLT({ entrada, onChange, olts, splitters, bandejas }) {
 }
 
 // ─── Aba Bandejas ─────────────────────────────────────────────────────────────
-function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters, usadosGlobal }) {
+function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters, usadosGlobal, isDark }) {
+  const S = getStyles(isDark)
   function addBandeja() {
     onChange([...bandejas, { id: uid(), nome: `Bandeja ${bandejas.length + 1}`, fusoes: [] }])
   }
@@ -278,7 +280,7 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
 
   function addFusao(bId) {
     const b = bandejas.find(b => b.id === bId)
-    upBandeja(bId, { fusoes: [...b.fusoes, { id: uid(), entrada: { tubo: 1, fibra: 1 }, saida: { tubo: 1, fibra: 1 }, tipo: 'fusao', obs: '' }] })
+    upBandeja(bId, { fusoes: [...b.fusoes, { id: uid(), entrada: { tubo: 1, fibra: 1 }, saida: { tubo: 1, fibra: 1 }, tipo: 'fusao', obs: '', destino_id: '' }] })
   }
   function remFusao(bId, fId) {
     upBandeja(bId, { fusoes: bandejas.find(b => b.id === bId).fusoes.filter(f => f.id !== fId) })
@@ -288,14 +290,17 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
     const currentF = b.fusoes.find(f => f.id === fId)
     const updated = { ...currentF, ...p }
     upBandeja(bId, { fusoes: b.fusoes.map(f => f.id === fId ? updated : f) })
-    // Sync linked splitter automatically
-    if (updated.splitter_id && onChangeSplitters && splitters) {
-      onChangeSplitters(splitters.map(s => s.id === updated.splitter_id ? {
-        ...s,
-        entrada: { ...s.entrada, fibra: updated.entrada?.fibra ?? s.entrada.fibra },
-        pon_placa: updated.pon_placa ?? null,
-        pon_porta: updated.pon_porta ?? null,
-      } : s))
+
+    if (onChangeSplitters && splitters) {
+      // Sync splitter PON vinculado (apenas para tipo 'pon')
+      if (updated.splitter_id) {
+        onChangeSplitters(splitters.map(s => s.id === updated.splitter_id ? {
+          ...s,
+          entrada: { ...s.entrada, fibra: updated.entrada?.fibra ?? s.entrada.fibra },
+          pon_placa: updated.pon_placa ?? null,
+          pon_porta: updated.pon_porta ?? null,
+        } : s))
+      }
     }
   }
 
@@ -351,7 +356,7 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
                     <th style={{ padding: '6px 8px', color: '#3fb950', fontWeight: 700, borderLeft: '2px solid rgba(63,185,80,0.3)', textAlign: 'center', whiteSpace: 'nowrap' }}>Saída</th>
                     <th style={{ padding: '6px 6px', color: '#f97316', fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap' }}>DIO</th>
                     <th style={{ padding: '6px 6px', color: '#8b949e', fontWeight: 700, textAlign: 'center' }}>Tipo</th>
-                    <th style={{ padding: '6px 6px', color: '#8b949e', fontWeight: 700, textAlign: 'left' }}>PON / Info</th>
+                    <th style={{ padding: '6px 6px', color: '#8b949e', fontWeight: 700, textAlign: 'left' }}>PON / Destino / Info</th>
                     <th style={{ width: 28 }} />
                   </tr>
                 </thead>
@@ -401,12 +406,15 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
 
                         {/* Tipo */}
                         <td style={{ padding: '5px 4px' }}>
-                          <select value={f.tipo} onChange={e => upFusao(b.id, f.id, { tipo: e.target.value })}
-                            style={{ ...S.inp, padding: '4px 4px', width: 78, fontSize: 11 }}>
+                          <select value={f.tipo} onChange={e => upFusao(b.id, f.id, { tipo: e.target.value, destino_id: '' })}
+                            style={{ ...S.inp, padding: '4px 4px', width: 90, fontSize: 11,
+                              borderColor: f.tipo === 'saida_cto' ? '#3fb950' : f.tipo === 'saida_cdo' ? '#8957e5' : BORDER }}>
                             <option value="fusao">Fusão</option>
                             <option value="pon">PON</option>
                             <option value="conector">Conector</option>
                             <option value="passthrough">Passagem</option>
+                            <option value="saida_cto">→ CTO</option>
+                            <option value="saida_cdo">→ CDO/CEO</option>
                           </select>
                         </td>
 
@@ -454,6 +462,30 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
                                 </span>
                               )}
                             </div>
+                          ) : f.tipo === 'saida_cto' ? (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: '#3fb950', whiteSpace: 'nowrap', background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)', borderRadius: 5, padding: '2px 7px' }}>→ CTO</span>
+                              <input
+                                value={f.destino_id ?? ''}
+                                onChange={e => upFusao(b.id, f.id, { destino_id: e.target.value })}
+                                placeholder="ID da CTO"
+                                style={{ ...S.inp, padding: '4px 7px', fontSize: 11, minWidth: 90, borderColor: f.destino_id?.trim() ? '#3fb950' : BORDER }}
+                              />
+                              <input value={f.obs ?? ''} onChange={e => upFusao(b.id, f.id, { obs: e.target.value })}
+                                placeholder="obs" style={{ ...S.inp, padding: '4px 7px', fontSize: 11, minWidth: 60 }} />
+                            </div>
+                          ) : f.tipo === 'saida_cdo' ? (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: '#8957e5', whiteSpace: 'nowrap', background: 'rgba(137,87,229,0.1)', border: '1px solid rgba(137,87,229,0.3)', borderRadius: 5, padding: '2px 7px' }}>→ CDO</span>
+                              <input
+                                value={f.destino_id ?? ''}
+                                onChange={e => upFusao(b.id, f.id, { destino_id: e.target.value })}
+                                placeholder="ID da CDO/CEO"
+                                style={{ ...S.inp, padding: '4px 7px', fontSize: 11, minWidth: 90, borderColor: f.destino_id?.trim() ? '#8957e5' : BORDER }}
+                              />
+                              <input value={f.obs ?? ''} onChange={e => upFusao(b.id, f.id, { obs: e.target.value })}
+                                placeholder="obs" style={{ ...S.inp, padding: '4px 7px', fontSize: 11, minWidth: 60 }} />
+                            </div>
                           ) : (
                             <input value={f.obs ?? ''} onChange={e => upFusao(b.id, f.id, { obs: e.target.value })}
                               placeholder="obs..." style={{ ...S.inp, padding: '4px 7px', fontSize: 11, minWidth: 90 }} />
@@ -483,10 +515,14 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
 }
 
 // ─── Aba Splitters ────────────────────────────────────────────────────────────
-function AbaSplitters({ splitters, onChange, bandejas }) {
+function AbaSplitters({ splitters, onChange, bandejas, isDark }) {
+  const S = getStyles(isDark)
+  // Bypass splitters são gerados automaticamente pelas saídas diretas da bandeja — não exibir aqui
+  const nonBypass = (splitters ?? []).filter(s => !s.id?.startsWith('bypass-'))
+
   function addSplitter() {
     const saidas = Array.from({ length: 8 }, (_, i) => ({ porta: i + 1, tipo: 'cto', cto_id: '', obs: '' }))
-    onChange([...splitters, { id: uid(), nome: `Splitter ${splitters.length + 1}`, tipo: '1x8', entrada: { tubo: 1, fibra: 1 }, saidas }])
+    onChange([...splitters, { id: uid(), nome: `Splitter ${nonBypass.length + 1}`, tipo: '1x8', entrada: { tubo: 1, fibra: 1 }, saidas }])
   }
   function remSplitter(id) { onChange(splitters.filter(s => s.id !== id)) }
   function upSplitter(id, p) { onChange(splitters.map(s => s.id === id ? { ...s, ...p } : s)) }
@@ -499,6 +535,11 @@ function AbaSplitters({ splitters, onChange, bandejas }) {
     upSplitter(sId, { saidas: s.saidas.map(sd => sd.porta === porta ? { ...sd, ...p } : sd) })
   }
 
+  // Saídas diretas da bandeja (bypass) para exibir em resumo
+  const bypassFusoes = (bandejas ?? []).flatMap(b =>
+    (b.fusoes ?? []).filter(f => f.tipo === 'saida_cto' || f.tipo === 'saida_cdo')
+  )
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -506,13 +547,51 @@ function AbaSplitters({ splitters, onChange, bandejas }) {
         <button onClick={addSplitter} style={S.btnAdd}>+ Splitter</button>
       </div>
 
-      {splitters.length === 0 && (
+      {/* Saídas diretas da bandeja */}
+      {bypassFusoes.length > 0 && (
+        <div style={{ ...S.sec, borderLeft: '3px solid #22c55e', marginBottom: 12 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#22c55e', marginBottom: 10 }}>
+            Saídas Diretas da Bandeja ({bypassFusoes.length})
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {bypassFusoes.map((f, i) => {
+              const fo = ABNT.find(a => a.idx === f.entrada?.fibra)
+              return (
+                <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                  padding: '7px 10px', borderRadius: 7,
+                  backgroundColor: f.destino_id?.trim() ? 'rgba(34,197,94,0.07)' : BG3,
+                  border: `1px solid ${f.destino_id?.trim() ? 'rgba(34,197,94,0.3)' : BORDER}` }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
+                    background: f.tipo === 'saida_cto' ? 'rgba(34,197,94,0.15)' : 'rgba(139,87,229,0.15)',
+                    border: `1px solid ${f.tipo === 'saida_cto' ? 'rgba(34,197,94,0.4)' : 'rgba(139,87,229,0.4)'}`,
+                    color: f.tipo === 'saida_cto' ? '#22c55e' : '#8957e5' }}>
+                    {f.tipo === 'saida_cto' ? '→ CTO' : '→ CDO'}
+                  </span>
+                  {fo && (
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 5,
+                      backgroundColor: fo.hex, color: fo.text }}>
+                      FO {fo.idx} {fo.nome}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 12, fontWeight: 600, color: f.destino_id?.trim() ? '#e6edf3' : '#484f58' }}>
+                    {f.destino_id?.trim() || <em style={{ color: '#484f58' }}>sem destino</em>}
+                  </span>
+                  {f.obs?.trim() && <span style={{ fontSize: 11, color: '#8b949e' }}>{f.obs}</span>}
+                  <span style={{ fontSize: 10, color: '#484f58', marginLeft: 'auto' }}>gerenciado na bandeja</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {nonBypass.length === 0 && bypassFusoes.length === 0 && (
         <div style={{ ...S.sec, textAlign: 'center', color: '#484f58', padding: '32px' }}>
           Nenhum splitter. Clique "+ Splitter".
         </div>
       )}
 
-      {splitters.map((s, si) => {
+      {nonBypass.map((s, si) => {
         const ligadas = s.saidas.filter(sd => sd.cto_id?.trim()).length
         const corEnt = ABNT.find(a => a.idx === s.entrada.fibra)
         // Busca fusão vinculada a este splitter nas bandejas
@@ -597,7 +676,8 @@ function AbaSplitters({ splitters, onChange, bandejas }) {
 }
 
 // ─── Aba Cabos ────────────────────────────────────────────────────────────────
-function AbaCabos({ cabos, onChange }) {
+function AbaCabos({ cabos, onChange, isDark }) {
+  const S = getStyles(isDark)
   function addCabo() {
     onChange([...(cabos ?? []), { id: uid(), nome: `Cabo ${(cabos?.length ?? 0) + 1}`, tipo: 'OPGW', fibras: 12, obs: '' }])
   }
@@ -641,7 +721,8 @@ function AbaCabos({ cabos, onChange }) {
 }
 
 // ─── Aba Resumo (legenda ABNT + estatísticas) ──────────────────────────────
-function AbaResumo({ entrada, bandejas, splitters, cabos }) {
+function AbaResumo({ entrada, bandejas, splitters, cabos, isDark }) {
+  const S = getStyles(isDark)
   const totalFusoes = bandejas.reduce((a, b) => a + b.fusoes.length, 0)
   const ligadas     = splitters.reduce((a, s) => a + s.saidas.filter(sd => sd.cto_id?.trim()).length, 0)
   const totalSaidas = splitters.reduce((a, s) => a + s.saidas.length, 0)
@@ -657,8 +738,9 @@ function AbaResumo({ entrada, bandejas, splitters, cabos }) {
           { label: 'Porta', val: entrada.porta_olt ?? '—', cor: '#3fb950' },
           { label: 'Bandejas', val: bandejas.length, cor: '#58a6ff' },
           { label: 'Fusões', val: totalFusoes, cor: '#a5d6ff' },
-          { label: 'Splitters', val: splitters.length, cor: '#e3b341' },
+          { label: 'Splitters', val: splitters.filter(s => !s.id?.startsWith('bypass-')).length, cor: '#e3b341' },
           { label: 'CTOs ligadas', val: `${ligadas}/${totalSaidas}`, cor: '#3fb950' },
+          { label: 'Saídas diretas', val: bandejas.reduce((a, b) => a + (b.fusoes ?? []).filter(f => f.tipo === 'saida_cto' || f.tipo === 'saida_cdo').length, 0), cor: '#22c55e' },
           { label: 'Cabos', val: (cabos ?? []).length, cor: '#bc8cff' },
         ].map(it => (
           <div key={it.label} style={{ backgroundColor: BG2, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px 14px', borderTop: `3px solid ${it.cor}` }}>
@@ -853,11 +935,11 @@ export default function DiagramaCDOEditor({ ceId, projetoId, capacidadeSaidas, i
 
       {/* Conteúdo */}
       <div style={S.body}>
-        {aba === 'olt'       && <AbaOLT       entrada={entrada}     onChange={setEntrada} olts={olts} splitters={splitters} bandejas={bandejas} />}
-        {aba === 'bandejas'  && <AbaBandejas  bandejas={bandejas}   onChange={setBandejas} entrada={entrada} splitters={splitters} onChangeSplitters={setSplitters} usadosGlobal={usadosGlobal} />}
-        {aba === 'splitters' && <AbaSplitters splitters={splitters} onChange={setSplitters} bandejas={bandejas} />}
-        {aba === 'cabos'     && <AbaCabos     cabos={cabos}         onChange={setCabos}     />}
-        {aba === 'resumo'    && <AbaResumo    entrada={entrada} bandejas={bandejas} splitters={splitters} cabos={cabos} />}
+        {aba === 'olt'       && <AbaOLT       entrada={entrada}     onChange={setEntrada} olts={olts} splitters={splitters} bandejas={bandejas} isDark={isDark} />}
+        {aba === 'bandejas'  && <AbaBandejas  bandejas={bandejas}   onChange={setBandejas} entrada={entrada} splitters={splitters} onChangeSplitters={setSplitters} usadosGlobal={usadosGlobal} isDark={isDark} />}
+        {aba === 'splitters' && <AbaSplitters splitters={splitters} onChange={setSplitters} bandejas={bandejas} isDark={isDark} />}
+        {aba === 'cabos'     && <AbaCabos     cabos={cabos}         onChange={setCabos}     isDark={isDark} />}
+        {aba === 'resumo'    && <AbaResumo    entrada={entrada} bandejas={bandejas} splitters={splitters} cabos={cabos} isDark={isDark} />}
       </div>
     </div>
   )

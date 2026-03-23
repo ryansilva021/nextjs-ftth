@@ -23,7 +23,7 @@ export default function SuperadminSidebarLayout({ session, children }) {
   }
 
   return (
-    <div style={{ backgroundColor: 'var(--background)', minHeight: '100vh' }} className="flex">
+    <div style={{ backgroundColor: 'var(--background)' }} className="flex h-screen overflow-hidden">
       {/* Overlay mobile */}
       {aberta && (
         <div
@@ -35,11 +35,11 @@ export default function SuperadminSidebarLayout({ session, children }) {
 
       {/* Sidebar */}
       <aside
-        style={sidebarStyle}
+        style={{ ...sidebarStyle, height: 'calc(100dvh - 52px)' }}
         className={`
-          fixed top-0 left-0 h-full z-30 flex flex-col
+          fixed top-[52px] left-0 z-30 flex flex-col
           transform transition-transform duration-200
-          lg:static lg:translate-x-0
+          lg:static lg:translate-x-0 lg:top-0 lg:!h-screen lg:flex-shrink-0
           ${aberta ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
@@ -115,11 +115,11 @@ export default function SuperadminSidebarLayout({ session, children }) {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header mobile */}
         <header
-          style={{ backgroundColor: 'var(--sidebar-bg)', borderBottom: '1px solid var(--sidebar-border)' }}
-          className="flex items-center justify-between px-4 py-3 lg:hidden"
+          style={{ backgroundColor: 'var(--sidebar-bg)', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}
+          className="sticky top-0 z-[60] flex items-center justify-between px-4 py-3 lg:hidden"
         >
           <button
             onClick={() => setAberta(true)}

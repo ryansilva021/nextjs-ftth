@@ -120,7 +120,7 @@ function ItemCDO({ caixa, ativo, onClick }) {
 // ---------------------------------------------------------------------------
 const OLT_STATUS = ['ativo', 'inativo', 'em_manutencao']
 
-function OLTsManager({ olts: initialOlts, projetoId }) {
+function OLTsManager({ olts: initialOlts, projetoId, readOnly = false }) {
   const [olts, setOlts]             = useState(initialOlts)
   const [form, setForm]             = useState({ olt_id: '', nome: '', modelo: '', ip: '', capacidade: 16, status: 'ativo' })
   const [editando, setEditando]     = useState(null)
@@ -189,7 +189,7 @@ function OLTsManager({ olts: initialOlts, projetoId }) {
           <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--foreground)' }}>Equipamentos OLT</p>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{olts.length} OLT(s) cadastrada(s)</p>
         </div>
-        {!adicionando && !editando && (
+        {!readOnly && !adicionando && !editando && (
           <button onClick={() => setAdicionando(true)}
             style={{ background: 'linear-gradient(135deg,#0284c7,#0369a1)', color: '#fff', fontWeight: 700, fontSize: 13, borderRadius: 8, padding: '9px 20px', cursor: 'pointer', border: 'none' }}>
             + Nova OLT
@@ -264,11 +264,13 @@ function OLTsManager({ olts: initialOlts, projetoId }) {
                           fontSize: 11, borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontWeight: 600 }}>
                         DIO {dioAberto === olt.id ? '▲' : '▼'}
                       </button>
-                      <button onClick={() => iniciarEdicao(olt)}
-                        style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', fontSize: 11, borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}>
-                        Editar
-                      </button>
-                      {confirmDel === olt.id ? (
+                      {!readOnly && (
+                        <button onClick={() => iniciarEdicao(olt)}
+                          style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', fontSize: 11, borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}>
+                          Editar
+                        </button>
+                      )}
+                      {!readOnly && (confirmDel === olt.id ? (
                         <div style={{ display: 'flex', gap: 4 }}>
                           <button onClick={() => removerOLT(olt.id)} disabled={saving}
                             style={{ backgroundColor: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 11, borderRadius: 6, padding: '5px 12px', cursor: 'pointer', border: 'none' }}>
@@ -278,7 +280,7 @@ function OLTsManager({ olts: initialOlts, projetoId }) {
                         </div>
                       ) : (
                         <button onClick={() => setConfirmDel(olt.id)} style={S.btnDel}>Excluir</button>
-                      )}
+                      ))}
                     </div>
                   </div>
                   {/* DIO expandido */}
@@ -506,40 +508,125 @@ function OLTForm({ form, onChange, onSubmit, onCancel, saving, editMode }) {
 }
 
 // ---------------------------------------------------------------------------
+// Modal de edição
+// ---------------------------------------------------------------------------
+function EditorModal({ title, onClose, children }) {
+  // Fecha com Escape
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        backgroundColor: 'rgba(0,0,0,0.65)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        padding: '16px',
+        overflowY: 'auto',
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 16,
+          width: '100%', maxWidth: 780,
+          marginTop: 24, marginBottom: 24,
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header do modal */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 20px',
+          borderBottom: '1px solid var(--border-color)',
+          background: 'var(--sidebar-bg)',
+        }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#0284c7', margin: 0 }}>{title}</p>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none', border: '1px solid var(--border-color)', borderRadius: 8,
+              color: 'var(--text-muted)', fontSize: 18, width: 32, height: 32,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+        <div style={{ padding: 0 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Componente principal
 // ---------------------------------------------------------------------------
-export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, tabInicial, idInicial }) {
+export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, tabInicial, idInicial, userRole }) {
+  const readOnly = userRole === 'tecnico'
   const [aba, setAba] = useState(tabInicial ?? 'olts')
-  const [ctoSelecionada, setCTOSelecionada]     = useState(null)
-  const [caixaSelecionada, setCaixaSelecionada] = useState(null)
-
-  const editorRef = useRef(null)
+  const [ctoModal, setCTOModal]     = useState(null)   // CTO aberta no modal
+  const [cdoModal, setCDOModal]     = useState(null)   // CDO/CE aberta no modal
 
   // Auto-seleciona item se veio via URL (ex: clique no mapa)
   useEffect(() => {
     if (!idInicial) return
     if (tabInicial === 'ctos') {
       const found = ctos.find(c => c.cto_id === idInicial)
-      if (found) {
-        setCTOSelecionada(found)
-        setTimeout(() => editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
-      }
+      if (found) setCTOModal(found)
     } else if (tabInicial === 'cdos') {
       const found = caixas.find(c => (c.ce_id ?? c.id) === idInicial)
-      if (found) {
-        setCaixaSelecionada(found)
-        setTimeout(() => editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
-      }
+      if (found) setCDOModal(found)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const idCaixaSelecionada = caixaSelecionada
-    ? (caixaSelecionada.ce_id ?? caixaSelecionada.id ?? '')
-    : ''
+  const idCDOModal = cdoModal ? (cdoModal.ce_id ?? cdoModal.id ?? '') : ''
 
   return (
     <div style={S.container}>
+      {/* Modal CTO */}
+      {ctoModal && (
+        <EditorModal
+          title={`Editando CTO: ${ctoModal.nome ?? ctoModal.cto_id}`}
+          onClose={() => setCTOModal(null)}
+        >
+          <DiagramaCTOEditor
+            key={ctoModal.cto_id}
+            ctoId={ctoModal.cto_id}
+            projetoId={projetoId}
+            capacidadePortas={ctoModal.capacidade ?? 0}
+            initialDiagrama={ctoModal.diagrama ?? null}
+          />
+        </EditorModal>
+      )}
+
+      {/* Modal CDO/CE */}
+      {cdoModal && (
+        <EditorModal
+          title={`Editando ${cdoModal.tipo ?? 'CDO'}: ${cdoModal.nome ?? idCDOModal}`}
+          onClose={() => setCDOModal(null)}
+        >
+          <DiagramaCDOEditor
+            key={idCDOModal}
+            ceId={idCDOModal}
+            projetoId={projetoId}
+            capacidadeSaidas={cdoModal.capacidade ?? 0}
+            olts={olts}
+          />
+        </EditorModal>
+      )}
+
       {/* Abas */}
       <div style={S.tabBar}>
         <button style={aba === 'olts'  ? S.tabAtiva : S.tabInativa}
@@ -547,11 +634,11 @@ export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, ta
           OLTs ({olts.length})
         </button>
         <button style={aba === 'cdos'  ? S.tabAtiva : S.tabInativa}
-          onClick={() => { setAba('cdos'); setCaixaSelecionada(null) }}>
+          onClick={() => setAba('cdos')}>
           CEO / CDOs ({caixas.length})
         </button>
         <button style={aba === 'ctos'  ? S.tabAtiva : S.tabInativa}
-          onClick={() => { setAba('ctos'); setCTOSelecionada(null) }}>
+          onClick={() => setAba('ctos')}>
           CTOs ({ctos.length})
         </button>
       </div>
@@ -559,60 +646,38 @@ export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, ta
       {/* Aba CTOs */}
       {aba === 'ctos' && (
         <div>
-          <p style={S.sectionTitle}>Selecione uma CTO para editar o diagrama</p>
+          <p style={S.sectionTitle}>
+            {readOnly ? 'Visualizando CTOs (somente leitura)' : 'Clique em uma CTO para editar o diagrama'}
+          </p>
           {ctos.length === 0
             ? <div style={S.vazio}>Nenhuma CTO cadastrada.</div>
             : <div style={S.lista}>{ctos.map(cto => (
-                <ItemCTO key={cto._id} cto={cto} ativo={ctoSelecionada?._id === cto._id} onClick={() => setCTOSelecionada(prev => prev?._id === cto._id ? null : cto)} />
+                <ItemCTO key={cto._id} cto={cto} ativo={false}
+                  onClick={readOnly ? undefined : () => setCTOModal(cto)} />
               ))}</div>
           }
-          {ctoSelecionada && (
-            <div ref={editorRef}>
-              <p style={{ ...S.sectionTitle, color: '#0284c7', marginBottom: '16px' }}>
-                Editando: {ctoSelecionada.nome ?? ctoSelecionada.cto_id}
-              </p>
-              <DiagramaCTOEditor
-                key={ctoSelecionada.cto_id}
-                ctoId={ctoSelecionada.cto_id}
-                projetoId={projetoId}
-                capacidadePortas={ctoSelecionada.capacidade ?? 0}
-                initialDiagrama={ctoSelecionada.diagrama ?? null}
-              />
-            </div>
-          )}
         </div>
       )}
 
       {/* Aba CDOs/CEs */}
       {aba === 'cdos' && (
         <div>
-          <p style={S.sectionTitle}>Selecione uma CE/CDO para editar o diagrama</p>
+          <p style={S.sectionTitle}>
+            {readOnly ? 'Visualizando CE/CDOs (somente leitura)' : 'Clique em uma CE/CDO para editar o diagrama'}
+          </p>
           {caixas.length === 0
             ? <div style={S.vazio}>Nenhuma CE/CDO cadastrada.</div>
             : <div style={S.lista}>{caixas.map(caixa => (
-                <ItemCDO key={caixa._id} caixa={caixa} ativo={caixaSelecionada?._id === caixa._id} onClick={() => setCaixaSelecionada(prev => prev?._id === caixa._id ? null : caixa)} />
+                <ItemCDO key={caixa._id} caixa={caixa} ativo={false}
+                  onClick={readOnly ? undefined : () => setCDOModal(caixa)} />
               ))}</div>
           }
-          {caixaSelecionada && (
-            <div ref={editorRef}>
-              <p style={{ ...S.sectionTitle, color: '#0284c7', marginBottom: '16px' }}>
-                Editando: {caixaSelecionada.nome ?? idCaixaSelecionada}
-              </p>
-              <DiagramaCDOEditor
-                key={idCaixaSelecionada}
-                ceId={idCaixaSelecionada}
-                projetoId={projetoId}
-                capacidadeSaidas={caixaSelecionada.capacidade ?? 0}
-                olts={olts}
-              />
-            </div>
-          )}
         </div>
       )}
 
       {/* Aba OLTs */}
       {aba === 'olts' && (
-        <OLTsManager olts={olts} projetoId={projetoId} />
+        <OLTsManager olts={olts} projetoId={projetoId} readOnly={readOnly} />
       )}
     </div>
   )

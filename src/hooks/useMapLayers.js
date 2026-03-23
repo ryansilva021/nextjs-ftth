@@ -246,8 +246,10 @@ function oltsToGeoJSON(olts = []) {
 
 const SATELLITE_SOURCE = 'esri-satellite'
 const SATELLITE_LAYER  = 'satellite-layer'
-const SOURCES = ['ctos', 'caixas', 'rotas', 'postes', 'olts']
+const SOURCES = ['selected-point', 'ctos', 'caixas', 'rotas', 'postes', 'olts']
 const LAYERS  = [
+  'selected-highlight-layer',
+  'ctos-full-pulse',
   'postes-layer',
   'rotas-layer',
   'rotas-layer-drop',
@@ -269,7 +271,7 @@ const LAYERS  = [
  * @param {{ ctos: Array, caixas: Array, rotas: Object, postes: Array }} data
  * @param {{ ctos: boolean, caixas: boolean, rotas: boolean, postes: boolean, satellite: boolean }} layerToggles
  */
-export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true) {
+export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true, selectedElement = null) {
   const { ctos = [], caixas = [], rotas = null, postes = [], olts = [] } = data ?? {}
   const layersReady = useRef(false)
   // Mapa sempre claro (positron) — labels sempre escuros, halos brancos
@@ -280,13 +282,13 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
     if (!map || !mapLoaded) return
 
     // Registrar ícones
-    map.addImage('cto-green',  createCTOIcon('#16a34a'))
-    map.addImage('cto-yellow', createCTOIcon('#ca8a04'))
-    map.addImage('cto-red',    createCTOIcon('#dc2626'))
-    map.addImage('ce-icon',    createCEIcon('#1d4ed8'))
-    map.addImage('cdo-icon',   createCDOIcon('#7c3aed'))
-    map.addImage('poste-icon', createPosteIcon('#94a3b8'))
-    map.addImage('olt-icon',   createOLTIcon('#0891b2'))
+    map.addImage('cto-green',  createCTOIcon('#22c55e', 38))
+    map.addImage('cto-yellow', createCTOIcon('#f59e0b', 38))
+    map.addImage('cto-red',    createCTOIcon('#f43f5e', 38))
+    map.addImage('ce-icon',    createCEIcon('#3b82f6', 34))
+    map.addImage('cdo-icon',   createCDOIcon('#a855f7', 34))
+    map.addImage('poste-icon', createPosteIcon('#64748b', 26))
+    map.addImage('olt-icon',   createOLTIcon('#06b6d4', 38))
 
     // Fonte satélite (Esri)
     map.addSource(SATELLITE_SOURCE, {
@@ -308,6 +310,24 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
       paint: { 'raster-opacity': 1 },
     }, firstLayerId)
 
+    // Source + layer: selected highlight
+    map.addSource('selected-point', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    })
+    map.addLayer({
+      id: 'selected-highlight-layer',
+      type: 'circle',
+      source: 'selected-point',
+      paint: {
+        'circle-radius': 22,
+        'circle-color': 'transparent',
+        'circle-stroke-color': '#f8fafc',
+        'circle-stroke-width': 3,
+        'circle-stroke-opacity': 0.95,
+      },
+    })
+
     // Source + layer: Postes
     map.addSource('postes', {
       type: 'geojson',
@@ -322,7 +342,7 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
         'icon-size': 0.9,
         'icon-allow-overlap': false,
         'text-field': ['get', 'poste_id'],
-        'text-size': 9,
+        'text-size': 10,
         'text-offset': [0, 1.2],
         'text-anchor': 'top',
         'text-allow-overlap': false,
@@ -330,9 +350,9 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
         'text-font': ['Noto Sans Regular'],
       },
       paint: {
-        'text-color': '#475569',
+        'text-color': '#334155',
         'text-halo-color': haloColor,
-        'text-halo-width': 1.5,
+        'text-halo-width': 2,
       },
     })
 
@@ -356,8 +376,8 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
         ],
         'line-width': [
           'match', ['get', 'tipo'],
-          'BACKBONE', 9,
-          'RAMAL',    4,
+          'BACKBONE', 10,
+          'RAMAL',    5,
           2,
         ],
       },
@@ -370,7 +390,7 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
       filter: ['==', ['get', 'tipo'], 'DROP'],
       paint: {
         'line-color': '#22c55e',
-        'line-width': 1.5,
+        'line-width': 2,
         'line-dasharray': [2, 2],
       },
     })
@@ -379,6 +399,20 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
     map.addSource('ctos', {
       type: 'geojson',
       data: ctosToGeoJSON(ctos),
+    })
+    // Camada de alerta: CTO 100% ocupada — sombra vermelha suave pulsante
+    map.addLayer({
+      id: 'ctos-full-pulse',
+      type: 'circle',
+      source: 'ctos',
+      filter: ['>=', ['get', 'pct'], 1.0],
+      paint: {
+        'circle-radius': 38,
+        'circle-color': '#ef4444',
+        'circle-opacity': 0.7,
+        'circle-blur': 1,
+        'circle-stroke-width': 0,
+      },
     })
     map.addLayer({
       id: 'ctos-layer',
@@ -394,7 +428,7 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
         'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.45, 14, 0.65, 17, 0.85],
         'icon-allow-overlap': true,
         'text-field': ['get', 'cto_id'],
-        'text-size': 10,
+        'text-size': 12,
         'text-offset': [0, 1.6],
         'text-anchor': 'top',
         'text-allow-overlap': false,
@@ -402,9 +436,9 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
         'text-font': ['Noto Sans Regular'],
       },
       paint: {
-        'text-color': '#1e293b',
+        'text-color': '#0f172a',
         'text-halo-color': haloColor,
-        'text-halo-width': 1.5,
+        'text-halo-width': 2,
       },
     })
 
@@ -423,7 +457,7 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
         'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 14, 0.7, 17, 0.9],
         'icon-allow-overlap': true,
         'text-field': ['coalesce', ['get', 'nome'], ['get', 'id']],
-        'text-size': 10,
+        'text-size': 11,
         'text-offset': [0, 1.6],
         'text-anchor': 'top',
         'text-allow-overlap': false,
@@ -431,9 +465,9 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
         'text-font': ['Noto Sans Regular'],
       },
       paint: {
-        'text-color': '#1e293b',
+        'text-color': '#0f172a',
         'text-halo-color': haloColor,
-        'text-halo-width': 1.5,
+        'text-halo-width': 2,
       },
     })
     map.addLayer({
@@ -446,7 +480,7 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
         'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 14, 0.7, 17, 0.9],
         'icon-allow-overlap': true,
         'text-field': ['coalesce', ['get', 'nome'], ['get', 'id']],
-        'text-size': 10,
+        'text-size': 11,
         'text-offset': [0, 1.6],
         'text-anchor': 'top',
         'text-allow-overlap': false,
@@ -454,9 +488,9 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
         'text-font': ['Noto Sans Regular'],
       },
       paint: {
-        'text-color': '#1e293b',
+        'text-color': '#0f172a',
         'text-halo-color': haloColor,
-        'text-halo-width': 1.5,
+        'text-halo-width': 2,
       },
     })
 
@@ -474,7 +508,7 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
         'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 14, 0.9, 17, 1.1],
         'icon-allow-overlap': true,
         'text-field': ['coalesce', ['get', 'nome'], ['get', 'id']],
-        'text-size': 11,
+        'text-size': 12,
         'text-offset': [0, 1.8],
         'text-anchor': 'top',
         'text-allow-overlap': false,
@@ -484,7 +518,7 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
       paint: {
         'text-color': '#0369a1',
         'text-halo-color': haloColor,
-        'text-halo-width': 2,
+        'text-halo-width': 2.5,
       },
     })
 
@@ -553,12 +587,53 @@ export function useMapLayers(map, mapLoaded, data, layerToggles, darkMode = true
 
     const satelliteOn = layerToggles?.satellite === true
     setVis(SATELLITE_LAYER, satelliteOn)
-    setVis('ctos-layer',       layerToggles?.ctos      !== false)
-    setVis('caixas-ce-layer',  layerToggles?.caixas    !== false)
+    setVis('ctos-layer',          layerToggles?.ctos   !== false)
+    setVis('ctos-full-pulse',     layerToggles?.ctos   !== false)
+    setVis('caixas-ce-layer',     layerToggles?.caixas !== false)
     setVis('caixas-cdo-layer', layerToggles?.caixas    !== false)
     setVis('rotas-layer',      layerToggles?.rotas     !== false)
     setVis('rotas-layer-drop', layerToggles?.rotas     !== false)
     setVis('postes-layer',     layerToggles?.postes    !== false)
     setVis('olts-layer',       layerToggles?.olts      !== false)
   }, [map, mapLoaded, layerToggles])
+
+  // ---------- Animação da sombra de CTO cheia (opacidade pulsante) ----------
+  useEffect(() => {
+    if (!map || !mapLoaded) return
+    let bright = true
+    const interval = setInterval(() => {
+      if (!map.getLayer('ctos-full-pulse')) return
+      bright = !bright
+      try {
+        map.setPaintProperty('ctos-full-pulse', 'circle-opacity', bright ? 0.72 : 0.08)
+      } catch (_) {}
+    }, 800)
+    return () => clearInterval(interval)
+  }, [map, mapLoaded])
+
+  // ---------- Destaque do elemento selecionado ----------
+  useEffect(() => {
+    if (!map || !mapLoaded) return
+    const src = map.getSource('selected-point')
+    if (!src) return
+    if (!selectedElement || !selectedElement.data) {
+      src.setData({ type: 'FeatureCollection', features: [] })
+      return
+    }
+    const d = selectedElement.data
+    const lat = d.lat ?? null
+    const lng = d.lng ?? null
+    if (lat == null || lng == null) {
+      src.setData({ type: 'FeatureCollection', features: [] })
+      return
+    }
+    src.setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [lng, lat] },
+        properties: {},
+      }],
+    })
+  }, [map, mapLoaded, selectedElement])
 }

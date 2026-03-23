@@ -1725,6 +1725,7 @@ function FlowInner({ projetoId, userRole, altura }) {
 
   return (
     <div style={{ height: containerH, background: '#060a16', borderRadius: 12, overflow: 'hidden', position: 'relative',
+      border: '1px solid var(--border-color)',
       cursor: activeTool === 'addSplitter' || activeTool === 'addCTO' || activeTool === 'addCDO' ? 'crosshair' : 'default',
       touchAction: 'none' }}>
       <ReactFlow

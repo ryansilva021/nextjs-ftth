@@ -13,8 +13,8 @@ export default async function TopologiaPage() {
       <div className="flex items-center gap-3 mb-4 flex-shrink-0">
         <span className="text-xl">🌐</span>
         <div>
-          <h1 className="text-lg font-bold text-white leading-tight">Diagramas de Rede</h1>
-          <p className="text-xs text-slate-400">OLT → CDO / CE → Splitter → CTO</p>
+          <h1 className="text-lg font-bold leading-tight" style={{ color: 'var(--foreground)' }}>Diagramas de Rede</h1>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>OLT → CDO / CE → Splitter → CTO</p>
         </div>
       </div>
       <div className="flex-1 min-h-0">

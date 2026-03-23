@@ -103,6 +103,19 @@ export async function upsertPoste(data) {
   revalidatePath('/')
   revalidatePath('/admin/postes')
 
+  // Registrar evento
+  try {
+    const { logEvento } = await import('@/actions/eventos')
+    const isNew = poste.__v === 0
+    await logEvento({
+      tipo_acao: isNew ? 'criou' : 'editou',
+      entidade: 'poste',
+      item_id: poste.poste_id,
+      item_nome: poste.nome ?? poste.poste_id,
+      projeto_id: targetProjeto,
+    })
+  } catch (_) {}
+
   return { ...poste, _id: poste._id.toString() }
 }
 
@@ -133,6 +146,18 @@ export async function deletePoste(posteId, projetoId) {
 
   revalidatePath('/')
   revalidatePath('/admin/postes')
+
+  // Registrar evento
+  try {
+    const { logEvento } = await import('@/actions/eventos')
+    await logEvento({
+      tipo_acao: 'excluiu',
+      entidade: 'poste',
+      item_id: posteId,
+      item_nome: posteId,
+      projeto_id: targetProjeto,
+    })
+  } catch (_) {}
 
   return { deleted: result.deletedCount > 0 }
 }

@@ -111,6 +111,19 @@ export async function upsertRota(data) {
   revalidatePath('/')
   revalidatePath('/admin/rotas')
 
+  // Registrar evento
+  try {
+    const { logEvento } = await import('@/actions/eventos')
+    const isNew = rota.__v === 0
+    await logEvento({
+      tipo_acao: isNew ? 'criou' : 'editou',
+      entidade: 'rota',
+      item_id: rota.rota_id,
+      item_nome: rota.nome ?? rota.rota_id,
+      projeto_id: targetProjeto,
+    })
+  } catch (_) {}
+
   // Retorna em formato compatível com o que getRotas espera e o que o cliente usa
   return {
     ...rota,
@@ -151,6 +164,18 @@ export async function deleteRota(rotaId, projetoId) {
 
   revalidatePath('/')
   revalidatePath('/admin/rotas')
+
+  // Registrar evento
+  try {
+    const { logEvento } = await import('@/actions/eventos')
+    await logEvento({
+      tipo_acao: 'excluiu',
+      entidade: 'rota',
+      item_id: rotaId,
+      item_nome: rotaId,
+      projeto_id: targetProjeto,
+    })
+  } catch (_) {}
 
   return { deleted: result.deletedCount > 0 }
 }

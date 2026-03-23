@@ -14,7 +14,7 @@ import { useModoCampo }  from '@/hooks/useModoCampo'
 import { useTheme } from '@/contexts/ThemeContext'
 
 import BottomSheet        from '@/components/map/BottomSheet'
-import LayerToggles       from '@/components/map/LayerToggles'
+// LayerToggles moved into map side panel
 import ModalMovimentacao  from '@/components/map/ModalMovimentacao'
 import ModalDiagrama      from '@/components/map/ModalDiagrama'
 import ModalDiagramaCDO   from '@/components/map/ModalDiagramaCDO'
@@ -106,7 +106,8 @@ export default function MapaFTTH({
   const [addRouteLinks, setAddRouteLinks]   = useState([]) // [{ pointIndex, type, id, nome }]
   const [routeFinalized, setRouteFinalized] = useState(false) // true = parou de coletar pontos
   const [addForm, setAddForm]           = useState({})
-  const [addFabOpen, setAddFabOpen]     = useState(false)
+  const [addFabOpen, setAddFabOpen]     = useState(false) // kept to avoid stale refs, unused after FAB removal
+  const [gpsExpanded, setGpsExpanded]   = useState(false) // GPS widget: minimizado = só ícone
   const [addSaving, setAddSaving]       = useState(false)
   const [addErro, setAddErro]           = useState(null)
 
@@ -121,6 +122,9 @@ export default function MapaFTTH({
 
   // ---- AGENT_BUSCA — busca no mapa ----
   const [buscaAberta, setBuscaAberta]           = useState(false)
+
+  // ---- Painel lateral do mapa ----
+  const [mapPainel, setMapPainel]               = useState(false)
 
   // ---- AGENT_CAMPO — registro de potência ----
   const [registroPotencia, setRegistroPotencia] = useState(null) // null | { ctoId }
@@ -139,7 +143,7 @@ export default function MapaFTTH({
     darkMode: theme === 'dark',
   })
 
-  useMapLayers(map, mapLoaded, { ctos, caixas, rotas, postes, olts }, layerToggles, theme === 'dark')
+  useMapLayers(map, mapLoaded, { ctos, caixas, rotas, postes, olts }, layerToggles, theme === 'dark', selectedElement)
 
   const addModeRef = useRef(addMode)
   addModeRef.current = addMode
@@ -697,59 +701,197 @@ export default function MapaFTTH({
         </div>
       )}
 
-      {/* AGENT_CAMPO — botão busca rápida no mobile */}
-      {isCampo && !buscaAberta && (
-        <button
-          onClick={() => setBuscaAberta(true)}
-          style={{
-            position: 'absolute', top: 56, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 40, display: 'flex', alignItems: 'center', gap: 8,
-            padding: '10px 20px', borderRadius: 24,
-            background: 'rgba(8,13,28,0.95)', border: '1px solid rgba(255,255,255,0.1)',
-            color: '#94a3b8', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-          }}
-        >
-          <span>🔍</span>
-          <span>Buscar cliente ou elemento...</span>
-        </button>
+      {/* Busca movida para o painel lateral */}
+
+      {/* Overlay para fechar o painel no mobile */}
+      {mapPainel && (
+        <div
+          onClick={() => setMapPainel(false)}
+          style={{ position: 'absolute', inset: 0, zIndex: 41, background: 'transparent' }}
+          className="lg:hidden"
+        />
       )}
 
-      {/* Controles superiores: satélite + recarregar */}
-      <div className="absolute top-3 left-3 z-40 flex flex-col gap-2 pointer-events-auto">
-        {/* Toggle satélite */}
-        <button
-          onClick={handleSatelliteToggle}
-          aria-pressed={layerToggles.satellite}
-          aria-label="Alternar camada satélite"
-          className={[
-            'flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium shadow transition-all',
-            layerToggles.satellite
-              ? 'bg-sky-600/90 text-white border-sky-400'
-              : 'bg-zinc-900/80 text-zinc-300 border-zinc-700 hover:border-zinc-500',
-          ].join(' ')}
+      {/* ── Painel lateral do mapa + pull-tab ──────────────────────────────── */}
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 42, pointerEvents: 'none' }}>
+        {/* Painel deslizante */}
+        <div
+          style={{
+            position: 'absolute', right: 0, top: 0, bottom: 0,
+            width: mapPainel ? 220 : 0,
+            overflow: 'hidden',
+            transition: 'width 0.22s ease',
+            pointerEvents: mapPainel ? 'auto' : 'none',
+          }}
         >
-          <SatelliteIcon />
-          Satélite
-        </button>
+          <div style={{
+            width: 220, height: '100%',
+            background: isDark ? 'rgba(6,10,22,0.97)' : '#ffffff',
+            borderLeft: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
+            boxShadow: isDark ? '-4px 0 24px rgba(0,0,0,0.6)' : '-4px 0 24px rgba(0,0,0,0.12)',
+            display: 'flex', flexDirection: 'column',
+            padding: '16px 12px',
+            gap: 8,
+            overflowY: 'auto',
+          }}>
+            {/* Título */}
+            <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: isDark ? '#475569' : '#94a3b8', marginBottom: 4 }}>
+              Controles
+            </div>
 
-        {/* Botão recarregar */}
+            {/* Busca */}
+            <button
+              onClick={() => { setBuscaAberta(true); setMapPainel(false) }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 12px', borderRadius: 10,
+                background: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
+                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
+                color: isDark ? '#94a3b8' : '#475569',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: 15 }}>🔍</span>
+              Buscar no mapa
+            </button>
+
+            {/* Divisor */}
+            <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0', margin: '4px 0' }} />
+
+            {/* Camadas */}
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isDark ? '#475569' : '#94a3b8', marginBottom: 2 }}>
+              Camadas
+            </div>
+            {[
+              { key: 'ctos',   label: 'CTOs',    icon: '📡', color: '#10b981' },
+              { key: 'caixas', label: 'CE/CDOs', icon: '🔷', color: '#6366f1' },
+              { key: 'rotas',  label: 'Rotas',   icon: '〰️', color: '#f59e0b' },
+              { key: 'postes', label: 'Postes',  icon: '🪝', color: '#eab308' },
+              { key: 'olts',   label: 'OLTs',    icon: '🖥️', color: '#0891b2' },
+            ].map(({ key, label, icon, color }) => {
+              const ativo = layerToggles[key] ?? true
+              return (
+                <button key={key}
+                  onClick={() => handleLayerToggle(key, !ativo)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 12px', borderRadius: 8,
+                    background: ativo ? `${color}18` : (isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc'),
+                    border: `1px solid ${ativo ? color + '44' : (isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0')}`,
+                    color: ativo ? color : (isDark ? '#64748b' : '#94a3b8'),
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <span style={{ fontSize: 13 }}>{icon}</span>
+                  {label}
+                  <span style={{ marginLeft: 'auto', fontSize: 10 }}>{ativo ? '●' : '○'}</span>
+                </button>
+              )
+            })}
+
+            {/* Divisor */}
+            <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0', margin: '4px 0' }} />
+
+            {/* Satélite */}
+            <button
+              onClick={handleSatelliteToggle}
+              aria-pressed={layerToggles.satellite}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 12px', borderRadius: 10,
+                background: layerToggles.satellite ? 'rgba(14,165,233,0.18)' : (isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9'),
+                border: `1px solid ${layerToggles.satellite ? '#0ea5e9' : (isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0')}`,
+                color: layerToggles.satellite ? '#38bdf8' : (isDark ? '#94a3b8' : '#475569'),
+                fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
+              }}
+            >
+              <SatelliteIcon />
+              Satélite
+            </button>
+
+            {/* Recarregar */}
+            <button
+              onClick={reloadData}
+              disabled={loadingData}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 12px', borderRadius: 10,
+                background: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
+                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
+                color: isDark ? '#94a3b8' : '#475569',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
+                opacity: loadingData ? 0.5 : 1,
+              }}
+            >
+              <RefreshIcon spin={loadingData} />
+              Recarregar
+            </button>
+
+            {/* ── Adicionar elementos — visível apenas para admin e superadmin ── */}
+            {(userRole === 'admin' || userRole === 'superadmin') && (
+              <>
+                <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0', margin: '4px 0' }} />
+                {/* Permissão: somente admin e superadmin podem ver esta seção */}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isDark ? '#475569' : '#94a3b8', marginBottom: 2 }}>
+                  Adicionar
+                </div>
+                {[
+                  { type: 'cto',   label: 'CTO',    color: '#10b981', icon: '📡' },
+                  { type: 'caixa', label: 'CE/CDO', color: '#6366f1', icon: '🔷' },
+                  { type: 'poste', label: 'Poste',  color: '#d97706', icon: '🪝' },
+                  { type: 'rota',  label: 'Rota',   color: '#f59e0b', icon: '〰️' },
+                ].map(({ type, label, color, icon }) => (
+                  <button key={type}
+                    onClick={() => { enterAddMode(type); setMapPainel(false) }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '8px 12px', borderRadius: 8,
+                      background: `${color}18`,
+                      border: `1px solid ${color}44`,
+                      color: color,
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <span style={{ fontSize: 13 }}>{icon}</span>
+                    {label}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Pull-tab (seta) — lado direito do painel */}
         <button
-          onClick={reloadData}
-          disabled={loadingData}
-          aria-label="Recarregar dados do mapa"
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium shadow transition-all
-                     bg-zinc-900/80 text-zinc-300 border-zinc-700 hover:border-zinc-500
-                     disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={() => setMapPainel(v => !v)}
+          aria-label={mapPainel ? 'Fechar painel' : 'Abrir painel de controles'}
+          style={{
+            position: 'absolute',
+            right: mapPainel ? 220 : 0,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            transition: 'right 0.22s ease',
+            pointerEvents: 'auto',
+            background: isDark ? 'rgba(6,10,22,0.95)' : '#ffffff',
+            border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
+            borderRight: mapPainel ? undefined : 'none',
+            borderLeft: mapPainel ? 'none' : undefined,
+            borderRadius: mapPainel ? '0 8px 8px 0' : '8px 0 0 8px',
+            width: 22,
+            height: 64,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 12,
+            color: isDark ? '#64748b' : '#94a3b8',
+            boxShadow: isDark ? '-2px 0 8px rgba(0,0,0,0.4)' : '-2px 0 8px rgba(0,0,0,0.1)',
+          }}
         >
-          <RefreshIcon spin={loadingData} />
-          Recarregar
+          {mapPainel ? '▶' : '◀'}
         </button>
-      </div>
-
-      {/* Toggles de camadas - canto inferior esquerdo (acima do scale) */}
-      <div className="absolute bottom-10 left-0 z-40 pointer-events-auto">
-        <LayerToggles toggles={layerToggles} onToggle={handleLayerToggle} />
       </div>
 
       {/* Erro GPS flutuante */}
@@ -894,66 +1036,92 @@ export default function MapaFTTH({
         />
       )}
 
-      {/* FAB unificado — ferramentas + GPS */}
-      {!addMode && !selectedElement && !buscaAberta && (
-        <div className="absolute bottom-6 right-4 z-40 flex flex-col items-end gap-2 pointer-events-auto" style={{ bottom: 'max(24px, env(safe-area-inset-bottom, 24px))' }}>
-          {addFabOpen && (
-            <div className="flex flex-col gap-1.5 mb-1"
-              style={{ background: isDark ? 'rgba(8,13,28,0.96)' : '#ffffff', border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
-                borderRadius: 16, padding: '10px 10px', boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.15)', minWidth: 160 }}>
+      {/* ── Widget GPS — canto inferior esquerdo ─────────────────────────────
+           Minimizado: botão compacto com ícone + pulse dot.
+           Expandido: card com Localizar / Seguir / Centralizar.           */}
+      {!addMode && !buscaAberta && (
+        <div style={{
+          position: 'absolute',
+          bottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
+          left: 12,
+          zIndex: 40,
+          pointerEvents: 'auto',
+          display: 'flex',
+          flexDirection: 'column-reverse',
+          alignItems: 'flex-start',
+          gap: 6,
+        }}>
+          {/* Botão toggle (sempre visível) */}
+          <button
+            onClick={() => setGpsExpanded(v => !v)}
+            title={gpsExpanded ? 'Minimizar GPS' : 'Abrir GPS'}
+            style={{
+              position: 'relative',
+              width: 44, height: 44,
+              borderRadius: 12,
+              background: gpsExpanded
+                ? (isDark ? 'rgba(37,99,235,0.35)' : 'rgba(37,99,235,0.12)')
+                : (isDark ? 'rgba(6,10,22,0.90)' : 'rgba(255,255,255,0.96)'),
+              border: gpsExpanded
+                ? '1.5px solid #3b82f6'
+                : (isDark ? '1px solid rgba(255,255,255,0.10)' : '1px solid #e2e8f0'),
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+              boxShadow: isDark ? '0 2px 12px rgba(0,0,0,0.5)' : '0 2px 12px rgba(0,0,0,0.10)',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: gpsExpanded ? '#3b82f6' : (isDark ? '#93c5fd' : '#2563eb'),
+              transition: 'all 0.18s',
+            }}
+          >
+            <GPSIcon />
+            {/* Pulse dot — GPS ativo */}
+            {tracking && (
+              <span style={{
+                position: 'absolute', top: 6, right: 6,
+                width: 7, height: 7, borderRadius: '50%',
+                background: '#3b82f6',
+                animation: 'gps-pulse 1.5s ease-in-out infinite',
+              }} />
+            )}
+          </button>
 
-              {/* Ferramentas de adição — só admin/superadmin */}
-              {(userRole === 'admin' || userRole === 'superadmin') && (<>
-                <div style={{ fontSize: 9, fontWeight: 700, color: isDark ? 'rgba(255,255,255,0.25)' : '#94a3b8',
-                  textTransform: 'uppercase', letterSpacing: '0.1em', padding: '2px 4px' }}>
-                  Adicionar
-                </div>
-                {[
-                  { type: 'cto',   label: 'CTO',   color: '#0284c7', icon: '📡' },
-                  { type: 'caixa', label: 'CE/CDO', color: '#7c3aed', icon: '🔷' },
-                  { type: 'poste', label: 'Poste',  color: '#d97706', icon: '🪝' },
-                  { type: 'rota',  label: 'Rota',   color: '#059669', icon: '〰️' },
-                ].map(({ type, label, color, icon }) => (
-                  <button key={type}
-                    onClick={() => { enterAddMode(type); setAddFabOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '8px 10px', borderRadius: 10, border: 'none',
-                      background: isDark ? 'rgba(255,255,255,0.05)' : 'transparent', color: isDark ? '#e2e8f0' : '#1e293b',
-                      fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
-                      transition: 'background 0.15s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = color + '22'}
-                    onMouseLeave={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'transparent'}
-                  >
-                    <span style={{ width: 20, textAlign: 'center' }}>{icon}</span>
-                    {label}
-                  </button>
-                ))}
-                <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.07)' : '#e2e8f0', margin: '4px 0' }} />
-              </>)}
-
-              {/* Busca — disponível para todos */}
-              <button
-                onClick={() => { setBuscaAberta(true); setAddFabOpen(false) }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '8px 10px', borderRadius: 10, border: 'none',
-                  background: isDark ? 'rgba(255,255,255,0.05)' : 'transparent', color: isDark ? '#c4b5fd' : '#7c3aed',
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,58,237,0.12)'}
-                onMouseLeave={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'transparent'}
-              >
-                <span style={{ width: 20, textAlign: 'center', fontSize: 15 }}>🔍</span>
-                Buscar
-              </button>
-
-              <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 0' }} />
-
-              {/* GPS */}
-              <div style={{ fontSize: 9, fontWeight: 700, color: isDark ? 'rgba(255,255,255,0.25)' : '#94a3b8',
-                textTransform: 'uppercase', letterSpacing: '0.1em', padding: '2px 4px' }}>
-                GPS
+          {/* Painel expandido */}
+          {gpsExpanded && (
+            <div style={{
+              background: isDark ? 'rgba(6,10,22,0.92)' : 'rgba(255,255,255,0.97)',
+              border: isDark ? '1px solid rgba(255,255,255,0.10)' : '1px solid #e2e8f0',
+              borderRadius: 14,
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+              boxShadow: isDark
+                ? '0 2px 8px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.5)'
+                : '0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.10)',
+              display: 'flex', flexDirection: 'column',
+              overflow: 'hidden', minWidth: 152,
+            }}>
+              {/* Cabeçalho */}
+              <div style={{
+                padding: '7px 12px 6px',
+                display: 'flex', alignItems: 'center', gap: 6,
+                borderBottom: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #f1f5f9',
+              }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                  background: tracking ? '#3b82f6' : (isDark ? '#334155' : '#cbd5e1'),
+                  ...(tracking ? { animation: 'gps-pulse 1.5s ease-in-out infinite' } : {}),
+                }} />
+                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: isDark ? '#475569' : '#94a3b8' }}>
+                  GPS
+                </span>
+                {tracking && followMode && (
+                  <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, color: '#3b82f6', background: 'rgba(59,130,246,0.12)', borderRadius: 4, padding: '1px 5px' }}>
+                    ATIVO
+                  </span>
+                )}
               </div>
 
-              {/* Minha localização */}
+              {/* Localizar */}
               <button
                 onClick={() => {
                   if (!navigator.geolocation) return
@@ -963,104 +1131,97 @@ export default function MapaFTTH({
                     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
                   )
                 }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '8px 10px', borderRadius: 10, border: 'none',
-                  background: isDark ? 'rgba(255,255,255,0.05)' : 'transparent', color: isDark ? '#93c5fd' : '#2563eb',
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.12)'}
-                onMouseLeave={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'transparent'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 12px', border: 'none', background: 'none',
+                  cursor: 'pointer', textAlign: 'left', width: '100%',
+                  color: isDark ? '#93c5fd' : '#2563eb', fontSize: 12, fontWeight: 600,
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.06)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
               >
                 <GPSIcon />
-                Minha localização
+                Localizar
               </button>
 
-              {/* Seguir técnico */}
+              <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9', margin: '0 10px' }} />
+
+              {/* Seguir / Parar */}
               <button
                 onClick={() => {
                   if (tracking && followMode) { stopTracking() }
                   else if (tracking) { setFollowMode(true) }
                   else { startTracking(); setFollowMode(true) }
                 }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '8px 10px', borderRadius: 10, border: 'none',
-                  background: tracking && followMode ? 'rgba(37,99,235,0.25)' : (isDark ? 'rgba(255,255,255,0.05)' : 'transparent'),
-                  color: tracking && followMode ? (isDark ? '#fff' : '#1d4ed8') : (isDark ? '#93c5fd' : '#2563eb'),
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-                onMouseEnter={e => e.currentTarget.style.background = tracking && followMode ? 'rgba(37,99,235,0.4)' : 'rgba(59,130,246,0.12)'}
-                onMouseLeave={e => e.currentTarget.style.background = tracking && followMode ? 'rgba(37,99,235,0.25)' : (isDark ? 'rgba(255,255,255,0.05)' : 'transparent')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 12px', border: 'none',
+                  background: tracking && followMode ? (isDark ? 'rgba(37,99,235,0.2)' : 'rgba(37,99,235,0.08)') : 'none',
+                  cursor: 'pointer', textAlign: 'left', width: '100%',
+                  color: tracking && followMode ? '#3b82f6' : (isDark ? '#93c5fd' : '#2563eb'),
+                  fontSize: 12, fontWeight: 600, transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(59,130,246,0.14)' : 'rgba(59,130,246,0.08)'}
+                onMouseLeave={e => e.currentTarget.style.background = tracking && followMode ? (isDark ? 'rgba(37,99,235,0.2)' : 'rgba(37,99,235,0.08)') : 'none'}
               >
                 <FollowIcon />
-                <span style={{ flex: 1 }}>{tracking && followMode ? 'Seguindo...' : 'Seguir técnico'}</span>
-                {tracking && <span style={{ width: 7, height: 7, borderRadius: '50%',
-                  background: '#60a5fa', animation: 'gps-pulse 1.5s ease-in-out infinite', flexShrink: 0 }} />}
+                <span style={{ flex: 1 }}>{tracking && followMode ? 'Seguindo...' : 'Seguir'}</span>
               </button>
 
-              {/* Recentralizar — só quando tem posição mas não está seguindo */}
+              {/* Centralizar — só quando há posição mas não está seguindo */}
               {gpsPosition && !followMode && (
-                <button
-                  onClick={() => map?.flyTo({ center: [gpsPosition.lng, gpsPosition.lat], zoom: 16, duration: 800 })}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '8px 10px', borderRadius: 10, border: 'none',
-                    background: isDark ? 'rgba(255,255,255,0.05)' : 'transparent', color: isDark ? '#94a3b8' : '#475569',
-                    fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(100,116,139,0.12)'}
-                  onMouseLeave={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'transparent'}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="16" y2="14"/>
-                  </svg>
-                  Recentralizar
-                </button>
+                <>
+                  <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9', margin: '0 10px' }} />
+                  <button
+                    onClick={() => map?.flyTo({ center: [gpsPosition.lng, gpsPosition.lat], zoom: 16, duration: 800 })}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '8px 12px', border: 'none', background: 'none',
+                      cursor: 'pointer', textAlign: 'left', width: '100%',
+                      color: isDark ? '#64748b' : '#94a3b8', fontSize: 12, fontWeight: 600,
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" strokeDasharray="2 4"/>
+                      <line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
+                      <line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
+                    </svg>
+                    Centralizar
+                  </button>
+                </>
               )}
             </div>
           )}
-
-          {/* Botão principal FAB — maior no modo campo */}
-          <button
-            onClick={() => setAddFabOpen((v) => !v)}
-            aria-label={addFabOpen ? 'Fechar menu' : 'Abrir menu'}
-            className="flex items-center justify-center rounded-full font-bold transition-all"
-            style={{
-              width: isCampo ? 64 : 56, height: isCampo ? 64 : 56,
-              minWidth: isCampo ? 64 : 56,
-              fontSize: isCampo ? 28 : 24,
-              backgroundColor: isDark
-                ? (addFabOpen ? '#475569' : '#0284c7')
-                : (addFabOpen ? '#e2e8f0' : '#ffffff'),
-              color: isDark ? '#ffffff' : '#0f172a',
-              border: isDark ? '2px solid rgba(255,255,255,0.2)' : '1.5px solid #cbd5e1',
-              boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.5)' : '0 4px 20px rgba(0,0,0,0.18)',
-              position: 'relative',
-            }}
-          >
-            {addFabOpen ? '✕' : '+'}
-            {/* Indicador GPS ativo */}
-            {tracking && !addFabOpen && (
-              <span style={{ position: 'absolute', top: 0, right: 0, width: 12, height: 12,
-                background: '#3b82f6', border: isDark ? '2px solid #0284c7' : '2px solid #ffffff', borderRadius: '50%',
-                animation: 'gps-pulse 1.5s ease-in-out infinite' }} />
-            )}
-          </button>
         </div>
       )}
 
       {/* Banner de instrução durante add mode */}
       {addMode && (
         <div
-          className="absolute top-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-semibold text-white shadow-lg flex items-center gap-3"
-          style={{ backgroundColor: 'rgba(8,13,28,0.95)', border: '1px solid rgba(255,255,255,0.15)', maxWidth: '90vw' }}
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-semibold shadow-lg flex items-center gap-3"
+          style={{
+            backgroundColor: isDark ? 'rgba(8,13,28,0.95)' : 'rgba(255,255,255,0.97)',
+            border: isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid #e2e8f0',
+            color: isDark ? '#f1f5f9' : '#0f172a',
+            maxWidth: '90vw',
+            boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.5)' : '0 4px 20px rgba(0,0,0,0.12)',
+          }}
         >
           {addMode === 'rota' && !routeFinalized
             ? <>
-                <span style={{ color: '#000000' }}>〰️</span>
+                <span>〰️</span>
                 {addRouteLinks.length > 0 && (
-                  <span style={{ color: '#86efac', fontSize: 10 }}>🔗 {addRouteLinks[addRouteLinks.length - 1].nome ?? addRouteLinks[addRouteLinks.length - 1].id}</span>
+                  <span style={{ color: '#22c55e', fontSize: 10 }}>🔗 {addRouteLinks[addRouteLinks.length - 1].nome ?? addRouteLinks[addRouteLinks.length - 1].id}</span>
                 )}
                 <span>{addRoutePoints.length === 0 ? 'Clique no mapa para iniciar' : `${addRoutePoints.length} pontos`}</span>
                 {addRoutePoints.length >= 2 && (
                   <button
                     onClick={() => setRouteFinalized(true)}
-                    style={{ background: '#000000', color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: '#0284c7', color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                   >
                     Finalizar
                   </button>
@@ -1071,7 +1232,7 @@ export default function MapaFTTH({
             : addCoords
             ? <><span style={{ color: '#22c55e' }}>✓</span><span>Local selecionado — preencha os dados</span></>
             : <><span>📍</span><span>Clique no mapa para posicionar</span></>}
-          <button onClick={cancelarAddMode} style={{ color: 'rgba(255,255,255,0.4)', marginLeft: 4 }} className="hover:text-white transition-colors">✕</button>
+          <button onClick={cancelarAddMode} style={{ color: isDark ? 'rgba(255,255,255,0.4)' : '#94a3b8', marginLeft: 4 }} className="hover:text-current transition-colors">✕</button>
         </div>
       )}
 
@@ -1079,27 +1240,30 @@ export default function MapaFTTH({
       {addMode && (addCoords || (addMode === 'rota' && routeFinalized && addRoutePoints.length >= 2)) && (
         <div
           className="absolute bottom-0 left-0 right-0 z-50 rounded-t-2xl shadow-2xl"
-          style={{ backgroundColor: 'rgba(8,13,28,0.98)', borderTop: '1px solid rgba(255,255,255,0.08)' }}
+          style={{
+            backgroundColor: isDark ? 'rgba(8,13,28,0.98)' : 'rgba(255,255,255,0.99)',
+            borderTop: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
+          }}
         >
           {/* Handle bar */}
           <div className="flex justify-center pt-3 pb-1">
-            <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.15)' }} />
+            <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : '#e2e8f0' }} />
           </div>
 
           <div className="px-4 pb-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 16 }}>
+              <h3 style={{ color: isDark ? '#e2e8f0' : '#0f172a', fontWeight: 700, fontSize: 16 }}>
                 {{ cto: 'Nova CTO', caixa: 'Nova CE/CDO', poste: 'Novo Poste', rota: 'Nova Rota' }[addMode]}
               </h3>
-              <button onClick={cancelarAddMode} style={{ color: 'rgba(255,255,255,0.3)', fontSize: 20, lineHeight: 1 }} className="hover:text-white transition-colors">✕</button>
+              <button onClick={cancelarAddMode} style={{ color: isDark ? 'rgba(255,255,255,0.3)' : '#94a3b8', fontSize: 20, lineHeight: 1 }} className="hover:text-current transition-colors">✕</button>
             </div>
 
-            {/* Tipo chips para rota — antes dos campos */}
+            {/* Tipo chips para rota */}
             {addMode === 'rota' && (
               <div className="flex gap-2 mb-4">
                 {[
                   { v: 'BACKBONE', cor: '#6366f1', desc: 'Principal' },
-                  { v: 'RAMAL',    cor: '#000000', desc: 'Distribuição' },
+                  { v: 'RAMAL',    cor: '#475569', desc: 'Distribuição' },
                   { v: 'DROP',     cor: '#22c55e', desc: 'Última milha' },
                 ].map(({ v, cor, desc }) => {
                   const ativo = (addForm.tipoRota ?? 'RAMAL') === v
@@ -1108,15 +1272,15 @@ export default function MapaFTTH({
                       onClick={() => setAddForm((p) => ({ ...p, tipoRota: v }))}
                       style={{
                         flex: 1,
-                        backgroundColor: ativo ? `${cor}26` : 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${ativo ? cor + '66' : 'rgba(255,255,255,0.08)'}`,
+                        backgroundColor: ativo ? `${cor}22` : (isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc'),
+                        border: `1px solid ${ativo ? cor + '66' : (isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0')}`,
                         borderRadius: 10, padding: '8px 4px',
                         transition: 'all .15s',
                       }}
                       className="flex flex-col items-center gap-0.5"
                     >
-                      <span style={{ color: ativo ? cor : 'rgba(255,255,255,0.35)', fontWeight: 700, fontSize: 12 }}>{v}</span>
-                      <span style={{ color: ativo ? cor : 'rgba(255,255,255,0.2)', fontSize: 10 }}>{desc}</span>
+                      <span style={{ color: ativo ? cor : (isDark ? 'rgba(255,255,255,0.35)' : '#94a3b8'), fontWeight: 700, fontSize: 12 }}>{v}</span>
+                      <span style={{ color: ativo ? cor : (isDark ? 'rgba(255,255,255,0.2)' : '#cbd5e1'), fontSize: 10 }}>{desc}</span>
                     </button>
                   )
                 })}
@@ -1127,7 +1291,7 @@ export default function MapaFTTH({
             {addMode === 'caixa' && (
               <div className="flex gap-2 mb-4">
                 {[
-                  { v: 'CDO', cor: '#22c55e' },
+                  { v: 'CDO', cor: '#a855f7' },
                   { v: 'CE',  cor: '#3b82f6' },
                 ].map(({ v, cor }) => {
                   const ativo = (addForm.tipo ?? 'CDO') === v
@@ -1136,10 +1300,10 @@ export default function MapaFTTH({
                       onClick={() => setAddForm((p) => ({ ...p, tipo: v }))}
                       style={{
                         flex: 1,
-                        backgroundColor: ativo ? `${cor}22` : 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${ativo ? cor + '55' : 'rgba(255,255,255,0.08)'}`,
+                        backgroundColor: ativo ? `${cor}22` : (isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc'),
+                        border: `1px solid ${ativo ? cor + '55' : (isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0')}`,
                         borderRadius: 10, padding: '8px 4px',
-                        color: ativo ? cor : 'rgba(255,255,255,0.35)',
+                        color: ativo ? cor : (isDark ? 'rgba(255,255,255,0.35)' : '#94a3b8'),
                         fontWeight: 700, fontSize: 13,
                         transition: 'all .15s',
                       }}>
@@ -1152,34 +1316,34 @@ export default function MapaFTTH({
 
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
-                <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, display: 'block', marginBottom: 4 }}>ID *</label>
+                <label style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.35)' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, display: 'block', marginBottom: 4 }}>ID *</label>
                 <input
                   value={addForm.id ?? ''}
                   onChange={(e) => setAddForm((p) => ({ ...p, id: e.target.value }))}
                   placeholder={addMode === 'cto' ? 'ex: CTO-001' : addMode === 'caixa' ? 'ex: CDO-001' : addMode === 'poste' ? 'ex: PT-001' : 'ex: RT-001'}
-                  style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: '#e2e8f0', fontSize: 13, outline: 'none' }}
-                  className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40"
+                  style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f8fafc', border: isDark ? '1px solid rgba(255,255,255,0.10)' : '1px solid #e2e8f0', color: isDark ? '#e2e8f0' : '#0f172a', fontSize: 13, outline: 'none' }}
+                  className="w-full rounded-lg px-3 py-2"
                 />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, display: 'block', marginBottom: 4 }}>Nome</label>
+                <label style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.35)' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, display: 'block', marginBottom: 4 }}>Nome</label>
                 <input
                   value={addForm.nome ?? ''}
                   onChange={(e) => setAddForm((p) => ({ ...p, nome: e.target.value }))}
                   placeholder="Opcional"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: '#e2e8f0', fontSize: 13, outline: 'none' }}
-                  className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40"
+                  style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f8fafc', border: isDark ? '1px solid rgba(255,255,255,0.10)' : '1px solid #e2e8f0', color: isDark ? '#e2e8f0' : '#0f172a', fontSize: 13, outline: 'none' }}
+                  className="w-full rounded-lg px-3 py-2"
                 />
               </div>
 
               {addMode === 'cto' && (
                 <div className="col-span-2">
-                  <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, display: 'block', marginBottom: 4 }}>Capacidade</label>
+                  <label style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.35)' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, display: 'block', marginBottom: 4 }}>Capacidade</label>
                   <select
                     value={addForm.capacidade ?? 16}
                     onChange={(e) => setAddForm((p) => ({ ...p, capacidade: parseInt(e.target.value) }))}
-                    style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: '#e2e8f0', fontSize: 13, outline: 'none' }}
-                    className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40"
+                    style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f8fafc', border: isDark ? '1px solid rgba(255,255,255,0.10)' : '1px solid #e2e8f0', color: isDark ? '#e2e8f0' : '#0f172a', fontSize: 13, outline: 'none' }}
+                    className="w-full rounded-lg px-3 py-2"
                   >
                     {[8,16,24,32,48,64].map((c) => <option key={c} value={c}>{c} portas</option>)}
                   </select>
@@ -1202,8 +1366,8 @@ export default function MapaFTTH({
                     if (addRoutePoints.length <= 2) setRouteFinalized(false)
                   }}
                   disabled={addRoutePoints.length === 0}
-                  style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }}
-                  className="flex-1 py-2.5 rounded-lg text-sm hover:bg-white/5 transition-colors disabled:opacity-40"
+                  style={{ border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid #e2e8f0', color: isDark ? 'rgba(255,255,255,0.4)' : '#64748b' }}
+                  className="flex-1 py-2.5 rounded-lg text-sm transition-colors disabled:opacity-40"
                 >
                   ↩ Desfazer
                 </button>
@@ -1224,19 +1388,22 @@ export default function MapaFTTH({
       {editingRota && (
         <div
           className="absolute bottom-0 left-0 right-0 z-50 rounded-t-2xl shadow-2xl"
-          style={{ backgroundColor: 'rgba(8,13,28,0.98)', borderTop: '3px solid #6366f1' }}
+          style={{
+            backgroundColor: isDark ? 'rgba(8,13,28,0.98)' : 'rgba(255,255,255,0.99)',
+            borderTop: '3px solid #6366f1',
+          }}
         >
           <div className="flex justify-center pt-3 pb-1">
-            <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.15)' }} />
+            <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : '#e2e8f0' }} />
           </div>
           <div className="px-4 pb-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 15 }}>
+              <h3 style={{ color: isDark ? '#e2e8f0' : '#0f172a', fontWeight: 700, fontSize: 15 }}>
                 ✏️ Editando rota — {editingRota.rota_id}
               </h3>
-              <button onClick={() => setEditingRota(null)} style={{ color: 'rgba(255,255,255,0.3)', fontSize: 20 }} className="hover:text-white transition-colors">✕</button>
+              <button onClick={() => setEditingRota(null)} style={{ color: isDark ? 'rgba(255,255,255,0.3)' : '#94a3b8', fontSize: 20 }} className="hover:text-current transition-colors">✕</button>
             </div>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 14 }}>
+            <p style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.35)' : '#64748b', marginBottom: 14 }}>
               Arraste os pontos no mapa para editar o traçado ({editingRota.coordinates.length} pontos)
             </p>
             {editRotaErro && (
@@ -1247,8 +1414,8 @@ export default function MapaFTTH({
             <div className="flex gap-3">
               <button
                 onClick={() => setEditingRota(null)}
-                style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }}
-                className="flex-1 py-2.5 rounded-lg text-sm hover:bg-white/5 transition-colors"
+                style={{ border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid #e2e8f0', color: isDark ? 'rgba(255,255,255,0.4)' : '#64748b' }}
+                className="flex-1 py-2.5 rounded-lg text-sm transition-colors"
               >
                 Cancelar
               </button>

@@ -19,6 +19,8 @@ const NAV_ITEMS = [
   { href: "/superadmin/projetos",  label: "Projetos",  icon: "🏢", minRole: "superadmin" },
   { href: "/superadmin/empresas",  label: "Empresas",  icon: "🏬", minRole: "superadmin" },
   { href: "/superadmin/registros", label: "Registros", icon: "📋", minRole: "superadmin" },
+  { href: "/admin/logs",           label: "Log de Eventos", icon: "📜", minRole: "tecnico" },
+  { href: "/configuracoes",        label: "Configurações",  icon: "⚙️" },
 ];
 
 const ROLE_RANK = {
@@ -56,8 +58,8 @@ export default function SidebarLayout({ session, children }) {
 
   return (
     <div
-      style={{ backgroundColor: "var(--background)", minHeight: "100vh" }}
-      className="flex"
+      style={{ backgroundColor: "var(--background)" }}
+      className="flex h-screen overflow-hidden"
     >
       {/* Overlay mobile */}
       {aberta && (
@@ -70,11 +72,11 @@ export default function SidebarLayout({ session, children }) {
 
       {/* Sidebar */}
       <aside
-        style={sidebarStyle}
+        style={{ ...sidebarStyle, height: 'calc(100dvh - 52px)' }}
         className={`
-          fixed top-0 left-0 h-full z-30 flex flex-col
+          fixed top-[52px] left-0 z-30 flex flex-col
           transform transition-transform duration-200
-          lg:static lg:translate-x-0
+          lg:static lg:translate-x-0 lg:top-0 lg:!h-screen lg:flex-shrink-0
           ${aberta ? "translate-x-0" : "-translate-x-full"}
         `}
       >
@@ -180,14 +182,15 @@ export default function SidebarLayout({ session, children }) {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header mobile */}
         <header
           style={{
             backgroundColor: "var(--sidebar-bg)",
             borderBottom: "1px solid var(--sidebar-border)",
+            flexShrink: 0,
           }}
-          className="relative z-[60] flex items-center justify-between px-4 py-3 lg:hidden"
+          className="sticky top-0 z-[60] flex items-center justify-between px-4 py-3 lg:hidden"
         >
           <button
             onClick={() => setAberta(true)}
@@ -213,7 +216,7 @@ export default function SidebarLayout({ session, children }) {
         </header>
 
         {/* Conteúdo */}
-        <main className="flex-1 overflow-auto min-h-0 relative isolate">{children}</main>
+        <main className="flex-1 overflow-auto min-h-0 relative isolate" style={{ minHeight: 0 }}>{children}</main>
       </div>
     </div>
   );
