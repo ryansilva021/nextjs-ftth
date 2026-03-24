@@ -6,9 +6,16 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import DiagramaCTOEditor from '@/components/admin/DiagramaCTOEditor'
 import DiagramaCDOEditor from '@/components/admin/DiagramaCDOEditor'
 import { upsertOLT, deleteOLT, saveOLTDio, getOLTs } from '@/actions/olts'
+
+// DiagramaFluxo usa React Flow (client-only, sem SSR)
+const DiagramaFluxo = dynamic(
+  () => import('@/components/admin/DiagramaFluxo'),
+  { ssr: false, loading: () => <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'var(--text-muted)', fontSize:13 }}>Carregando diagrama...</div> }
+)
 
 // ---------------------------------------------------------------------------
 // Estilos
@@ -86,16 +93,35 @@ function calcOcupacaoCDO(caixa) {
 // ---------------------------------------------------------------------------
 // Items de lista
 // ---------------------------------------------------------------------------
-function ItemCTO({ cto, ativo, onClick }) {
+function ItemCTO({ cto, ativo, onClick, cdoNome }) {
   const { ocupadas, total } = calcOcupacaoCTO(cto)
+  const pct = total > 0 ? ocupadas / total : 0
+  const barColor = pct >= 0.9 ? '#ef4444' : pct >= 0.7 ? '#f59e0b' : '#22c55e'
   return (
     <div style={ativo ? S.cardItemAtivo : S.cardItem} onClick={onClick} role="button" tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}>
-      <div>
-        <p style={S.cardItemNome}>{cto.nome ?? cto.cto_id}</p>
-        <p style={S.cardItemSub}>{cto.cto_id}</p>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <p style={S.cardItemNome}>{cto.nome ?? cto.cto_id}</p>
+          {cto.cdo_id
+            ? <span style={{ fontSize: 10, fontWeight: 700, backgroundColor: '#1e3a5f', color: '#7dd3fc', borderRadius: 4, padding: '1px 6px', whiteSpace: 'nowrap' }}>
+                {cdoNome ?? cto.cdo_id}
+              </span>
+            : <span style={{ fontSize: 10, fontWeight: 700, backgroundColor: 'rgba(239,68,68,0.12)', color: '#fca5a5', borderRadius: 4, padding: '1px 6px' }}>
+                ⚠ Sem vínculo
+              </span>
+          }
+        </div>
+        <p style={S.cardItemSub}>{cto.cto_id}{cto.splitter_cto ? ` · ${cto.splitter_cto}` : ''}</p>
+        {total > 0 && (
+          <div style={{ marginTop: 4, height: 3, width: 100, backgroundColor: 'var(--border-color)', borderRadius: 2 }}>
+            <div style={{ height: '100%', width: `${Math.min(100, pct * 100)}%`, backgroundColor: barColor, borderRadius: 2, transition: 'width .3s' }} />
+          </div>
+        )}
       </div>
-      <span style={ativo ? S.badgeAtivo : S.badge}>{ocupadas}/{total} portas</span>
+      <span style={{ ...(ativo ? S.badgeAtivo : S.badge), flexShrink: 0, color: barColor, borderColor: barColor + '44', backgroundColor: barColor + '18' }}>
+        {ocupadas}/{total}
+      </span>
     </div>
   )
 }
@@ -607,6 +633,7 @@ export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, ta
             projetoId={projetoId}
             capacidadePortas={ctoModal.capacidade ?? 0}
             initialDiagrama={ctoModal.diagrama ?? null}
+            caixas={caixas}
           />
         </EditorModal>
       )}
@@ -623,12 +650,18 @@ export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, ta
             projetoId={projetoId}
             capacidadeSaidas={cdoModal.capacidade ?? 0}
             olts={olts}
+            ctos={ctos}
+            caixas={caixas}
           />
         </EditorModal>
       )}
 
       {/* Abas */}
       <div style={S.tabBar}>
+        <button style={aba === 'topologia' ? S.tabAtiva : S.tabInativa}
+          onClick={() => setAba('topologia')}>
+          🗺 Topologia
+        </button>
         <button style={aba === 'olts'  ? S.tabAtiva : S.tabInativa}
           onClick={() => setAba('olts')}>
           OLTs ({olts.length})
@@ -643,21 +676,74 @@ export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, ta
         </button>
       </div>
 
-      {/* Aba CTOs */}
-      {aba === 'ctos' && (
-        <div>
-          <p style={S.sectionTitle}>
-            {readOnly ? 'Visualizando CTOs (somente leitura)' : 'Clique em uma CTO para editar o diagrama'}
-          </p>
-          {ctos.length === 0
-            ? <div style={S.vazio}>Nenhuma CTO cadastrada.</div>
-            : <div style={S.lista}>{ctos.map(cto => (
-                <ItemCTO key={cto._id} cto={cto} ativo={false}
-                  onClick={readOnly ? undefined : () => setCTOModal(cto)} />
-              ))}</div>
-          }
+      {/* Aba Topologia */}
+      {aba === 'topologia' && (
+        <div style={{ height: 'calc(100vh - 220px)', minHeight: 480, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+          <DiagramaFluxo projetoId={projetoId} altura="100%" />
         </div>
       )}
+
+      {/* Aba CTOs */}
+      {aba === 'ctos' && (() => {
+        // Build CDO lookup map for names
+        const cdoMap = Object.fromEntries(caixas.map(c => [c.id, c.nome ?? c.id]))
+
+        // Group CTOs by cdo_id
+        const grupos = {}
+        for (const cto of ctos) {
+          const key = cto.cdo_id ?? '__sem_vinculo__'
+          ;(grupos[key] = grupos[key] ?? []).push(cto)
+        }
+        const grupoKeys = Object.keys(grupos).filter(k => k !== '__sem_vinculo__').sort()
+        if (grupos['__sem_vinculo__']) grupoKeys.push('__sem_vinculo__')
+
+        return (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <p style={S.sectionTitle}>
+                {readOnly ? 'Visualizando CTOs (somente leitura)' : 'Clique em uma CTO para editar o diagrama'}
+              </p>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {ctos.filter(c => c.cdo_id).length}/{ctos.length} vinculadas
+              </span>
+            </div>
+            {ctos.length === 0
+              ? <div style={S.vazio}>Nenhuma CTO cadastrada.</div>
+              : grupoKeys.map(key => {
+                  const isSemVinculo = key === '__sem_vinculo__'
+                  const cdoNome = isSemVinculo ? null : (cdoMap[key] ?? key)
+                  const ctosGrupo = grupos[key]
+                  return (
+                    <div key={key} style={{ marginBottom: 18 }}>
+                      {/* Grupo header */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700,
+                          color: isSemVinculo ? '#fca5a5' : '#7dd3fc',
+                          backgroundColor: isSemVinculo ? 'rgba(239,68,68,0.1)' : 'rgba(2,132,199,0.12)',
+                          border: `1px solid ${isSemVinculo ? 'rgba(239,68,68,0.3)' : 'rgba(2,132,199,0.3)'}`,
+                          borderRadius: 5, padding: '2px 10px',
+                        }}>
+                          {isSemVinculo ? '⚠ Sem vínculo CDO' : `📦 ${cdoNome}`}
+                        </span>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{ctosGrupo.length} CTO{ctosGrupo.length !== 1 ? 's' : ''}</span>
+                        <div style={{ flex: 1, height: 1, backgroundColor: 'var(--border-color)' }} />
+                      </div>
+                      {/* Lista */}
+                      <div style={S.lista}>
+                        {ctosGrupo.map(cto => (
+                          <ItemCTO key={cto._id} cto={cto} ativo={false}
+                            cdoNome={cdoNome}
+                            onClick={readOnly ? undefined : () => setCTOModal(cto)} />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })
+            }
+          </div>
+        )
+      })()}
 
       {/* Aba CDOs/CEs */}
       {aba === 'cdos' && (

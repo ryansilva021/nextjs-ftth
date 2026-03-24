@@ -23,6 +23,14 @@ const ConfigSchema = new Schema(
     maxCtos:       { type: Number, default: null },
     maxUsuarios:   { type: Number, default: null },
 
+    // Padrão de cores de fibra óptica
+    // ABNT = NBR 14721 (Brasil) | EIA_598_A = padrão internacional
+    fiberColorStandard: {
+      type:    String,
+      enum:    ['ABNT', 'EIA_598_A'],
+      default: 'ABNT',
+    },
+
     // Feature flags
     registroPublicoAtivo: { type: Boolean, default: false },
     autoAprovarRegistro:  { type: Boolean, default: false },

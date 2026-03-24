@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import Link from 'next/link'
+import { getProjetoConfig, updateProjetoConfig } from '@/actions/projetos'
 
 // ---------------------------------------------------------------------------
 // Helpers de persistência (localStorage)
@@ -114,6 +115,12 @@ export default function ConfiguracoesPage() {
   const [gpsAcc, setGpsAcc]           = useState('high')
   const [gpsAutoFollow, setGpsAutoFollow] = useState(false)
 
+  // Fibras Ópticas (salvo no servidor)
+  const [fiberStandard, setFiberStandard]     = useState('ABNT')
+  const [fiberSaving, setFiberSaving]         = useState(false)
+  const [fiberMsg, setFiberMsg]               = useState('')
+  const [fiberLoadError, setFiberLoadError]   = useState('')
+
   // Carrega preferências salvas
   useEffect(() => {
     setCampoMode(loadPref('pref_campo_mode', false))
@@ -121,7 +128,38 @@ export default function ConfiguracoesPage() {
     setSombrasCTO(loadPref('pref_sombras_cto', true))
     setGpsAcc(loadPref('pref_gps_acc', 'high'))
     setGpsAutoFollow(loadPref('pref_gps_follow', false))
+
+    // Carrega config de fibras — servidor tem prioridade, localStorage como fallback
+    const localStandard = loadPref('pref_fiber_standard', null)
+    if (localStandard) setFiberStandard(localStandard)
+    getProjetoConfig()
+      .then(cfg => {
+        const std = cfg.fiberColorStandard ?? localStandard ?? 'ABNT'
+        setFiberStandard(std)
+        savePref('pref_fiber_standard', std)
+      })
+      .catch(() => {
+        if (!localStandard) setFiberLoadError('Não foi possível carregar as configurações de fibra.')
+      })
   }, [])
+
+  async function saveFiberStandard(standard) {
+    setFiberStandard(standard)
+    // Persiste localmente de imediato (funciona para qualquer role)
+    savePref('pref_fiber_standard', standard)
+    setFiberSaving(true)
+    setFiberMsg('')
+    try {
+      await updateProjetoConfig({ fiberColorStandard: standard })
+      setFiberMsg('Salvo!')
+    } catch (e) {
+      // Config salva localmente mesmo se o servidor falhar
+      setFiberMsg('Salvo localmente.')
+    } finally {
+      setFiberSaving(false)
+      setTimeout(() => setFiberMsg(''), 3000)
+    }
+  }
 
   function set(setter, key, val) {
     setter(val)
@@ -231,6 +269,103 @@ export default function ConfiguracoesPage() {
               onChange={v => set(setSombrasCTO, 'pref_sombras_cto', v)}
             />
           </SettingRow>
+        </div>
+
+        {/* ── Fibras Ópticas ── */}
+        <div style={card}>
+          <SectionTitle>Fibras Ópticas</SectionTitle>
+
+          {fiberLoadError && (
+            <p style={{ fontSize: 12, color: '#f85149', marginBottom: 12 }}>{fiberLoadError}</p>
+          )}
+
+          <SettingRow
+            label="Padrão de cores"
+            description="Define a sequência de cores usada em bandejas, fusões e diagramas"
+            last
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {fiberMsg && (
+                <span style={{ fontSize: 12, color: fiberMsg.startsWith('Erro') ? '#f85149' : '#3fb950' }}>
+                  {fiberMsg}
+                </span>
+              )}
+              {fiberSaving && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Salvando…</span>}
+            </div>
+          </SettingRow>
+
+          {/* Cards de seleção de padrão */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+            {[
+              {
+                value: 'ABNT',
+                label: 'ABNT NBR 14721',
+                desc: 'Padrão brasileiro',
+                colors: ['#16a34a','#ca8a04','#94a3b8','#2563eb','#dc2626','#7c3aed','#92400e','#db2777','#1e293b','#6b7280','#ea580c','#0891b2'],
+                names: ['Verde','Amarelo','Branco','Azul','Vermelho','Violeta','Marrom','Rosa','Preto','Cinza','Laranja','Aqua'],
+              },
+              {
+                value: 'EIA_598_A',
+                label: 'EIA-598-A',
+                desc: 'Padrão internacional',
+                colors: ['#2563eb','#ea580c','#16a34a','#92400e','#6b7280','#94a3b8','#dc2626','#1e293b','#ca8a04','#7c3aed','#db2777','#0891b2'],
+                names: ['Azul','Laranja','Verde','Marrom','Cinza','Branco','Vermelho','Preto','Amarelo','Violeta','Rosa','Aqua'],
+              },
+            ].map(opt => {
+              const active = fiberStandard === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => saveFiberStandard(opt.value)}
+                  disabled={fiberSaving}
+                  style={{
+                    textAlign: 'left', cursor: fiberSaving ? 'not-allowed' : 'pointer',
+                    background: active ? (isDark ? 'rgba(2,132,199,0.12)' : '#e0f2fe') : 'var(--card-bg)',
+                    border: `2px solid ${active ? '#0284c7' : 'var(--border-color)'}`,
+                    borderRadius: 12, padding: '12px 14px',
+                    transition: 'all 0.15s',
+                    opacity: fiberSaving ? 0.6 : 1,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: active ? '#0284c7' : 'var(--foreground)' }}>
+                      {opt.label}
+                    </span>
+                    {active && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, color: '#0284c7',
+                        background: isDark ? 'rgba(2,132,199,0.2)' : '#bae6fd',
+                        borderRadius: 4, padding: '1px 6px',
+                      }}>
+                        ATIVO
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 8px' }}>{opt.desc}</p>
+                  {/* Preview das 12 cores em ordem */}
+                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                    {opt.colors.map((hex, i) => (
+                      <span
+                        key={i}
+                        title={`${i + 1}. ${opt.names[i]}`}
+                        style={{
+                          width: 16, height: 16, borderRadius: 4,
+                          background: hex,
+                          boxShadow: active ? `0 0 4px ${hex}88` : 'none',
+                          border: `1px solid ${hex}aa`,
+                          flexShrink: 0,
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 7, fontWeight: 800, color: '#fff',
+                        }}
+                      >
+                        {i + 1}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* ── GPS ── */}

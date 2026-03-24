@@ -276,14 +276,7 @@ export async function saveDiagramaCaixa(data) {
     await Promise.all(ctoLinks.map(lnk =>
       CTO.updateOne(
         { projeto_id: targetProjeto, cto_id: lnk.cto_id },
-        {
-          $set: {
-            cdo_id:                          lnk.cdo_id,
-            splitter_cto:                    lnk.splitter_cto,
-            'diagrama.entrada.cdo_id':       lnk.cdo_id,
-            'diagrama.entrada.splitter_cto': lnk.splitter_cto,
-          },
-        }
+        { $set: { cdo_id: lnk.cdo_id, splitter_cto: lnk.splitter_cto } }
       )
     ))
   }

@@ -30,18 +30,18 @@ import { getTopologia } from '@/actions/olts'
 
 // ── Cores ABNT NBR 14721 (12 fibras por tubo) ──────────────────────────────
 const ABNT = [
-  { idx: 1,  nome: 'Verde',    hex: '#22c55e' },
-  { idx: 2,  nome: 'Amarelo',  hex: '#eab308' },
-  { idx: 3,  nome: 'Branco',   hex: '#e2e8f0' },
-  { idx: 4,  nome: 'Azul',     hex: '#3b82f6' },
-  { idx: 5,  nome: 'Vermelho', hex: '#ef4444' },
-  { idx: 6,  nome: 'Violeta',  hex: '#a855f7' },
-  { idx: 7,  nome: 'Marrom',   hex: '#a16207' },
-  { idx: 8,  nome: 'Rosa',     hex: '#ec4899' },
-  { idx: 9,  nome: 'Preto',    hex: '#475569' },
-  { idx: 10, nome: 'Cinza',    hex: '#94a3b8' },
-  { idx: 11, nome: 'Laranja',  hex: '#f97316' },
-  { idx: 12, nome: 'Ciano',    hex: '#06b6d4' },
+  { idx: 1,  nome: 'Verde',    hex: '#16a34a' },
+  { idx: 2,  nome: 'Amarelo',  hex: '#ca8a04' },
+  { idx: 3,  nome: 'Branco',   hex: '#94a3b8' },
+  { idx: 4,  nome: 'Azul',     hex: '#2563eb' },
+  { idx: 5,  nome: 'Vermelho', hex: '#dc2626' },
+  { idx: 6,  nome: 'Violeta',  hex: '#7c3aed' },
+  { idx: 7,  nome: 'Marrom',   hex: '#92400e' },
+  { idx: 8,  nome: 'Rosa',     hex: '#db2777' },
+  { idx: 9,  nome: 'Preto',    hex: '#1e293b' },
+  { idx: 10, nome: 'Cinza',    hex: '#6b7280' },
+  { idx: 11, nome: 'Laranja',  hex: '#ea580c' },
+  { idx: 12, nome: 'Aqua',     hex: '#0891b2' },
 ]
 
 function fiberColor(idx) {
@@ -374,7 +374,7 @@ function buildGraphData(topologia) {
         source:       splNid,
         target:       destNid,
         sourceHandle: `s-out-${saIdx}`,
-        type:         'bezier',
+        type:         'step',
         label:        `S${portNum}`,
         style:        { stroke: portColor, strokeWidth: 1.5, strokeDasharray: dashArray, opacity: edgeOpacity },
         labelStyle:   { fill: portColor, fontSize: 10, fontWeight: 700 },

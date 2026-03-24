@@ -26,6 +26,7 @@ import { Movimentacao } from '@/models/Movimentacao'
 import { Topologia } from '@/models/Topologia'
 
 const SUPERADMIN_ONLY = ['superadmin']
+import { WRITE_ROLES, FIELD_ROLES, ALL_ROLES } from '@/lib/auth'
 
 // ---------------------------------------------------------------------------
 // GET /api/projetos → getProjetos
@@ -240,6 +241,72 @@ export async function limparProjeto(projetoId) {
  * @param {string} projetoId
  * @returns {Promise<{ projeto_id: string, ativo: boolean }>}
  */
+// ---------------------------------------------------------------------------
+// GET config do projeto atual → getProjetoConfig
+// ---------------------------------------------------------------------------
+
+/**
+ * Retorna a configuração do projeto do usuário autenticado.
+ * Requer: qualquer role autenticado com empresa ativa.
+ *
+ * @returns {Promise<{ fiberColorStandard: string }>}
+ */
+export async function getProjetoConfig() {
+  const session = await requireActiveEmpresa(ALL_ROLES)
+  const { role, projeto_id } = session.user
+
+  await connectDB()
+
+  const projeto = await Projeto.findOne(
+    { projeto_id: role === 'superadmin' ? projeto_id : projeto_id },
+    'config'
+  ).lean()
+
+  return {
+    fiberColorStandard: projeto?.config?.fiberColorStandard ?? 'ABNT',
+  }
+}
+
+// ---------------------------------------------------------------------------
+// POST config do projeto atual → updateProjetoConfig
+// ---------------------------------------------------------------------------
+
+/**
+ * Atualiza campos de configuração do projeto do usuário autenticado.
+ * Requer: admin ou superadmin.
+ *
+ * @param {Object} data
+ * @param {'ABNT'|'EIA_598_A'} [data.fiberColorStandard]
+ * @returns {Promise<{ saved: boolean }>}
+ */
+export async function updateProjetoConfig(data) {
+  const session = await requireActiveEmpresa(FIELD_ROLES)
+  const { projeto_id } = session.user
+
+  const { fiberColorStandard } = data ?? {}
+
+  const validStandards = ['ABNT', 'EIA_598_A']
+  if (fiberColorStandard && !validStandards.includes(fiberColorStandard)) {
+    throw new Error('Padrão de cores inválido')
+  }
+
+  await connectDB()
+
+  const update = {}
+  if (fiberColorStandard) update['config.fiberColorStandard'] = fiberColorStandard
+
+  const result = await Projeto.updateOne(
+    { projeto_id },
+    { $set: update }
+  )
+
+  revalidatePath('/configuracoes')
+
+  return { saved: result.matchedCount > 0 }
+}
+
+// ---------------------------------------------------------------------------
+
 export async function toggleProjetoAtivo(projetoId) {
   await requireActiveEmpresa(SUPERADMIN_ONLY)
 

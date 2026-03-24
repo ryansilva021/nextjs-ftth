@@ -10,7 +10,6 @@ const NAV_ITEMS = [
   { href: "/",                   label: "Mapa",        icon: "🗺️" },
   // --- Admin ---
   { href: "/admin/campo",        label: "Campo",       icon: "📡", minRole: "admin" },
-  { href: "/admin/topologia",    label: "Diagramas",   icon: "🌐", minRole: "tecnico" },
   { href: "/admin/diagramas",    label: "Fusões ABNT", icon: "🧩", minRole: "admin" },
   { href: "/admin/usuarios",     label: "Usuários",    icon: "👥", minRole: "admin" },
   { href: "/admin/importar",     label: "Imp/Exportar", icon: "📦", minRole: "admin" },
@@ -20,7 +19,6 @@ const NAV_ITEMS = [
   { href: "/superadmin/empresas",  label: "Empresas",  icon: "🏬", minRole: "superadmin" },
   { href: "/superadmin/registros", label: "Registros", icon: "📋", minRole: "superadmin" },
   { href: "/admin/logs",           label: "Log de Eventos", icon: "📜", minRole: "tecnico" },
-  { href: "/configuracoes",        label: "Configurações",  icon: "⚙️" },
 ];
 
 const ROLE_RANK = {
@@ -155,22 +153,35 @@ export default function SidebarLayout({ session, children }) {
 
         {/* Footer do sidebar */}
         <div style={{ borderTop: "1px solid var(--border-color)", marginTop: 'auto' }} className="px-4 py-4">
-          <Link href="/perfil" onClick={() => setAberta(false)}
-            className="flex items-center gap-3 mb-3 rounded-lg px-1 py-1 transition-colors hover:bg-slate-200/20"
-            style={{ textDecoration: 'none' }}>
-            <div
-              style={{ backgroundColor: "var(--card-bg-active)" }}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-sky-400 text-xs font-bold uppercase flex-shrink-0"
+          <div className="flex items-center gap-2 mb-3">
+            <Link href="/perfil" onClick={() => setAberta(false)}
+              className="flex items-center gap-3 flex-1 min-w-0 rounded-lg px-1 py-1 transition-colors hover:bg-slate-200/20"
+              style={{ textDecoration: 'none' }}>
+              <div
+                style={{ backgroundColor: "var(--card-bg-active)" }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-sky-400 text-xs font-bold uppercase flex-shrink-0"
+              >
+                {session?.user?.username?.[0] ?? "?"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p style={{ color: 'var(--foreground)' }} className="text-xs font-medium truncate">
+                  {session?.user?.username}
+                </p>
+                <p style={{ color: 'var(--text-muted)' }} className="text-xs capitalize">{role}</p>
+              </div>
+            </Link>
+            <Link href="/configuracoes" onClick={() => setAberta(false)}
+              title="Configurações"
+              style={{
+                flexShrink: 0, fontSize: 15, textDecoration: 'none',
+                width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 8, border: '1px solid var(--border-color)',
+                background: 'var(--card-bg-active)', color: 'var(--text-muted)',
+              }}
             >
-              {session?.user?.username?.[0] ?? "?"}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p style={{ color: 'var(--foreground)' }} className="text-xs font-medium truncate">
-                {session?.user?.username}
-              </p>
-              <p style={{ color: 'var(--text-muted)' }} className="text-xs capitalize">{role}</p>
-            </div>
-          </Link>
+              ⚙️
+            </Link>
+          </div>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             style={{ border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}

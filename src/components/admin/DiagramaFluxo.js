@@ -1,1196 +1,1300 @@
 'use client'
 
 /**
- * DiagramaFluxo.js
- * Canvas interativo de topologia de rede óptica FTTH usando React Flow v12 (@xyflow/react).
- * Renderiza: OLT → CDO/CE (com bandeja de fusões) → Splitters → CTOs
- *
- * Funcionalidades:
- *  - Layout automático via dagre (LR)
- *  - Nós customizados com temas por tipo
- *  - Arestas coloridas por cor ABNT da fibra
- *  - Zoom/pan, minimap, controles
- *  - Toolbar com Auto Layout e Ajustar Tela
+ * DiagramaFluxo.js — Topologia FTTH com React Flow v12
+ * Fluxo obrigatório: OLT → CDO/CEO → BANDEJA → SPLITTER → CTO
+ * Suporta tema light/dark via ThemeContext.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  ReactFlow,
-  Controls,
-  MiniMap,
-  Background,
-  BackgroundVariant,
-  Panel,
-  Handle,
-  Position,
-  useReactFlow,
-  ReactFlowProvider,
+  ReactFlow, Controls, MiniMap, Background, BackgroundVariant,
+  Panel, Handle, Position, useReactFlow, ReactFlowProvider,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import Dagre from '@dagrejs/dagre'
 import { getTopologia } from '@/actions/olts'
+import { useTheme } from '@/contexts/ThemeContext'
+import { ABNT, abntHex } from '@/lib/topologia-ftth'
 
-// ─── Tabela de cores ABNT NBR 14721 ─────────────────────────────────────────
+// ─── Mobile detection ─────────────────────────────────────────────────────────
 
-const ABNT = [
-  { idx: 1,  nome: 'Verde',    hex: '#16a34a' },
-  { idx: 2,  nome: 'Amarelo',  hex: '#ca8a04' },
-  { idx: 3,  nome: 'Branco',   hex: '#94a3b8' },
-  { idx: 4,  nome: 'Azul',     hex: '#2563eb' },
-  { idx: 5,  nome: 'Vermelho', hex: '#dc2626' },
-  { idx: 6,  nome: 'Violeta',  hex: '#7c3aed' },
-  { idx: 7,  nome: 'Marrom',   hex: '#92400e' },
-  { idx: 8,  nome: 'Rosa',     hex: '#db2777' },
-  { idx: 9,  nome: 'Preto',    hex: '#1e293b' },
-  { idx: 10, nome: 'Cinza',    hex: '#6b7280' },
-  { idx: 11, nome: 'Laranja',  hex: '#ea580c' },
-  { idx: 12, nome: 'Ciano',    hex: '#0891b2' },
-]
-
-/** Retorna o objeto ABNT pelo índice de fibra (base-1, cicla). */
-function abntByFibra(fibra) {
-  if (!fibra || fibra < 1) return ABNT[0]
-  return ABNT[(fibra - 1) % ABNT.length]
+function useMobile() {
+  const [mobile, setMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  return mobile
 }
 
-/** Retorna o hex ABNT pelo índice (base-1). */
-function abntHex(fibra) {
-  return abntByFibra(fibra).hex
+// ─── Paleta de cores (dark / light) ─────────────────────────────────────────
+
+function mkTheme(isDark) {
+  if (isDark) return {
+    canvas:     '#060a16',
+    bg:         '#0d1117',
+    bg2:        '#161b22',
+    border:     '#21262d',
+    text:       '#e6edf3',
+    muted:      '#8b949e',
+    shadow:     '0 4px 24px rgba(0,0,0,0.6)',
+    // OLT
+    oltBg:  '#050f1f', oltBdr: '#0891b2', oltHdr: '#67e8f9', oltHdrBg: '#0a1929',
+    // CDO
+    cdoBg:  '#0d0820', cdoBdr: '#7c3aed', cdoHdr: '#c4b5fd', cdoHdrBg: '#100520',
+    // Splitter
+    splBg:  '#1a0d00', splBdr: '#ea580c', splHdr: '#fb923c', splHdrBg: '#1f0800',
+    // CTO
+    ctoBg:  '#052e16', ctoBdr: '#16a34a', ctoHdr: '#4ade80', ctoHdrBg: '#031a0e',
+    // Panels
+    panelBg: 'rgba(13,17,23,0.92)', panelBorder: '#21262d',
+    mmBg: '#0d1117', mmMask: '#060a1688',
+    // Edges
+    feeder:  { stroke: '#2563eb', strokeWidth: 3 },
+    distrib: { stroke: '#7c3aed', strokeWidth: 2 },
+    drop:    { stroke: '#16a34a', strokeWidth: 1.5 },
+  }
+  return {
+    canvas:     '#e2e8f0',
+    bg:         '#ffffff',
+    bg2:        '#f8fafc',
+    border:     '#cbd5e1',
+    text:       '#1e293b',
+    muted:      '#64748b',
+    shadow:     '0 2px 16px rgba(0,0,0,0.12)',
+    // OLT
+    oltBg:  '#eff6ff', oltBdr: '#0369a1', oltHdr: '#0369a1', oltHdrBg: '#dbeafe',
+    // CDO
+    cdoBg:  '#faf5ff', cdoBdr: '#7c3aed', cdoHdr: '#6d28d9', cdoHdrBg: '#ede9fe',
+    // Splitter
+    splBg:  '#fff7ed', splBdr: '#c2410c', splHdr: '#9a3412', splHdrBg: '#fed7aa',
+    // CTO
+    ctoBg:  '#f0fdf4', ctoBdr: '#16a34a', ctoHdr: '#166534', ctoHdrBg: '#bbf7d0',
+    // Panels
+    panelBg: 'rgba(255,255,255,0.94)', panelBorder: '#cbd5e1',
+    mmBg: '#f8fafc', mmMask: '#e2e8f088',
+    // Edges
+    feeder:  { stroke: '#1d4ed8', strokeWidth: 3 },
+    distrib: { stroke: '#7c3aed', strokeWidth: 2 },
+    drop:    { stroke: '#15803d', strokeWidth: 1.5 },
+  }
 }
 
-// ─── Paleta do tema escuro ───────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const C = {
-  bg:       '#060a16',
-  border:   '#21262d',
-  text:     '#e6edf3',
-  muted:    '#8b949e',
-  // OLT
-  oltBg:    '#050f1f',
-  oltBdr:   '#0891b2',
-  oltHdr:   '#67e8f9',
-  // CDO
-  cdoBg:    '#0d0820',
-  cdoBdr:   '#7c3aed',
-  cdoHdr:   '#c4b5fd',
-  // Splitter
-  splBg:    '#1a0d00',
-  splBdr:   '#ea580c',
-  splHdr:   '#fb923c',
-  // CTO
-  ctoBg:    '#052e16',
-  ctoBdr:   '#16a34a',
-  ctoHdr:   '#4ade80',
-  // Cascata
-  casBg:    '#0c0520',
-  casBdr:   '#a78bfa',
-  casHdr:   '#ddd6fe',
+const HANDLE_BASE = {
+  width: 11, height: 11, borderRadius: '50%', border: '2px solid #fff4',
 }
 
-// ─── Estilos compartilhados ──────────────────────────────────────────────────
+// Dimensões base para dagre (largura fixa; altura calculada dinamicamente)
+const NODE_W = { olt: 230, cdo: 310, splitter: 195, cto: 240 }
+const NODE_H = { olt: 150, cdo: 200, splitter: 140, cto: 128 }
 
-const nodeBase = {
-  borderRadius: 10,
-  fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-  fontSize: 12,
-  color: C.text,
-  boxShadow: '0 4px 24px rgba(0,0,0,0.6)',
-  position: 'relative',
-  overflow: 'visible',
+function calcCDOHeight(bandejas) {
+  const total = bandejas.reduce((s, b) => s + (b.fusoes?.length ?? 0), 0)
+  return Math.max(160, 64 + bandejas.length * 28 + total * 24)
 }
 
-const hdrBase = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  padding: '8px 12px',
-  fontWeight: 700,
-  fontSize: 13,
-  borderRadius: '8px 8px 0 0',
-  letterSpacing: 0.3,
+// Splitter layout constants (must match SplitterNode DOM structure)
+const SPL_HEADER_H = 38  // header bar
+const SPL_ENTRY_H  = 32  // fiber entrance row
+const SPL_PAD_BOT  = 6
+const SPL_ROW_H    = 24  // each output row
+
+function calcSplitterHeight(saidas) {
+  return Math.max(120, SPL_HEADER_H + SPL_ENTRY_H + saidas.length * SPL_ROW_H + SPL_PAD_BOT)
 }
 
-const bodyBase = {
-  padding: '8px 12px',
-}
+// ─── OLT Node ────────────────────────────────────────────────────────────────
 
-const handleStyle = {
-  width: 10,
-  height: 10,
-  borderRadius: '50%',
-  border: '2px solid #21262d',
-}
-
-// ─── OLTFlowNode ─────────────────────────────────────────────────────────────
-
-function OLTFlowNode({ data }) {
-  const { nome, modelo, ip, capacidade, status, ponCount } = data
-
-  const statusColor = status === 'ativo' ? '#16a34a' : status === 'inativo' ? '#dc2626' : '#ca8a04'
+function OLTNode({ data }) {
+  const { T, nome, modelo, ip, capacidade, status, ponCount } = data
+  const online = status === 'ativo' || status === 'online'
 
   return (
-    <div
-      style={{
-        ...nodeBase,
-        backgroundColor: C.oltBg,
-        border: `2px solid ${C.oltBdr}`,
-        minWidth: 200,
-      }}
-    >
+    <div style={{
+      background: T.oltBg, border: `2px solid ${T.oltBdr}`, borderRadius: 10,
+      minWidth: NODE_W.olt, boxShadow: T.shadow, overflow: 'visible', position: 'relative',
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+    }}>
       {/* Header */}
-      <div style={{ ...hdrBase, backgroundColor: 'rgba(8,145,178,0.15)', color: C.oltHdr }}>
-        <span style={{ fontSize: 15 }}>🖥️</span>
-        <span style={{ flex: 1 }}>{nome || 'OLT'}</span>
-        <span
-          style={{
-            fontSize: 10,
-            background: 'rgba(8,145,178,0.25)',
-            color: C.oltHdr,
-            padding: '2px 6px',
-            borderRadius: 4,
-            fontWeight: 600,
-          }}
-        >
-          OLT
-        </span>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '8px 12px', fontWeight: 700, fontSize: 13,
+        borderRadius: '8px 8px 0 0', background: T.oltHdrBg, color: T.oltHdr,
+      }}>
+        <span style={{ fontSize: 15 }}>⚡</span>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
+        <span style={{
+          width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+          background: online ? '#22c55e' : '#ef4444',
+          boxShadow: online ? '0 0 6px #22c55e88' : 'none',
+        }} />
       </div>
-
       {/* Body */}
-      <div style={bodyBase}>
-        {modelo && (
-          <div style={{ color: C.muted, marginBottom: 4 }}>
-            <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#93c5fd' }}>{modelo}</span>
-          </div>
-        )}
-        {ip && (
-          <div style={{ fontFamily: 'monospace', fontSize: 11, color: C.muted, marginBottom: 4 }}>
-            {ip}
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
-          {ponCount !== undefined && (
-            <span style={{ fontSize: 11, color: C.muted }}>
-              <span style={{ color: C.oltHdr, fontWeight: 700 }}>{ponCount}</span> PON
+      <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {modelo && <div style={{ color: T.muted, fontSize: 11 }}>{modelo}</div>}
+        {ip     && <div style={{ color: T.muted, fontSize: 11, fontFamily: 'monospace' }}>{ip}</div>}
+        <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+          {capacidade != null && (
+            <span style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 700,
+              background: T.oltBdr + '22', border: `1px solid ${T.oltBdr}55`, color: T.oltHdr,
+            }}>
+              {capacidade} PONs
             </span>
           )}
-          {capacidade && (
-            <span style={{ fontSize: 11, color: C.muted }}>
-              Cap: <span style={{ color: C.text }}>{capacidade}</span>
+          {ponCount > 0 && (
+            <span style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 700,
+              background: '#22c55e22', border: '1px solid #22c55e44', color: '#22c55e',
+            }}>
+              {ponCount} CDO{ponCount !== 1 ? 's' : ''}
             </span>
           )}
-          <span
-            style={{
-              marginLeft: 'auto',
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              backgroundColor: statusColor,
-              display: 'inline-block',
-            }}
-            title={status}
-          />
         </div>
       </div>
-
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="out"
-        style={{ ...handleStyle, backgroundColor: C.oltBdr, right: -6 }}
-      />
+      <Handle type="source" position={Position.Right} id="out"
+        style={{ ...HANDLE_BASE, background: T.oltBdr, right: -6 }} />
     </div>
   )
 }
 
-// ─── CDOFlowNode ─────────────────────────────────────────────────────────────
+// ─── CDO Node ─────────────────────────────────────────────────────────────────
 
-function CDOFlowNode({ data }) {
-  const { nome, tipo, bandejas, splitters, entrada, isCascata } = data
-
-  const bg    = isCascata ? C.casBg  : C.cdoBg
-  const bdr   = isCascata ? C.casBdr : C.cdoBdr
-  const hdr   = isCascata ? C.casHdr : C.cdoHdr
-  const bdrStyle = isCascata ? 'dashed' : 'solid'
-
-  // Bypass splitters são saídas diretas da bandeja — não mostrar como splitter real
-  const realSplitters = (splitters ?? []).filter(s => !s.id?.startsWith('bypass-'))
-  const splCount = realSplitters.length
-
-  // Saídas diretas da bandeja (tipo saida_cto / saida_cdo)
-  const directOuts = useMemo(() => {
-    const out = []
-    for (const b of bandejas ?? []) {
-      for (const f of b.fusoes ?? []) {
-        if ((f.tipo === 'saida_cto' || f.tipo === 'saida_cdo') && f.destino_id?.trim()) {
-          out.push({ ...f, bandejaNome: b.nome })
-        }
-      }
-    }
-    return out
-  }, [bandejas])
-
-  // Fusões regulares (excluindo saídas diretas) para exibir no diagrama
-  const fusoes = useMemo(() => {
-    const all = []
-    if (!bandejas) return all
-    for (const bandeja of bandejas) {
-      for (const fusao of bandeja.fusoes ?? []) {
-        if (fusao.tipo === 'saida_cto' || fusao.tipo === 'saida_cdo') continue
-        all.push({ ...fusao, bandejaNome: bandeja.nome })
-      }
-    }
-    return all.slice(0, 24)
-  }, [bandejas])
-
-  // Divide em duas colunas: esquerda (inputs) e direita (outputs)
-  const half   = Math.ceil(fusoes.length / 2)
-  const colA   = fusoes.slice(0, half)
-  const colB   = fusoes.slice(half)
+function CDONode({ data }) {
+  const { T, nome, tipo, entrada, bandejas = [], ponFusoes = [] } = data
 
   return (
-    <div
-      style={{
-        ...nodeBase,
-        backgroundColor: bg,
-        border: `2px ${bdrStyle} ${bdr}`,
-        minWidth: 280,
-      }}
-    >
+    <div style={{
+      background: T.cdoBg, border: `2px solid ${T.cdoBdr}`, borderRadius: 10,
+      minWidth: NODE_W.cdo, boxShadow: T.shadow, overflow: 'visible', position: 'relative',
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+    }}>
       {/* Input handle */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="in"
-        style={{ ...handleStyle, backgroundColor: bdr, left: -6 }}
-      />
+      <Handle type="target" position={Position.Left} id="in"
+        style={{ ...HANDLE_BASE, background: T.cdoBdr, left: -6 }} />
 
       {/* Header */}
-      <div style={{ ...hdrBase, backgroundColor: `${bdr}22`, color: hdr }}>
-        <span style={{ fontSize: 14 }}>{isCascata ? '🔗' : '🔌'}</span>
-        <span style={{ flex: 1 }}>{nome || tipo || 'CDO'}</span>
-        <span
-          style={{
-            fontSize: 10,
-            background: `${bdr}33`,
-            color: hdr,
-            padding: '2px 6px',
-            borderRadius: 4,
-            fontWeight: 700,
-          }}
-        >
-          {isCascata ? 'CE/CDO · CASCATA' : (tipo || 'CDO')}
-        </span>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '8px 12px', fontWeight: 700, fontSize: 13,
+        borderRadius: '8px 8px 0 0', background: T.cdoHdrBg, color: T.cdoHdr,
+        justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14 }}>📦</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
+            {nome}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+          {tipo && (
+            <span style={{
+              fontSize: 9, padding: '1px 6px', borderRadius: 4, fontWeight: 700,
+              background: T.cdoBdr + '33', color: T.cdoHdr, border: `1px solid ${T.cdoBdr}55`,
+            }}>
+              {tipo}
+            </span>
+          )}
+          {entrada?.pon != null && (
+            <span style={{ fontSize: 10, color: T.muted, fontFamily: 'monospace' }}>
+              PON {entrada.pon}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Entrada info */}
-      {entrada && (
-        <div
-          style={{
-            padding: '4px 12px',
-            fontSize: 11,
-            color: C.muted,
-            borderBottom: `1px solid ${C.border}`,
-            display: 'flex',
-            gap: 12,
-          }}
-        >
-          {entrada.pon && (
-            <span>PON <span style={{ color: hdr, fontWeight: 700 }}>{entrada.pon}</span></span>
-          )}
-          {entrada.porta_olt && (
-            <span>Porta <span style={{ color: hdr }}>{entrada.porta_olt}</span></span>
-          )}
-        </div>
-      )}
-
-      {/* Bandeja — fusões regulares */}
-      {fusoes.length > 0 && (
-        <div style={{ padding: '8px 12px', display: 'flex', gap: 8 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, color: C.muted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Entrada</div>
-            {colA.map((f, i) => <FibraRow key={f.id ?? i} pos={f.pos ?? (i + 1)} cor={f.cor} />)}
-          </div>
-          <div style={{ width: 1, backgroundColor: C.border, margin: '0 4px' }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, color: C.muted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Saída</div>
-            {colB.map((f, i) => <FibraRow key={f.id ?? i} pos={f.pos ?? (half + i + 1)} cor={f.cor} />)}
-          </div>
-        </div>
-      )}
-
-      {/* Saídas diretas da bandeja — cada uma com handle inline */}
-      {directOuts.length > 0 && (
-        <div style={{
-          borderTop: `1px solid ${C.border}`,
-          padding: '6px 12px 8px',
-        }}>
-          <div style={{ fontSize: 9, color: '#22c55e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5 }}>
-            Saída direta bandeja
-          </div>
-          {directOuts.map((f) => {
-            const fo = ABNT[((f.entrada?.fibra ?? 1) - 1) % ABNT.length]
+      {/* Bandejas com fusões */}
+      {bandejas.length > 0 && (
+        <div style={{ padding: '5px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {bandejas.map(bdj => {
+            const ponRows = (bdj.fusoes ?? []).filter(f => f.tipo === 'pon')
             return (
-              <div key={f.id} style={{
-                position: 'relative',
-                display: 'flex', alignItems: 'center', gap: 6,
-                height: 22, paddingRight: 16,
+              <div key={bdj.id} style={{
+                borderRadius: 6, border: `1px solid ${T.border}`,
+                background: T.bg2 + '88', overflow: 'visible',
               }}>
-                {/* FO color dot */}
-                <span style={{
-                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                  backgroundColor: fo?.hex ?? '#22c55e',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                }} />
-                {/* Label */}
-                <span style={{ fontSize: 10, color: '#e6edf3', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  FO{f.entrada?.fibra ?? 1} → <span style={{ color: '#4ade80', fontWeight: 700 }}>{f.destino_id}</span>
-                </span>
-                {/* Arrow badge */}
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginRight: 4 }}>→</span>
-                {/* Inline handle at this row */}
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id={`direct-${f.id}`}
-                  style={{ ...handleStyle, backgroundColor: '#22c55e', right: -6, top: '50%', transform: 'translateY(-50%)', position: 'absolute' }}
-                />
+                {/* Cabeçalho bandeja */}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '3px 8px', borderBottom: `1px solid ${T.border}`,
+                  fontSize: 9, fontWeight: 700, color: T.muted, textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}>
+                  <span>{bdj.nome}</span>
+                  <span>{ponRows.length} PON{ponRows.length !== 1 ? 's' : ''}</span>
+                </div>
+                {/* Linhas de fusão */}
+                {(bdj.fusoes ?? []).map(f => {
+                  const entHex = abntHex(f.entrada?.fibra)
+                  const saiHex = abntHex(f.saida?.fibra ?? f.entrada?.fibra)
+                  const isPon  = f.tipo === 'pon'
+                  return (
+                    <div key={f.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '3px 8px', position: 'relative', overflow: 'visible',
+                      fontSize: 10,
+                      background: isPon && f.splitter_id ? T.cdoBdr + '08' : 'transparent',
+                      borderBottom: `1px solid ${T.border}18`,
+                    }}>
+                      {/* Dot entrada */}
+                      <span style={{
+                        width: 9, height: 9, borderRadius: '50%', background: entHex,
+                        display: 'inline-block', flexShrink: 0,
+                        boxShadow: `0 0 4px ${entHex}77`,
+                        border: `1px solid ${T.border}`,
+                      }} />
+                      <span style={{ color: T.muted, fontSize: 9 }}>F{f.entrada?.fibra ?? '?'}</span>
+                      <span style={{ color: T.border, fontSize: 9 }}>→</span>
+                      {/* Dot saída */}
+                      <span style={{
+                        width: 9, height: 9, borderRadius: '50%', background: saiHex,
+                        display: 'inline-block', flexShrink: 0,
+                        boxShadow: `0 0 4px ${saiHex}77`,
+                        border: `1px solid ${T.border}`,
+                      }} />
+                      <span style={{ color: saiHex, fontSize: 9, fontWeight: 700 }}>
+                        F{f.saida?.fibra ?? f.entrada?.fibra ?? '?'}
+                      </span>
+                      {isPon && (
+                        <span style={{ color: T.cdoBdr, fontSize: 9, marginLeft: 2 }}>
+                          PON{f.pon_porta ? `/${f.pon_porta}` : ''}
+                          {f.splitter_id ? ' →SPL' : ' ⚠'}
+                        </span>
+                      )}
+                      {/* Handle inline — alinhado à linha de fusão, sai para o splitter */}
+                      {isPon && f.splitter_id && (
+                        <Handle
+                          type="source"
+                          position={Position.Right}
+                          id={`spl-${f.splitter_id}`}
+                          style={{
+                            ...HANDLE_BASE,
+                            width: 12, height: 12,
+                            position: 'absolute', right: -16, top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: saiHex,
+                            boxShadow: `0 0 7px ${saiHex}aa`,
+                            zIndex: 10,
+                          }}
+                        />
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )
           })}
         </div>
       )}
 
-      {/* Splitter count footer */}
-      {splCount > 0 && (
-        <div style={{ padding: '4px 12px 8px', fontSize: 11, color: C.muted, borderTop: `1px solid ${C.border}` }}>
-          <span style={{ color: C.splHdr, fontWeight: 700 }}>{splCount}</span> splitter{splCount !== 1 ? 's' : ''}
+      {/* Sem bandejas: handle genérico */}
+      {bandejas.length === 0 && (
+        <div style={{ padding: '8px 12px', color: T.muted, fontSize: 11 }}>
+          Sem bandejas configuradas
         </div>
       )}
 
-      {/* Output handles — one per real splitter */}
-      {realSplitters.map((spl, idx) => {
-        const total = Math.max(splCount, 1)
-        const pct = total === 1 ? 50 : ((idx / (total - 1)) * 80 + 10)
-        return (
-          <Handle
-            key={spl.id ?? idx}
-            type="source"
-            position={Position.Right}
-            id={`spl-${spl.id ?? idx}`}
-            style={{ ...handleStyle, backgroundColor: C.splBdr, right: -6, top: `${pct}%`, transform: 'translateY(-50%)' }}
-          />
-        )
-      })}
-
-      {/* Fallback single output handle when no splitters and no direct outs */}
-      {splCount === 0 && directOuts.length === 0 && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="out"
-          style={{ ...handleStyle, backgroundColor: bdr, right: -6 }}
-        />
-      )}
-    </div>
-  )
-}
-
-/** Linha de fibra na bandeja do CDO. */
-function FibraRow({ pos, cor }) {
-  // cor pode ser índice ABNT (1-12) ou string hex
-  const corObj = typeof cor === 'number' ? ABNT[(cor - 1) % ABNT.length] : null
-  const hex    = corObj ? corObj.hex : (cor || '#374151')
-  const label  = pos != null ? `FO-${String(pos).padStart(2, '0')}` : ''
-
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 4,
-        marginBottom: 2,
-        height: 14,
-      }}
-    >
-      <span style={{ fontSize: 9, color: C.muted, width: 30, textAlign: 'right', fontFamily: 'monospace' }}>
-        {label}
-      </span>
-      <div
+      {/* Fallback handle — visível só quando não há ponFusões com splitter */}
+      <Handle type="source" position={Position.Right} id="out"
         style={{
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          backgroundColor: hex,
-          border: '1px solid rgba(255,255,255,0.2)',
-          flexShrink: 0,
-        }}
-      />
-      <div style={{ flex: 1, height: 1, backgroundColor: hex, opacity: 0.4 }} />
+          ...HANDLE_BASE, background: T.cdoBdr, right: -6,
+          opacity: ponFusoes.length > 0 ? 0 : 1,
+        }} />
     </div>
   )
 }
 
-// ─── SplitterFlowNode ────────────────────────────────────────────────────────
+// ─── Splitter Node ───────────────────────────────────────────────────────────
 
-function SplitterFlowNode({ data }) {
-  const { nome, tipo, entrada, saidas } = data
-
-  const saidaCount = saidas?.length ?? 0
-  const entradaHex = entrada?.fibra ? abntHex(entrada.fibra) : '#6b7280'
+function SplitterNode({ data }) {
+  const { T, nome, tipo, entrada, saidas = [] } = data
+  const ligadas = saidas.filter(s => s.cto_id?.trim()).length
 
   return (
-    <div
-      style={{
-        ...nodeBase,
-        backgroundColor: C.splBg,
-        border: `2px solid ${C.splBdr}`,
-        minWidth: 180,
-      }}
-    >
-      {/* Input handle */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="in"
-        style={{ ...handleStyle, backgroundColor: C.splBdr, left: -6 }}
-      />
+    <div style={{
+      background: T.splBg, border: `2px solid ${T.splBdr}`, borderRadius: 10,
+      minWidth: NODE_W.splitter, boxShadow: T.shadow, overflow: 'visible', position: 'relative',
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+    }}>
+      <Handle type="target" position={Position.Left} id="in"
+        style={{ ...HANDLE_BASE, background: T.splBdr, left: -6 }} />
 
-      {/* Header */}
-      <div style={{ ...hdrBase, backgroundColor: 'rgba(234,88,12,0.15)', color: C.splHdr }}>
-        <span style={{ fontSize: 13 }}>⚡</span>
-        <span style={{ flex: 1 }}>Splitter</span>
-        <span
-          style={{
-            fontSize: 11,
-            background: 'rgba(234,88,12,0.3)',
-            color: '#fed7aa',
-            padding: '2px 7px',
-            borderRadius: 4,
-            fontWeight: 700,
-          }}
-        >
-          {tipo || '1x8'}
-        </span>
-      </div>
-
-      {/* Body */}
-      <div style={bodyBase}>
-        {nome && (
-          <div style={{ color: C.muted, fontSize: 11, marginBottom: 6 }}>{nome}</div>
-        )}
-
-        {/* Entrada */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              backgroundColor: entradaHex,
-              border: '1px solid rgba(255,255,255,0.2)',
-              flexShrink: 0,
-            }}
-          />
-          <span style={{ fontSize: 11, color: C.muted }}>
-            {entrada?.tubo !== undefined && entrada?.fibra !== undefined
-              ? `T${entrada.tubo}:F${entrada.fibra}`
-              : 'Entrada'}
+      {/* Header — height = SPL_HEADER_H (38px) */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '8px 12px', fontWeight: 700, fontSize: 13, height: SPL_HEADER_H,
+        borderRadius: '8px 8px 0 0', background: T.splHdrBg, color: T.splHdr,
+        boxSizing: 'border-box',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+          <span style={{ fontSize: 13, flexShrink: 0 }}>🔀</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {nome}
           </span>
         </div>
-
-        {/* Saídas preview */}
-        <div style={{ fontSize: 11, color: C.muted }}>
-          <span style={{ color: C.splHdr, fontWeight: 700 }}>{saidaCount}</span> saída{saidaCount !== 1 ? 's' : ''}
-        </div>
-
-        {/* Observações das saídas */}
-        {(saidas ?? []).map((sd, i) => sd.obs ? (
-          <div key={i} style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
-            S{sd.num}: {sd.obs}
-          </div>
-        ) : null)}
+        {tipo && (
+          <span style={{
+            fontSize: 10, padding: '1px 7px', borderRadius: 4, fontWeight: 700, flexShrink: 0,
+            background: T.splBdr + '33', border: `1px solid ${T.splBdr}55`, color: T.splHdr,
+          }}>
+            {tipo}
+          </span>
+        )}
       </div>
 
-      {/* Output handles — one per saida */}
-      {(saidas ?? []).map((sd, idx) => {
-        const total = Math.max(saidaCount, 1)
-        const pct   = total === 1 ? 50 : ((idx / (total - 1)) * 80 + 10)
-        const hex   = abntHex(idx + 1)
+      {/* Fiber entrance row — height = SPL_ENTRY_H (32px) */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '0 12px', height: SPL_ENTRY_H, boxSizing: 'border-box',
+        borderBottom: `1px solid ${T.border}40`,
+      }}>
+        {entrada?.fibra != null ? (
+          <>
+            <span style={{
+              width: 9, height: 9, borderRadius: '50%', background: abntHex(entrada.fibra),
+              display: 'inline-block', boxShadow: `0 0 5px ${abntHex(entrada.fibra)}88`,
+              border: `1px solid ${abntHex(entrada.fibra)}aa`, flexShrink: 0,
+            }} />
+            <span style={{ color: T.muted, fontSize: 11 }}>Entrada F{entrada.fibra}</span>
+          </>
+        ) : (
+          <span style={{ color: T.muted, fontSize: 11 }}>{saidas.length} portas · {ligadas} ligadas</span>
+        )}
+        {entrada?.fibra != null && (
+          <span style={{
+            marginLeft: 'auto', fontSize: 10, fontWeight: 700,
+            color: ligadas === saidas.length ? T.ctoBdr : ligadas > 0 ? '#f59e0b' : T.muted,
+          }}>
+            {ligadas}/{saidas.length}
+          </span>
+        )}
+      </div>
+
+      {/* Output rows — each SPL_ROW_H (24px), handle inline per row */}
+      {saidas.map((s, idx) => {
+        const porta   = s.porta ?? s.num ?? (idx + 1)
+        const hasLink = !!s.cto_id?.trim()
+        const hex     = abntHex(porta)
+        const label   = s.cto_id?.trim() || (s.obs?.trim() || 'livre')
         return (
-          <Handle
-            key={sd.num ?? idx}
-            type="source"
-            position={Position.Right}
-            id={`s-${sd.num ?? (idx + 1)}`}
+          <div
+            key={porta}
+            title={`S${porta} (${ABNT[(porta - 1) % 12]?.nome ?? ''}) → ${label}`}
             style={{
-              ...handleStyle,
-              backgroundColor: hex,
-              right: -6,
-              top: `${pct}%`,
-              transform: 'translateY(-50%)',
+              position: 'relative',
+              display: 'flex', alignItems: 'center', gap: 5,
+              height: SPL_ROW_H, padding: '0 14px 0 10px',
+              boxSizing: 'border-box',
+              borderBottom: idx < saidas.length - 1 ? `1px solid ${T.border}20` : 'none',
+              background: hasLink ? `${hex}08` : 'transparent',
             }}
-          />
-        )
-      })}
-
-      {/* Fallback single output handle when no saidas */}
-      {saidaCount === 0 && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="out"
-          style={{ ...handleStyle, backgroundColor: C.splBdr, right: -6 }}
-        />
-      )}
-    </div>
-  )
-}
-
-// ─── CTOFlowNode ─────────────────────────────────────────────────────────────
-
-function CTOFlowNode({ data }) {
-  const { nome, cto_id, capacidade, ocupacao, caboId } = data
-
-  const cap   = capacidade || 16
-  const ocu   = ocupacao   || 0
-  const pct   = cap > 0 ? Math.round((ocu / cap) * 100) : 0
-
-  // Cor da barra de ocupação
-  function segColor(segIdx) {
-    const segPct = ((segIdx + 1) / 10) * 100
-    if (segPct > pct) return '#21262d'
-    if (pct >= 100)   return '#dc2626'
-    if (pct >= 80)    return '#ea580c'
-    if (pct >= 50)    return '#ca8a04'
-    return '#16a34a'
-  }
-
-  return (
-    <div
-      style={{
-        ...nodeBase,
-        backgroundColor: C.ctoBg,
-        border: `1.5px solid ${C.ctoBdr}`,
-        minWidth: 200,
-      }}
-    >
-      {/* Input handle */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="in"
-        style={{ ...handleStyle, backgroundColor: C.ctoBdr, left: -6 }}
-      />
-
-      {/* Header */}
-      <div style={{ ...hdrBase, backgroundColor: 'rgba(22,163,74,0.15)', color: C.ctoHdr }}>
-        <span style={{ fontSize: 13 }}>📦</span>
-        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {nome || cto_id || 'CTO'}
-        </span>
-      </div>
-
-      {/* Body */}
-      <div style={bodyBase}>
-        {cto_id && (
-          <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#86efac', marginBottom: 4 }}>
-            {cto_id}
-          </div>
-        )}
-        {caboId && (
-          <div style={{ fontSize: 10, color: C.muted, marginBottom: 6 }}>
-            Cabo: <span style={{ color: C.text }}>{caboId}</span>
-          </div>
-        )}
-
-        {/* Occupation bar — 10 segments */}
-        <div style={{ display: 'flex', gap: 2, marginBottom: 4 }}>
-          {Array.from({ length: 10 }, (_, i) => (
-            <div
-              key={i}
+          >
+            <span style={{
+              width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+              background: hasLink ? hex : 'transparent',
+              border: `2px solid ${hex}`,
+              boxShadow: hasLink ? `0 0 4px ${hex}66` : 'none',
+            }} />
+            <span style={{ fontSize: 9, color: hex, fontWeight: 700, minWidth: 18, flexShrink: 0 }}>
+              S{porta}
+            </span>
+            <span style={{
+              fontSize: 9, color: hasLink ? T.text : T.muted,
+              flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {label}
+            </span>
+            {/* Handle inline — alinhado à linha da porta, na direita */}
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={`s-${porta}`}
               style={{
-                flex: 1,
-                height: 6,
-                borderRadius: 2,
-                backgroundColor: segColor(i),
-                transition: 'background-color 0.2s',
+                ...HANDLE_BASE,
+                width: 10, height: 10,
+                position: 'absolute', right: -6, top: '50%',
+                transform: 'translateY(-50%)',
+                background: hex,
+                boxShadow: `0 0 5px ${hex}77`,
               }}
             />
-          ))}
-        </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
-        <div style={{ fontSize: 11, color: C.muted }}>
-          <span style={{ color: pct >= 100 ? '#f87171' : pct >= 80 ? '#fb923c' : C.ctoHdr, fontWeight: 700 }}>
-            {ocu}
-          </span>
-          <span>/{cap}</span>
-          <span style={{ marginLeft: 6, color: C.muted }}>({pct}%)</span>
+// ─── Passagem Node ───────────────────────────────────────────────────────────
+
+function PassagemNode({ data }) {
+  const { T, nome, label } = data
+  return (
+    <div style={{
+      background: T.bg2, border: `2px dashed ${T.muted}`, borderRadius: 8,
+      minWidth: 140, boxShadow: T.shadow, overflow: 'visible', position: 'relative',
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+    }}>
+      <Handle type="target" position={Position.Left} id="in"
+        style={{ ...HANDLE_BASE, background: T.muted, left: -6 }} />
+      <Handle type="source" position={Position.Right} id="out"
+        style={{ ...HANDLE_BASE, background: T.muted, right: -6 }} />
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '7px 12px', fontSize: 11,
+      }}>
+        <span style={{ fontSize: 13 }}>↔</span>
+        <div>
+          <div style={{ fontWeight: 700, color: T.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Passagem</div>
+          <div style={{ color: T.text, fontSize: 12, fontWeight: 600 }}>{nome || label || '—'}</div>
         </div>
       </div>
     </div>
   )
 }
 
-// ─── Registro de tipos de nó ─────────────────────────────────────────────────
+// ─── CTO Node ────────────────────────────────────────────────────────────────
 
-const nodeTypes = {
-  olt:      OLTFlowNode,
-  cdo:      CDOFlowNode,
-  splitter: SplitterFlowNode,
-  cto:      CTOFlowNode,
+function CTONode({ data }) {
+  const { T, nome, cto_id, capacidade = 16, ocupacao = 0, fibraEntrada,
+          bandejas = [], splitters = [] } = data
+  const pct     = Math.min(1, ocupacao / Math.max(1, capacidade))
+  const livres  = capacidade - ocupacao
+  const cheio   = livres <= 0
+  const alertC  = cheio ? '#ef4444' : pct > 0.8 ? '#f59e0b' : T.ctoBdr
+  const segs    = Math.min(capacidade, 16)
+  const filled  = Math.round(pct * segs)
+
+  return (
+    <div style={{
+      background: T.ctoBg, borderRadius: 10,
+      border: `2px solid ${alertC}`,
+      minWidth: NODE_W.cto, boxShadow: cheio
+        ? `0 0 16px #ef444455, ${T.shadow}`
+        : T.shadow,
+      overflow: 'visible', position: 'relative',
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+    }}>
+      <Handle type="target" position={Position.Left} id="in"
+        style={{ ...HANDLE_BASE, background: alertC, left: -6 }} />
+      <Handle type="source" position={Position.Right} id="out"
+        style={{ ...HANDLE_BASE, background: alertC, right: -6 }} />
+
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '8px 12px', fontWeight: 700, fontSize: 12,
+        borderRadius: '8px 8px 0 0', background: T.ctoHdrBg, color: alertC,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: 13 }}>📡</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>
+            {nome}
+          </span>
+        </div>
+        {cto_id && (
+          <span style={{ fontSize: 9, color: T.muted, fontFamily: 'monospace', flexShrink: 0 }}>
+            {cto_id}
+          </span>
+        )}
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {/* Badge fibra de entrada (identidade da FO) */}
+        {fibraEntrada != null && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
+            <span style={{
+              width: 9, height: 9, borderRadius: '50%', display: 'inline-block',
+              background: abntHex(fibraEntrada),
+              boxShadow: `0 0 4px ${abntHex(fibraEntrada)}88`,
+              border: `1px solid ${abntHex(fibraEntrada)}aa`,
+            }} />
+            <span style={{ color: T.muted }}>F{fibraEntrada} {ABNT[(fibraEntrada - 1) % 12]?.nome ?? ''}</span>
+          </div>
+        )}
+        {/* Barra de ocupação */}
+        <div style={{ display: 'flex', gap: 2 }}>
+          {Array.from({ length: segs }).map((_, i) => (
+            <div key={i} style={{
+              flex: 1, height: 6, borderRadius: 2,
+              background: i < filled ? alertC : T.border,
+              boxShadow: i < filled && cheio ? `0 0 3px ${alertC}99` : 'none',
+            }} />
+          ))}
+        </div>
+        {/* Contador */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+          <span style={{ color: T.muted }}>{ocupacao}/{capacidade} portas</span>
+          <span style={{ color: alertC, fontWeight: 700 }}>
+            {cheio ? '🔴 CHEIO' : `${livres} livre${livres !== 1 ? 's' : ''}`}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Bandejas + Splitters internos ── */}
+      {(bandejas.length > 0 || splitters.length > 0) && (
+        <div style={{ borderTop: `1px solid ${T.border}`, padding: '4px 10px 8px' }}>
+
+          {bandejas.map(b => {
+            const fusoes = b.fusoes ?? []
+            const ativas = fusoes.filter(f => f.tipo !== 'livre').length
+            return (
+              <div key={b.id} style={{ marginBottom: 5 }}>
+                {/* Bandeja header */}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  backgroundColor: T.bg2, borderRadius: '4px 4px 0 0',
+                  padding: '3px 6px', marginBottom: 1,
+                  borderBottom: `1px solid ${T.border}`,
+                }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: '#0891b2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>
+                    🗂 {b.nome}
+                  </span>
+                  <span style={{ fontSize: 8, color: ativas > 0 ? T.ctoBdr : T.muted, fontWeight: 700, flexShrink: 0, marginLeft: 4 }}>
+                    {ativas}/{fusoes.length}
+                  </span>
+                </div>
+
+                {/* Uma linha por fusão — visual igual ao editor */}
+                <div style={{
+                  backgroundColor: T.bg, border: `1px solid ${T.border}`,
+                  borderTop: 'none', borderRadius: '0 0 4px 4px', padding: '2px 4px',
+                }}>
+                  {fusoes.map(f => {
+                    const hex      = abntHex(f.cor)
+                    const abntNome = ABNT[(f.cor - 1) % 12]?.nome ?? ''
+                    const vivo     = f.tipo !== 'livre'
+
+                    // Resolve target legível (igual ao editor)
+                    const splObj = f.tipo === 'splitter'
+                      ? splitters.find(s => s.id === f.ref_id)
+                      : null
+                    const splNome = splObj
+                      ? `${splObj.nome ?? `Splitter ${splitters.indexOf(splObj) + 1}`} (${splObj.tipo})`
+                      : null
+                    const target =
+                      f.tipo === 'splitter' ? (splNome ?? f.ref_id ?? '?') :
+                      f.tipo === 'cascata'  ? (f.ref_id ?? '?') :
+                      f.tipo === 'direto'   ? 'Porta direta' : null
+
+                    const tipoText =
+                      f.tipo === 'splitter' ? '→ Splitter' :
+                      f.tipo === 'cascata'  ? '→ Cascata'  :
+                      f.tipo === 'direto'   ? '→ Direto'   : 'livre'
+                    const tipoColor =
+                      f.tipo === 'splitter' ? '#7c3aed' :
+                      f.tipo === 'cascata'  ? '#0891b2' :
+                      f.tipo === 'direto'   ? '#16a34a' : T.muted
+
+                    return (
+                      <div
+                        key={f.id}
+                        title={`#${f.pos} F${f.cor} ${abntNome} · ${f.tipo}${target ? ` → ${target}` : ''}`}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          padding: '2px 2px', marginBottom: 1,
+                          borderRadius: 3,
+                          backgroundColor: vivo ? `${tipoColor}0c` : 'transparent',
+                          opacity: vivo ? 1 : 0.45,
+                        }}
+                      >
+                        {/* #pos */}
+                        <span style={{ fontSize: 7, color: T.muted, fontWeight: 700, minWidth: 14, textAlign: 'right', flexShrink: 0 }}>
+                          #{f.pos}
+                        </span>
+
+                        {/* Badge colorido (como o select do editor) */}
+                        <span style={{
+                          backgroundColor: hex, color: '#fff',
+                          borderRadius: 3, padding: '0 5px',
+                          fontSize: 8, fontWeight: 700,
+                          whiteSpace: 'nowrap', flexShrink: 0,
+                          lineHeight: '14px',
+                        }}>
+                          {f.cor}. {abntNome}
+                        </span>
+
+                        {/* → Tipo + target */}
+                        <span style={{
+                          fontSize: 7, color: tipoColor, fontWeight: vivo ? 700 : 400,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          flex: 1, lineHeight: 1,
+                        }}>
+                          {tipoText}{target ? `: ${target}` : ''}
+                        </span>
+                      </div>
+                    )
+                  })}
+                  {fusoes.length === 0 && (
+                    <span style={{ fontSize: 8, color: T.muted, padding: '2px 4px', display: 'block', fontStyle: 'italic' }}>
+                      Sem fusões
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+
+          {splitters.length > 0 && (
+            <div style={{ marginTop: bandejas.length > 0 ? 4 : 0 }}>
+              {splitters.map((spl, si) => {
+                const ocup  = (spl.saidas ?? []).filter(sd => sd.cliente?.trim()).length
+                const total = (spl.saidas ?? []).length
+                const p     = total > 0 ? ocup / total : 0
+                const barC  = p >= 0.9 ? '#ef4444' : p >= 0.7 ? '#f59e0b' : '#16a34a'
+                return (
+                  <div key={spl.id} style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: si < splitters.length - 1 ? 3 : 0 }}>
+                    <span style={{ fontSize: 9, color: T.muted, minWidth: 46, whiteSpace: 'nowrap' }}>🔀 {spl.tipo}</span>
+                    <div style={{ flex: 1, height: 4, backgroundColor: T.border, borderRadius: 2 }}>
+                      <div style={{ width: `${p * 100}%`, height: '100%', backgroundColor: barC, borderRadius: 2 }} />
+                    </div>
+                    <span style={{ fontSize: 9, color: barC, fontWeight: 700, minWidth: 26, textAlign: 'right' }}>
+                      {ocup}/{total}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+        </div>
+      )}
+    </div>
+  )
 }
 
-// ─── Auto-layout com dagre ───────────────────────────────────────────────────
+// ─── Registro de node types ───────────────────────────────────────────────────
 
-/** Larguras/alturas estimadas por tipo de nó para o dagre. */
-const NODE_DIMS = {
-  olt:      { width: 200, height: 130 },
-  cdo:      { width: 280, height: 220 },
-  splitter: { width: 180, height: 140 },
-  cto:      { width: 200, height: 110 },
-}
+const NODE_TYPES = { olt: OLTNode, cdo: CDONode, splitter: SplitterNode, cto: CTONode, passagem: PassagemNode }
 
-function layoutGraph(nodes, edges) {
-  const g = new Dagre.graphlib.Graph()
-  g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({
-    rankdir:  'LR',
-    nodesep:  60,
-    ranksep:  120,
-    marginx:  50,
-    marginy:  50,
-  })
+// ─── buildGraph ───────────────────────────────────────────────────────────────
 
-  nodes.forEach((n) => {
-    const dims = NODE_DIMS[n.type] ?? { width: 200, height: 120 }
-    g.setNode(n.id, { width: n.width ?? dims.width, height: n.height ?? dims.height })
-  })
-  edges.forEach((e) => g.setEdge(e.source, e.target))
+function buildGraph(topologia, T) {
+  if (!topologia?.length) return { nodes: [], edges: [] }
 
-  Dagre.layout(g)
+  const nodes = []
+  const edges = []
+  const ctoSet   = new Set()   // tracks cto-* node ids
+  const cdoSet   = new Set()   // tracks cdo-* node ids (by caixa.id)
+  const miscSet  = new Set()   // tracks passagem-* and other misc node ids
+  const allCTOs   = topologia[0]._allCTOs   ?? []
+  const allCaixas = topologia[0]._allCaixas ?? []
 
-  return nodes.map((n) => {
-    const pos  = g.node(n.id)
-    const dims = NODE_DIMS[n.type] ?? { width: 200, height: 120 }
-    const w    = n.width  ?? dims.width
-    const h    = n.height ?? dims.height
-    return { ...n, position: { x: pos.x - w / 2, y: pos.y - h / 2 } }
-  })
-}
+  let ei = 0
+  function edge(src, tgt, style, opts = {}) {
+    edges.push({ id: `e${ei++}`, source: src, target: tgt, style, type: 'smoothstep', ...opts })
+  }
 
-// ─── Construção do grafo a partir da topologia ───────────────────────────────
+  function lookupCTO(id) {
+    return allCTOs.find(c => String(c.cto_id) === String(id) || String(c._id) === String(id))
+  }
 
-function buildGraphFromTopologia(topologia) {
-  const nodes       = []
-  const edges       = []
-  const ctoNodeSet  = new Set() // evita duplicatas de CTO
+  function lookupCDO(id) {
+    return allCaixas.find(c => String(c.id) === String(id) || String(c._id) === String(id))
+  }
 
-  for (const olt of topologia) {
-    const oltNodeId = `olt-${olt.id}`
+  // parentSrcHandle: handle no nó pai de onde sai a aresta
+  //   'out' → OLT (ou CDO sem splitter específico)
+  //   's-N' → porta N do SplitterNode
+  function processCDO(caixa, parentId, parentStyle, parentSrcHandle = 'out', extraEdgeOpts = {}) {
+    if (cdoSet.has(String(caixa.id))) return
+    cdoSet.add(String(caixa.id))
 
-    // --- Nó OLT ---
+    const cdoId   = `cdo-${caixa.id}`
+    const diag    = caixa.diagrama ?? {}
+    const bandejas  = diag.bandejas  ?? []
+    const splitters = diag.splitters ?? []
+    const entrada   = diag.entrada   ?? {}
+
+    // Fusões PON de todas as bandejas → mapeamento splitter_id → fusão
+    const allFusoes = bandejas.flatMap(b => (b.fusoes ?? []).map(f => ({ ...f })))
+    const ponFusoes = allFusoes.filter(f => f.tipo === 'pon' && f.splitter_id)
+    const ponMap    = new Map(ponFusoes.map(f => [String(f.splitter_id), f]))
+
     nodes.push({
-      id:   oltNodeId,
-      type: 'olt',
-      position: { x: 0, y: 0 },
-      data: {
-        nome:       olt.nome,
-        modelo:     olt.modelo,
-        ip:         olt.ip,
-        capacidade: olt.capacidade,
-        status:     olt.status,
-        ponCount:   (olt.caixas ?? []).length,
-      },
+      id: cdoId, type: 'cdo', position: { x: 0, y: 0 },
+      data: { T, nome: caixa.nome, tipo: caixa.tipo, entrada, bandejas, ponFusoes },
     })
 
-    for (const cdo of (olt.caixas ?? [])) {
-      const cdoNodeId = `cdo-${cdo.id}`
-      const isCascata = cdo.tipo === 'CE'
-      const diagrama  = cdo.diagrama ?? {}
-      const splitters = diagrama.splitters ?? []
-      const bandejas  = diagrama.bandejas  ?? []
-      const entrada   = diagrama.entrada   ?? {}
+    // Edge: parent → CDO — PON label só faz sentido quando vem diretamente da OLT
+    const ponLabel = parentSrcHandle === 'out' && entrada?.pon != null ? `PON ${entrada.pon}` : undefined
+    edge(parentId, cdoId, parentStyle, {
+      sourceHandle: parentSrcHandle, targetHandle: 'in',
+      ...(ponLabel ? {
+        label: ponLabel,
+        labelStyle: { fill: T.oltHdr, fontSize: 10, fontWeight: 700 },
+        labelBgStyle: { fill: T.oltHdrBg + 'cc', borderRadius: 3 },
+      } : {}),
+      ...extraEdgeOpts,
+    })
 
-      // --- Nó CDO/CE ---
+    // Processar cada splitter
+    for (const spl of splitters) {
+      const splNodeId = `spl-${caixa.id}-${spl.id}`
+      const saidas    = spl.saidas ?? []
+      const ponFusao  = ponMap.get(String(spl.id))
+      // Fibra real: vem da fusão PON → saida.fibra, ou da entrada do splitter
+      const splFibra  = ponFusao?.saida?.fibra ?? ponFusao?.entrada?.fibra ?? spl.entrada?.fibra
+      const splHex    = abntHex(splFibra)
+
       nodes.push({
-        id:   cdoNodeId,
-        type: 'cdo',
-        position: { x: 0, y: 0 },
-        data: {
-          nome:       cdo.nome,
-          tipo:       cdo.tipo,
-          isCascata,
-          bandejas,
-          splitters,
-          entrada,
-        },
+        id: splNodeId, type: 'splitter', position: { x: 0, y: 0 },
+        data: { T, nome: spl.nome, tipo: spl.tipo, entrada: spl.entrada, saidas },
       })
 
-      // --- Aresta OLT → CDO ---
-      const ponLabel = entrada?.pon ? `PON ${entrada.pon}` : 'Backbone'
-      edges.push({
-        id:     `e-olt-${cdo.id}`,
-        source: oltNodeId,
-        target: cdoNodeId,
-        sourceHandle: 'out',
-        targetHandle: 'in',
-        label:  ponLabel,
-        type:   'smoothstep',
-        style:  { stroke: '#0891b2', strokeWidth: 2 },
-        labelStyle: { fill: '#67e8f9', fontSize: 11, fontWeight: 600 },
-        labelBgStyle: { fill: '#050f1f', fillOpacity: 0.85 },
+      // Edge CDO → Splitter (usa handle inline da bandeja se há fusão PON vinculada)
+      const srcHandle = ponFusao ? `spl-${spl.id}` : 'out'
+      const fLabel    = splFibra != null ? `F${splFibra}` : undefined
+      const eStyle    = { ...T.distrib, stroke: splHex || T.distrib.stroke }
+      edge(cdoId, splNodeId, eStyle, {
+        sourceHandle: srcHandle, targetHandle: 'in',
+        ...(fLabel ? {
+          label: fLabel,
+          labelStyle: { fill: splHex, fontSize: 10, fontWeight: 700 },
+          labelBgStyle: { fill: T.cdoBg + 'cc', borderRadius: 3 },
+        } : {}),
       })
 
-      // --- Nós Splitter e arestas CDO → Splitter (apenas splitters reais) ---
-      const realSplitters = splitters.filter(s => !s.id?.startsWith('bypass-'))
-      for (const spl of realSplitters) {
-        const splNodeId = `spl-${spl.id}`
-        const saidas    = spl.saidas ?? []
+      // Edges Splitter → destinos (CTO | CDO | Passagem)
+      // Ordenar por porta para que Dagre posicione F1 em cima, F2 abaixo, etc.
+      const saidasOrdenadas = saidas.slice().sort((a, b) => (a.porta ?? a.num ?? 0) - (b.porta ?? b.num ?? 0))
+      for (let idx = 0; idx < saidasOrdenadas.length; idx++) {
+        const s       = saidasOrdenadas[idx]
+        const porta   = s.porta ?? s.num ?? (idx + 1)
+        const destTipo = s.tipo ?? 'cto'           // tipo da saída (cto|cdo|passagem|pon|conector|…)
 
-        nodes.push({
-          id:   splNodeId,
-          type: 'splitter',
-          position: { x: 0, y: 0 },
-          data: {
-            nome:   spl.nome,
-            tipo:   spl.tipo,
-            entrada: spl.entrada,
-            saidas,
-          },
-        })
+        if (!s.cto_id?.trim()) continue            // sem destino configurado
 
-        // Cor da aresta baseada na fibra de entrada do splitter
-        const edgeFibraHex = spl.entrada?.fibra ? abntHex(spl.entrada.fibra) : '#7c3aed'
-        const edgeLabel    = spl.entrada?.tubo !== undefined && spl.entrada?.fibra !== undefined
-          ? `T${spl.entrada.tubo}:F${spl.entrada.fibra}`
-          : undefined
+        const portaHex = abntHex(porta)
+        const edgeLabelOpts = {
+          label: `F${porta}`,
+          labelStyle:   { fill: portaHex, fontSize: 10, fontWeight: 700 },
+          labelBgStyle: { fill: T.ctoBg + 'cc', borderRadius: 3 },
+        }
 
-        edges.push({
-          id:           `e-cdo-spl-${cdo.id}-${spl.id}`,
-          source:       cdoNodeId,
-          target:       splNodeId,
-          sourceHandle: `spl-${spl.id}`,
-          targetHandle: 'in',
-          label:        edgeLabel,
-          type:         'smoothstep',
-          style:        { stroke: edgeFibraHex, strokeWidth: 2 },
-          labelStyle:   { fill: edgeFibraHex, fontSize: 10, fontWeight: 600 },
-          labelBgStyle: { fill: '#0d0820', fillOpacity: 0.85 },
-        })
+        // ── CDO/CE como destino ──
+        if (destTipo === 'cdo' || destTipo === 'ce') {
+          const cdoKey  = String(s.cto_id)
+          const eStyle  = { ...T.drop, stroke: portaHex, strokeWidth: 2 }
+          if (!cdoSet.has(cdoKey)) {
+            const cdoData = lookupCDO(s.cto_id)
+            if (cdoData) {
+              // CDO encontrado no DB — processa recursivo com handle e label corretos
+              processCDO(cdoData, splNodeId, eStyle, `s-${porta}`, edgeLabelOpts)
+            } else {
+              // CDO não encontrado → stub visual
+              cdoSet.add(cdoKey)
+              nodes.push({
+                id: `cdo-${cdoKey}`, type: 'cdo', position: { x: 0, y: 0 },
+                data: { T, nome: s.obs?.trim() || `CDO ${s.cto_id}`, tipo: 'CDO', entrada: {}, bandejas: [], ponFusoes: [] },
+              })
+              edge(splNodeId, `cdo-${cdoKey}`, eStyle,
+                { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+              )
+            }
+          } else {
+            // CDO já no grafo — adiciona apenas a aresta deste splitter
+            edge(splNodeId, `cdo-${cdoKey}`, eStyle,
+              { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+            )
+          }
+          continue
+        }
 
-        // --- Nós CTO e arestas Splitter → CTO ---
-        for (const saida of saidas) {
-          if (!saida.cto_id) continue
-
-          const ctoNodeId = `cto-${saida.cto_id}`
-
-          // Encontra o CTO nos dados da CDO
-          const ctoData = (cdo.ctos ?? []).find((c) => c.cto_id === saida.cto_id)
-
-          if (!ctoNodeSet.has(ctoNodeId)) {
-            ctoNodeSet.add(ctoNodeId)
+        // ── Passagem ──
+        if (destTipo === 'passagem') {
+          const miscId = `passagem-${String(s.cto_id)}`
+          if (!miscSet.has(miscId)) {
+            miscSet.add(miscId)
             nodes.push({
-              id:   ctoNodeId,
-              type: 'cto',
-              position: { x: 0, y: 0 },
-              data: {
-                nome:       ctoData?.nome        ?? saida.cto_id,
-                cto_id:     saida.cto_id,
-                capacidade: ctoData?.capacidade,
-                ocupacao:   ctoData?.ocupacao,
-                caboId:     ctoData?.diagrama?.entrada?.cabo_id,
-              },
+              id: miscId, type: 'passagem', position: { x: 0, y: 0 },
+              data: { T, nome: s.obs?.trim() || s.cto_id, label: s.cto_id },
             })
           }
-
-          const saidaNum   = saida.num ?? 1
-          const edgeColor  = abntHex(saidaNum)
-
-          edges.push({
-            id:           `e-spl-cto-${spl.id}-${saida.cto_id}`,
-            source:       splNodeId,
-            target:       ctoNodeId,
-            sourceHandle: `s-${saidaNum}`,
-            targetHandle: 'in',
-            label:        `S${saidaNum}`,
-            type:         'smoothstep',
-            style:        { stroke: edgeColor, strokeWidth: 1.5 },
-            labelStyle:   { fill: edgeColor, fontSize: 10, fontWeight: 600 },
-            labelBgStyle: { fill: '#052e16', fillOpacity: 0.8 },
-          })
+          edge(splNodeId, miscId,
+            { ...T.drop, stroke: portaHex, strokeWidth: 1.5, strokeDasharray: '5,3' },
+            { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+          )
+          continue
         }
-      }
 
-      // --- Saídas diretas da bandeja (saida_cto / saida_cdo): aresta CDO → CTO sem splitter ---
-      for (const bandeja of bandejas) {
-        for (const fusao of (bandeja.fusoes ?? [])) {
-          if (fusao.tipo !== 'saida_cto' && fusao.tipo !== 'saida_cdo') continue
-          if (!fusao.destino_id?.trim()) continue
+        // ── Tipos não gráficos (pon, conector, fusao_bandeja) ── skip visual
+        if (destTipo !== 'cto' && destTipo !== 'ce') continue
 
-          const destId    = fusao.destino_id.trim()
-          const ctoNodeId = `cto-${destId}`
-          const ctoData   = (cdo.ctos ?? []).find(c => c.cto_id === destId)
-          const fibraHex  = fusao.entrada?.fibra ? abntHex(fusao.entrada.fibra) : '#22c55e'
-          const foLabel   = fusao.entrada?.fibra != null
-            ? `T${fusao.entrada?.tubo ?? 1}:F${fusao.entrada.fibra}`
-            : 'direto'
-
-          if (!ctoNodeSet.has(ctoNodeId)) {
-            ctoNodeSet.add(ctoNodeId)
-            nodes.push({
-              id:   ctoNodeId,
-              type: fusao.tipo === 'saida_cdo' ? 'cdo' : 'cto',
-              position: { x: 0, y: 0 },
-              data: {
-                nome:       ctoData?.nome ?? destId,
-                cto_id:     destId,
-                capacidade: ctoData?.capacidade,
-                ocupacao:   ctoData?.ocupacao,
-              },
-            })
-          }
-
-          edges.push({
-            id:           `e-direct-${cdo.id}-${fusao.id}`,
-            source:       cdoNodeId,
-            target:       ctoNodeId,
-            sourceHandle: `direct-${fusao.id}`,
-            targetHandle: 'in',
-            label:        foLabel,
-            type:         'smoothstep',
-            animated:     false,
-            style:        { stroke: fibraHex, strokeWidth: 2 },
-            labelStyle:   { fill: fibraHex, fontSize: 10, fontWeight: 700 },
-            labelBgStyle: { fill: '#060a16', fillOpacity: 0.85 },
-          })
-        }
-      }
-
-      // --- CTOs sem splitter: aresta direta CDO → CTO (gray dashed) ---
-      const ctoIdsComSplitter = new Set([
-        ...realSplitters.flatMap(spl => (spl.saidas ?? []).map(sd => sd.cto_id).filter(Boolean)),
-        ...bandejas.flatMap(b => (b.fusoes ?? [])
-          .filter(f => f.tipo === 'saida_cto' && f.destino_id?.trim())
-          .map(f => f.destino_id.trim())),
-      ])
-
-      for (const cto of (cdo.ctos ?? [])) {
-        if (ctoIdsComSplitter.has(cto.cto_id)) continue
-
-        const ctoNodeId = `cto-${cto.cto_id}`
-
-        if (!ctoNodeSet.has(ctoNodeId)) {
-          ctoNodeSet.add(ctoNodeId)
+        // ── CTO (padrão) ──
+        const ctoKey = String(s.cto_id)
+        if (!ctoSet.has(ctoKey)) {
+          ctoSet.add(ctoKey)
+          const ctoData = lookupCTO(s.cto_id) ?? { cto_id: s.cto_id, nome: s.obs?.trim() || `CTO ${s.cto_id}` }
           nodes.push({
-            id:   ctoNodeId,
-            type: 'cto',
-            position: { x: 0, y: 0 },
+            id: `cto-${ctoKey}`, type: 'cto', position: { x: 0, y: 0 },
             data: {
-              nome:       cto.nome,
-              cto_id:     cto.cto_id,
-              capacidade: cto.capacidade,
-              ocupacao:   cto.ocupacao,
-              caboId:     cto.diagrama?.entrada?.cabo_id,
+              T,
+              nome:         ctoData.nome,
+              cto_id:       ctoData.cto_id ?? s.cto_id,
+              capacidade:   ctoData.capacidade  ?? 16,
+              ocupacao:     ctoData.ocupacao    ?? 0,
+              fibraEntrada: porta,
+              bandejas:     ctoData.diagrama?.bandejas  ?? [],
+              splitters:    ctoData.diagrama?.splitters ?? [],
             },
           })
         }
 
-        edges.push({
-          id:           `e-cdo-cto-direct-${cdo.id}-${cto.cto_id}`,
-          source:       cdoNodeId,
-          target:       ctoNodeId,
-          sourceHandle: 'out',
-          targetHandle: 'in',
-          type:         'smoothstep',
-          style:        { stroke: '#6b7280', strokeWidth: 1.5, strokeDasharray: '5,4' },
-          labelStyle:   { fill: '#6b7280', fontSize: 10 },
-          labelBgStyle: { fill: '#060a16', fillOpacity: 0.8 },
-        })
+        edge(splNodeId, `cto-${ctoKey}`,
+          { ...T.drop, stroke: portaHex, strokeWidth: 2 },
+          { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+        )
       }
+    }
+  }
+
+  for (const olt of topologia) {
+    const oltId  = `olt-${olt.id}`
+    const caixas = olt.caixas ?? []
+
+    nodes.push({
+      id: oltId, type: 'olt', position: { x: 0, y: 0 },
+      data: { T, nome: olt.nome, modelo: olt.modelo, ip: olt.ip,
+              capacidade: olt.capacidade, status: olt.status, ponCount: caixas.length },
+    })
+
+    for (const caixa of caixas) {
+      processCDO(caixa, oltId, T.feeder)
     }
   }
 
   return { nodes, edges }
 }
 
-// ─── Componente interno com acesso ao ReactFlow context ──────────────────────
+// ─── Layout Dagre ─────────────────────────────────────────────────────────────
 
-function DiagramaFluxoInner({ projetoId, altura }) {
-  const [nodes, setNodes] = useState([])
-  const [edges, setEdges] = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState(null)
+function calcCTOHeight(bandejas = [], splitters = []) {
+  if (!bandejas.length && !splitters.length) return NODE_H.cto
+  // Per-bandeja: 22px header + n_fusoes * 15px (badge row + margin) + 8px gap
+  let h = 96
+  for (const b of bandejas) {
+    const n = Math.max(1, b.fusoes?.length ?? 0)
+    h += 22 + n * 15 + 8
+  }
+  // Splitters section: 4px top margin + 16px per splitter
+  if (splitters.length > 0) h += 4 + splitters.length * 16
+  return Math.max(NODE_H.cto, h)
+}
 
-  const { fitView } = useReactFlow()
+function calcH(node) {
+  if (node.type === 'cdo')      return calcCDOHeight(node.data?.bandejas ?? [])
+  if (node.type === 'splitter') return calcSplitterHeight(node.data?.saidas ?? [])
+  if (node.type === 'cto')      return calcCTOHeight(node.data?.bandejas ?? [], node.data?.splitters ?? [])
+  return NODE_H[node.type] ?? 140
+}
 
-  // Carrega e constrói o grafo
-  useEffect(() => {
-    if (!projetoId) {
-      setLoading(false)
-      return
+function dagreLayout(nodes, edges) {
+  const g = new Dagre.graphlib.Graph()
+  g.setDefaultEdgeLabel(() => ({}))
+  g.setGraph({ rankdir: 'LR', nodesep: 55, ranksep: 200, edgesep: 30 })
+
+  for (const n of nodes) {
+    g.setNode(n.id, { width: NODE_W[n.type] ?? 220, height: calcH(n) })
+  }
+  for (const e of edges) {
+    g.setEdge(e.source, e.target)
+  }
+
+  Dagre.layout(g)
+
+  const laid = nodes.map(n => {
+    const pos = g.node(n.id)
+    return {
+      ...n,
+      position: {
+        x: pos.x - (NODE_W[n.type] ?? 220) / 2,
+        y: pos.y - calcH(n) / 2,
+      },
     }
+  })
 
-    setLoading(true)
-    setError(null)
-
-    getTopologia(projetoId)
-      .then((topologia) => {
-        if (!topologia || topologia.length === 0) {
-          setNodes([])
-          setEdges([])
-          return
-        }
-        const { nodes: rawNodes, edges: rawEdges } = buildGraphFromTopologia(topologia)
-        const laid = layoutGraph(rawNodes, rawEdges)
-        setNodes(laid)
-        setEdges(rawEdges)
-        // fitView after state settles
-        setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 80)
+  // Pós-processamento: ordenar CTOs dentro de cada coluna por porta (F1→F8)
+  // Dagre já tenta minimizar cruzamentos, mas não garante ordenação por fibraEntrada.
+  const ctoNodes = laid.filter(n => n.type === 'cto')
+  if (ctoNodes.length > 1) {
+    // Agrupar CTOs pela mesma coluna (mesmo X, tolerância de 20px)
+    const groups = new Map()
+    for (const n of ctoNodes) {
+      const xKey = Math.round(n.position.x / 20) * 20
+      if (!groups.has(xKey)) groups.set(xKey, [])
+      groups.get(xKey).push(n)
+    }
+    for (const group of groups.values()) {
+      if (group.length <= 1) continue
+      // Y positions ocupadas por este grupo, ordenadas de cima para baixo
+      const ys = group.map(n => n.position.y).sort((a, b) => a - b)
+      // Ordenar o grupo por fibraEntrada (porta), depois redistribuir os Ys
+      const sorted = group.slice().sort((a, b) =>
+        (a.data?.fibraEntrada ?? 99) - (b.data?.fibraEntrada ?? 99)
+      )
+      sorted.forEach((n, i) => {
+        const node = laid.find(l => l.id === n.id)
+        if (node) node.position.y = ys[i]
       })
-      .catch((err) => {
-        console.error('[DiagramaFluxo] Erro ao carregar topologia:', err)
-        setError(err?.message ?? 'Erro ao carregar topologia')
-      })
-      .finally(() => setLoading(false))
-  }, [projetoId, fitView])
+    }
+  }
 
-  // Auto layout manual
-  const handleAutoLayout = useCallback(() => {
-    if (nodes.length === 0) return
-    const laid = layoutGraph(nodes, edges)
-    setNodes(laid)
-    setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 60)
-  }, [nodes, edges, fitView])
+  return laid
+}
 
-  // Ajustar tela
-  const handleFitView = useCallback(() => {
-    fitView({ padding: 0.15, duration: 400 })
-  }, [fitView])
+// ─── Painel de legenda ────────────────────────────────────────────────────────
 
+function LegendPanel({ T }) {
   return (
-    <>
-      {/* Override React Flow default styles for dark theme */}
-      <style>{`
-        .react-flow__controls button {
-          background-color: #161b22 !important;
-          border-color: #21262d !important;
-          color: #e6edf3 !important;
-        }
-        .react-flow__controls button:hover {
-          background-color: #21262d !important;
-        }
-        .react-flow__controls button svg {
-          fill: #e6edf3 !important;
-        }
-        .react-flow__minimap {
-          background-color: #0d1117 !important;
-          border: 1px solid #21262d !important;
-          border-radius: 8px !important;
-          overflow: hidden !important;
-        }
-        .react-flow__edge-path {
-          filter: drop-shadow(0 0 3px rgba(0,0,0,0.8));
-        }
-        .react-flow__edge-label {
-          font-size: 11px !important;
-        }
-        .react-flow__node {
-          border-radius: 10px !important;
-        }
-      `}</style>
-
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.15 }}
-        minZoom={0.15}
-        maxZoom={2.5}
-        defaultEdgeOptions={{
-          type: 'smoothstep',
-          style: { strokeWidth: 2 },
-        }}
-        style={{ backgroundColor: C.bg }}
-        proOptions={{ hideAttribution: true }}
-      >
-        {/* Controls */}
-        <Controls
-          style={{
-            backgroundColor: '#161b22',
-            border: '1px solid #21262d',
-            borderRadius: 8,
-            overflow: 'hidden',
-          }}
-        />
-
-        {/* MiniMap */}
-        <MiniMap
-          style={{ backgroundColor: '#0d1117', border: '1px solid #21262d', borderRadius: 8 }}
-          nodeColor={(n) => {
-            if (n.type === 'olt')      return C.oltBdr
-            if (n.type === 'cdo')      return n.data?.isCascata ? C.casBdr : C.cdoBdr
-            if (n.type === 'splitter') return C.splBdr
-            if (n.type === 'cto')      return C.ctoBdr
-            return '#21262d'
-          }}
-          maskColor="rgba(6,10,22,0.7)"
-        />
-
-        {/* Background dots */}
-        <Background color="#21262d" gap={20} size={1} variant={BackgroundVariant.Dots} />
-
-        {/* Toolbar */}
-        <Panel position="top-left">
-          <div
+    <div style={{
+      background: T.panelBg, border: `1px solid ${T.panelBorder}`,
+      borderRadius: 10, padding: '10px 14px', backdropFilter: 'blur(6px)',
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif", minWidth: 180,
+    }}>
+      {/* Tipos de enlace */}
+      <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+        letterSpacing: '0.08em', color: T.muted, marginBottom: 6 }}>
+        Tipos de enlace
+      </div>
+      {[
+        { label: 'Feeder  OLT → CDO',    color: T.feeder.stroke,  w: 3 },
+        { label: 'Distribuição  CDO → SPL', color: T.distrib.stroke, w: 2 },
+        { label: 'Drop  SPL → CTO',      color: T.drop.stroke,    w: 1.5 },
+      ].map(it => (
+        <div key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <svg width={28} height={10} style={{ flexShrink: 0 }}>
+            <line x1={0} y1={5} x2={28} y2={5} stroke={it.color} strokeWidth={it.w} />
+          </svg>
+          <span style={{ fontSize: 10, color: T.muted }}>{it.label}</span>
+        </div>
+      ))}
+      {/* Fibras ABNT */}
+      <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+        letterSpacing: '0.08em', color: T.muted, marginTop: 8, marginBottom: 6,
+        borderTop: `1px solid ${T.border}`, paddingTop: 6 }}>
+        Fibras ABNT NBR 14721
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+        {ABNT.map(f => (
+          <div key={f.idx}
+            title={`F${f.idx} — ${f.nome}`}
             style={{
-              display: 'flex',
-              gap: 8,
-              alignItems: 'center',
-              background: 'rgba(13,17,23,0.92)',
-              border: '1px solid #21262d',
-              borderRadius: 8,
-              padding: '6px 10px',
-              backdropFilter: 'blur(8px)',
-            }}
-          >
-            <button
-              onClick={handleAutoLayout}
-              style={{
-                background: 'rgba(234,88,12,0.15)',
-                border: '1px solid rgba(234,88,12,0.4)',
-                color: '#fb923c',
-                borderRadius: 6,
-                padding: '4px 10px',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <span>⚡</span> Auto Layout
-            </button>
-
-            <button
-              onClick={handleFitView}
-              style={{
-                background: 'rgba(8,145,178,0.12)',
-                border: '1px solid rgba(8,145,178,0.35)',
-                color: '#67e8f9',
-                borderRadius: 6,
-                padding: '4px 10px',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <span>⊡</span> Ajustar
-            </button>
-
-            {loading && (
-              <span
-                style={{
-                  fontSize: 11,
-                  color: '#8b949e',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: '#0891b2',
-                    animation: 'pulse 1.2s infinite',
-                  }}
-                />
-                Carregando...
-              </span>
-            )}
-
-            {error && (
-              <span style={{ fontSize: 11, color: '#f87171' }}>
-                Erro: {error}
-              </span>
-            )}
+              display: 'flex', alignItems: 'center', gap: 3,
+              padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+              background: f.hex + '28', border: `1px solid ${f.hex}55`,
+              color: f.hex,
+            }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: f.hex, display: 'inline-block' }} />
+            F{f.idx}
           </div>
-        </Panel>
-
-        {/* Legend */}
-        <Panel position="bottom-right">
-          <div
-            style={{
-              background: 'rgba(13,17,23,0.92)',
-              border: '1px solid #21262d',
-              borderRadius: 8,
-              padding: '8px 12px',
-              backdropFilter: 'blur(8px)',
-              fontSize: 11,
-              color: '#8b949e',
-              minWidth: 130,
-            }}
-          >
-            <div style={{ fontWeight: 700, color: '#e6edf3', marginBottom: 6, fontSize: 11 }}>
-              Legenda
-            </div>
-            {[
-              { color: C.oltBdr, label: 'OLT' },
-              { color: C.cdoBdr, label: 'CDO' },
-              { color: C.casBdr, label: 'CE/Cascata', dashed: true },
-              { color: C.splBdr, label: 'Splitter' },
-              { color: C.ctoBdr, label: 'CTO' },
-            ].map(({ color, label, dashed }) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <div
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: 3,
-                    border: `2px ${dashed ? 'dashed' : 'solid'} ${color}`,
-                    flexShrink: 0,
-                  }}
-                />
-                <span>{label}</span>
-              </div>
-            ))}
-          </div>
-        </Panel>
-      </ReactFlow>
-    </>
+        ))}
+      </div>
+    </div>
   )
 }
 
-// ─── Componente exportado — auto-wrapped em ReactFlowProvider ────────────────
+// ─── Inner component (needs ReactFlow context) ────────────────────────────────
 
-/**
- * DiagramaFluxo
- * Canvas interativo de topologia FTTH com React Flow v12.
- *
- * @param {Object} props
- * @param {string} props.projetoId - ID do projeto para buscar a topologia
- * @param {number} [props.altura=700] - Altura do canvas em pixels
- */
-export default function DiagramaFluxo({ projetoId, altura = 700 }) {
+function DiagramaFluxoInner({ projetoId }) {
+  const { theme } = useTheme()
+  const isDark    = theme === 'dark'
+  const T         = useMemo(() => mkTheme(isDark), [isDark])
+
+  const isMobile = useMobile()
+  const [legendOpen, setLegendOpen] = useState(false)
+
+  const [nodes,   setNodes]   = useState([])
+  const [edges,   setEdges]   = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState(null)
+  const [stats,   setStats]   = useState(null)
+
+  const { fitView } = useReactFlow()
+
+  const runLayout = useCallback((ns, es) => {
+    const laid = dagreLayout(ns, es)
+    setNodes(laid)
+    setEdges(es)
+    setTimeout(() => fitView({ padding: 0.12, duration: 500 }), 80)
+  }, [fitView])
+
+  const load = useCallback(() => {
+    if (!projetoId) return
+    setLoading(true)
+    setError(null)
+    getTopologia(projetoId)
+      .then(topo => {
+        const { nodes: ns, edges: es } = buildGraph(topo, T)
+        setStats({
+          olts:      ns.filter(n => n.type === 'olt').length,
+          cdos:      ns.filter(n => n.type === 'cdo').length,
+          splitters: ns.filter(n => n.type === 'splitter').length,
+          ctos:      ns.filter(n => n.type === 'cto').length,
+        })
+        runLayout(ns, es)
+      })
+      .catch(e => setError(e?.message ?? 'Erro ao carregar topologia'))
+      .finally(() => setLoading(false))
+  }, [projetoId, T, runLayout])
+
+  useEffect(() => { load() }, [load])
+
+  // Auto-reload when editor saves diagram data
+  useEffect(() => {
+    const handler = () => load()
+    window.addEventListener('fiberops:topologia-changed', handler)
+    return () => window.removeEventListener('fiberops:topologia-changed', handler)
+  }, [load])
+
+  // Re-theme all nodes when theme changes (without reload)
+  useEffect(() => {
+    if (nodes.length === 0) return
+    setNodes(prev => prev.map(n => ({ ...n, data: { ...n.data, T } })))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [T])
+
+  const handleOrganize = useCallback(() => runLayout(nodes, edges), [nodes, edges, runLayout])
+  const handleFitView  = useCallback(() => fitView({ padding: 0.12, duration: 500 }), [fitView])
+
+  const btnStyle = {
+    padding: '7px 14px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+    border: `1px solid ${T.panelBorder}`, background: T.panelBg,
+    color: T.text, backdropFilter: 'blur(4px)',
+    display: 'flex', alignItems: 'center', gap: 5,
+  }
+
+  // ── Loading ──
+  if (loading) return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '100%', background: T.canvas, color: T.muted,
+      gap: 10, fontSize: 14, fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+    }}>
+      <div style={{
+        width: 20, height: 20, borderRadius: '50%',
+        border: `2px solid ${T.border}`, borderTopColor: T.feeder.stroke,
+        animation: 'spin .8s linear infinite',
+      }} />
+      Carregando topologia...
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+
+  // ── Error ──
+  if (error) return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
+      height: '100%', background: T.canvas, gap: 10,
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+    }}>
+      <span style={{ fontSize: 28 }}>⚠️</span>
+      <span style={{ color: '#ef4444', fontSize: 13 }}>{error}</span>
+      <button onClick={load} style={{ ...btnStyle, marginTop: 8, color: T.feeder.stroke }}>
+        ↻ Tentar novamente
+      </button>
+    </div>
+  )
+
+  // ── Empty ──
+  if (nodes.length === 0) return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '100%', background: T.canvas, color: T.muted, fontSize: 14, flexDirection: 'column', gap: 8,
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+    }}>
+      <span style={{ fontSize: 32 }}>📡</span>
+      <span>Nenhuma topologia configurada.</span>
+      <span style={{ fontSize: 12 }}>Configure OLTs e CE/CDOs para visualizar o diagrama.</span>
+    </div>
+  )
+
   return (
-    <div
-      style={{
-        height: altura,
-        borderRadius: 12,
-        overflow: 'hidden',
-        border: `1px solid ${C.border}`,
-        position: 'relative',
-      }}
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={NODE_TYPES}
+      fitView
+      minZoom={0.08}
+      maxZoom={2.5}
+      style={{ background: T.canvas }}
+      proOptions={{ hideAttribution: true }}
     >
+      <Background
+        variant={BackgroundVariant.Dots}
+        color={isDark ? '#21262d' : '#cbd5e1'}
+        gap={20}
+        size={1.5}
+      />
+      <Controls
+        style={{
+          background: T.panelBg, border: `1px solid ${T.panelBorder}`,
+          borderRadius: 8, backdropFilter: 'blur(4px)',
+        }}
+      />
+      {/* MiniMap — desktop only (hides on mobile to maximise diagram space) */}
+      {!isMobile && (
+        <MiniMap
+          style={{ background: T.mmBg, border: `1px solid ${T.panelBorder}` }}
+          maskColor={T.mmMask}
+          nodeColor={n => {
+            if (n.type === 'olt')      return T.oltBdr
+            if (n.type === 'cdo')      return T.cdoBdr
+            if (n.type === 'splitter') return T.splBdr
+            if (n.type === 'cto')      return T.ctoBdr
+            if (n.type === 'passagem') return T.muted
+            return T.muted
+          }}
+        />
+      )}
+
+      {/* Toolbar */}
+      <Panel position="top-left">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6,
+          fontFamily: "'Inter','Segoe UI',system-ui,sans-serif" }}>
+          <div style={{ display: 'flex', gap: isMobile ? 4 : 6, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+            <button onClick={handleOrganize} style={{ ...btnStyle, padding: isMobile ? '5px 10px' : '7px 14px', fontSize: isMobile ? 11 : 12 }}>⚡ Organizar</button>
+            <button onClick={handleFitView}  style={{ ...btnStyle, padding: isMobile ? '5px 10px' : '7px 14px', fontSize: isMobile ? 11 : 12 }}>⊡ Ajustar</button>
+            <button onClick={load} style={{ ...btnStyle, color: T.muted, padding: isMobile ? '5px 10px' : '7px 14px', fontSize: isMobile ? 11 : 12 }}>↻ Atualizar</button>
+          </div>
+          {/* Badges de contagem — hidden on mobile */}
+          {stats && !isMobile && (
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              {[
+                { label: 'OLT',  val: stats.olts,      c: T.oltBdr },
+                { label: 'CDO',  val: stats.cdos,      c: T.cdoBdr },
+                { label: 'SPL',  val: stats.splitters, c: T.splBdr },
+                { label: 'CTO',  val: stats.ctos,      c: T.ctoBdr },
+              ].map(s => (
+                <div key={s.label} style={{
+                  padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                  background: T.panelBg, border: `1px solid ${s.c}55`, color: s.c,
+                  backdropFilter: 'blur(4px)',
+                }}>
+                  {s.val} {s.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Panel>
+
+      {/* Legenda — desktop only */}
+      {!isMobile && (
+        <Panel position="bottom-left">
+          <LegendPanel T={T} />
+        </Panel>
+      )}
+    </ReactFlow>
+
+    {/* Mobile FAB + bottom sheet legend */}
+    {isMobile && (
+      <>
+        {/* FAB button */}
+        <button
+          onClick={() => setLegendOpen(o => !o)}
+          style={{
+            position: 'absolute', right: 14, bottom: 80, zIndex: 50,
+            width: 48, height: 48, borderRadius: '50%',
+            background: T.feeder.stroke, color: '#fff',
+            border: 'none', cursor: 'pointer', fontSize: 20,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+          }}
+        >
+          🔗
+        </button>
+
+        {/* Bottom sheet */}
+        {legendOpen && (
+          <>
+            {/* Backdrop */}
+            <div
+              onClick={() => setLegendOpen(false)}
+              style={{
+                position: 'absolute', inset: 0, zIndex: 51,
+                background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
+              }}
+            />
+            {/* Sheet */}
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 52,
+              background: T.panelBg, borderTop: `2px solid ${T.panelBorder}`,
+              borderRadius: '16px 16px 0 0',
+              padding: '16px 20px 32px',
+              maxHeight: '60vh', overflowY: 'auto',
+              fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+            }}>
+              {/* Handle bar */}
+              <div style={{ width: 40, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 16px' }} />
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <span style={{ fontWeight: 700, fontSize: 15, color: T.text }}>Legenda da Topologia</span>
+                <button onClick={() => setLegendOpen(false)}
+                  style={{ background: 'none', border: 'none', fontSize: 20, color: T.muted, cursor: 'pointer', lineHeight: 1 }}>
+                  ✕
+                </button>
+              </div>
+              {/* Tipos de enlace */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: T.muted, marginBottom: 10 }}>
+                  Tipos de enlace
+                </div>
+                {[
+                  { label: 'Feeder — OLT → CDO',       color: T.feeder.stroke,  w: 3 },
+                  { label: 'Distribuição — CDO → SPL',  color: T.distrib.stroke, w: 2 },
+                  { label: 'Drop — SPL → CTO',          color: T.drop.stroke,    w: 1.5 },
+                ].map(it => (
+                  <div key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                    <svg width={36} height={12} style={{ flexShrink: 0 }}>
+                      <line x1={0} y1={6} x2={36} y2={6} stroke={it.color} strokeWidth={it.w} />
+                    </svg>
+                    <span style={{ fontSize: 14, color: T.text }}>{it.label}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Fibras ABNT */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: T.muted, marginBottom: 10 }}>
+                  Fibras ABNT NBR 14721
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                  {ABNT.map(f => (
+                    <div key={f.idx} style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '8px 10px', borderRadius: 8,
+                      background: f.hex + '22', border: `1px solid ${f.hex}55`,
+                    }}>
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: f.hex, display: 'inline-block', flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: f.hex }}>F{f.idx}</span>
+                      <span style={{ fontSize: 11, color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nome}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </>
+    )}
+    </div>
+  )
+}
+
+// ─── Wrapper com Provider ─────────────────────────────────────────────────────
+
+export default function DiagramaFluxo({ projetoId, altura = '100%' }) {
+  return (
+    <div style={{ width: '100%', height: altura }}>
       <ReactFlowProvider>
-        <DiagramaFluxoInner projetoId={projetoId} altura={altura} />
+        <DiagramaFluxoInner projetoId={projetoId} />
       </ReactFlowProvider>
     </div>
   )

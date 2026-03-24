@@ -8,21 +8,37 @@
 import { useState, useEffect } from 'react'
 import { getDiagramaCaixa, saveDiagramaCaixa, getUsadosProjeto } from '@/actions/caixas'
 import { useTheme } from '@/contexts/ThemeContext'
+import { logTopoChange, validarConexao, criarFusaoAuto } from '@/lib/topologia-ftth'
+
+// ─── Mobile detection ─────────────────────────────────────────────────────────
+
+function useMobile() {
+  const [mobile, setMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  return mobile
+}
 
 // ─── ABNT NBR 14721 ───────────────────────────────────────────────────────────
+// Sequência: Verde · Amarelo · Branco · Azul · Vermelho · Violeta ·
+//            Marrom · Rosa · Preto · Cinza · Laranja · Aqua
 const ABNT = [
-  { idx: 1,  nome: 'Verde',    hex: '#15803d', text: '#dcfce7' },
-  { idx: 2,  nome: 'Amarelo',  hex: '#a16207', text: '#fef9c3' },
-  { idx: 3,  nome: 'Branco',   hex: '#475569', text: '#f1f5f9' },
-  { idx: 4,  nome: 'Azul',     hex: '#1d4ed8', text: '#dbeafe' },
-  { idx: 5,  nome: 'Vermelho', hex: '#b91c1c', text: '#fee2e2' },
-  { idx: 6,  nome: 'Violeta',  hex: '#6d28d9', text: '#ede9fe' },
-  { idx: 7,  nome: 'Marrom',   hex: '#78350f', text: '#fef3c7' },
-  { idx: 8,  nome: 'Rosa',     hex: '#9d174d', text: '#fce7f3' },
+  { idx: 1,  nome: 'Verde',    hex: '#16a34a', text: '#dcfce7' },
+  { idx: 2,  nome: 'Amarelo',  hex: '#ca8a04', text: '#fef9c3' },
+  { idx: 3,  nome: 'Branco',   hex: '#94a3b8', text: '#f1f5f9' },
+  { idx: 4,  nome: 'Azul',     hex: '#2563eb', text: '#dbeafe' },
+  { idx: 5,  nome: 'Vermelho', hex: '#dc2626', text: '#fee2e2' },
+  { idx: 6,  nome: 'Violeta',  hex: '#7c3aed', text: '#ede9fe' },
+  { idx: 7,  nome: 'Marrom',   hex: '#92400e', text: '#fef3c7' },
+  { idx: 8,  nome: 'Rosa',     hex: '#db2777', text: '#fce7f3' },
   { idx: 9,  nome: 'Preto',    hex: '#1e293b', text: '#cbd5e1' },
-  { idx: 10, nome: 'Cinza',    hex: '#374151', text: '#e5e7eb' },
-  { idx: 11, nome: 'Laranja',  hex: '#c2410c', text: '#ffedd5' },
-  { idx: 12, nome: 'Ciano',    hex: '#0e7490', text: '#cffafe' },
+  { idx: 10, nome: 'Cinza',    hex: '#6b7280', text: '#f3f4f6' },
+  { idx: 11, nome: 'Laranja',  hex: '#ea580c', text: '#ffedd5' },
+  { idx: 12, nome: 'Aqua',     hex: '#0891b2', text: '#cffafe' },
 ]
 
 const SPLITTER_TIPOS = ['1x2', '1x4', '1x8', '1x16', '1x32']
@@ -269,6 +285,124 @@ function AbaOLT({ entrada, onChange, olts, splitters, bandejas, isDark }) {
   )
 }
 
+// ─── Bandeja SVG — visualização ENTRADA → FUSÕES → SAÍDA ─────────────────────
+/**
+ * Renderiza a bandeja de forma visual:
+ *   ENTRADA  ●──────●──────●  SAÍDA
+ * Cada fusão aparece como linha horizontal com dots ABNT coloridos.
+ * Tipo pon tem cor própria (roxo). Fluxo: bandeja → splitter → CTO.
+ */
+function BandejaSvg({ fusoes = [], isDark }) {
+  const W = 360
+  const PAD = 14
+  const ROW_H = 28
+  const ENT_X = 28
+  const SAI_X = W - 28
+  const FUS_X = W / 2
+  const H = PAD * 2 + Math.max(fusoes.length, 1) * ROW_H
+
+  const textColor = isDark ? '#8b949e' : '#64748b'
+  const bg = isDark ? '#0d1117' : '#f8fafc'
+  const borderColor = isDark ? '#21262d' : '#e2e8f0'
+
+  // Cor do nó de fusão por tipo
+  function tipoColor(tipo) {
+    if (tipo === 'pon')         return '#8957e5'
+    if (tipo === 'conector')    return '#f59e0b'
+    if (tipo === 'passthrough') return '#06b6d4'
+    return '#484f58'
+  }
+
+  function abntColor(fibra) {
+    const c = ABNT[((fibra ?? 1) - 1) % ABNT.length]
+    return c?.hex ?? '#374151'
+  }
+
+  return (
+    <svg width={W} height={H} style={{ display: 'block', borderRadius: 8, backgroundColor: bg, border: `1px solid ${borderColor}` }}>
+      {/* Labels coluna */}
+      <text x={ENT_X} y={10} fontSize={8} fill={textColor} textAnchor="middle" fontFamily="system-ui" letterSpacing={1}>
+        ENTRADA
+      </text>
+      <text x={FUS_X} y={10} fontSize={8} fill={textColor} textAnchor="middle" fontFamily="system-ui" letterSpacing={1}>
+        FUSÕES
+      </text>
+      <text x={SAI_X} y={10} fontSize={8} fill={textColor} textAnchor="middle" fontFamily="system-ui" letterSpacing={1}>
+        SAÍDA
+      </text>
+
+      {fusoes.length === 0 && (
+        <text x={W / 2} y={H / 2 + 4} fontSize={11} fill={textColor} textAnchor="middle" fontFamily="system-ui">
+          Sem fusões
+        </text>
+      )}
+
+      {fusoes.map((f, i) => {
+        const y      = PAD + 6 + i * ROW_H + ROW_H / 2
+        const entC   = abntColor(f.entrada?.fibra)
+        const saiC   = abntColor(f.saida?.fibra)
+        const midC   = tipoColor(f.tipo)
+        const isCTO  = false   // saída direta da bandeja removida — somente via splitter
+        const isPON  = f.tipo === 'pon'
+
+        // Espessura da linha por tipo
+        const strokeW = isCTO ? 2 : isPON ? 2 : 1.5
+
+        return (
+          <g key={f.id ?? i}>
+            {/* Linha entrada → nó fusão */}
+            <line x1={ENT_X + 7} y1={y} x2={FUS_X - 8} y2={y}
+              stroke={entC} strokeWidth={strokeW} strokeLinecap="round" />
+            {/* Linha nó fusão → saída */}
+            <line x1={FUS_X + 8} y1={y} x2={SAI_X - 7} y2={y}
+              stroke={saiC} strokeWidth={strokeW} strokeLinecap="round" />
+
+            {/* Dot entrada (ABNT color) */}
+            <circle cx={ENT_X} cy={y} r={6} fill={entC} />
+            <text x={ENT_X} y={y + 3.5} fontSize={8} fill="#fff" textAnchor="middle" fontFamily="monospace" fontWeight="bold">
+              {f.entrada?.fibra ?? '?'}
+            </text>
+
+            {/* Nó de fusão */}
+            <circle cx={FUS_X} cy={y} r={7} fill={isDark ? '#161b22' : '#fff'} stroke={midC} strokeWidth={2} />
+            {/* Símbolo no nó */}
+            {isPON && (
+              <text x={FUS_X} y={y + 3} fontSize={7} fill={midC} textAnchor="middle" fontFamily="monospace" fontWeight="bold">P</text>
+            )}
+            {isCTO && (
+              <text x={FUS_X} y={y + 3} fontSize={7} fill={midC} textAnchor="middle" fontFamily="monospace" fontWeight="bold">→</text>
+            )}
+            {!isPON && !isCTO && (
+              <text x={FUS_X} y={y + 3} fontSize={7} fill={midC} textAnchor="middle" fontFamily="monospace">✕</text>
+            )}
+
+            {/* Label destino/PON acima do nó */}
+            {isCTO && f.destino_id && (
+              <text x={FUS_X} y={y - 10} fontSize={8} fill={midC} textAnchor="middle" fontFamily="system-ui" fontWeight="bold">
+                {f.destino_id.length > 10 ? f.destino_id.slice(0, 10) + '…' : f.destino_id}
+              </text>
+            )}
+            {isPON && f.pon_porta != null && (
+              <text x={FUS_X} y={y - 10} fontSize={8} fill={midC} textAnchor="middle" fontFamily="monospace">
+                {f.pon_placa != null ? `P${f.pon_placa}/` : ''}{f.pon_porta}
+              </text>
+            )}
+
+            {/* Dot saída (ABNT color) */}
+            <circle cx={SAI_X} cy={y} r={6} fill={saiC} />
+            <text x={SAI_X} y={y + 3.5} fontSize={8} fill="#fff" textAnchor="middle" fontFamily="monospace" fontWeight="bold">
+              {f.saida?.fibra ?? '?'}
+            </text>
+
+            {/* Número da fusão */}
+            <text x={4} y={y + 3.5} fontSize={8} fill={textColor} fontFamily="monospace">{i + 1}</text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
 // ─── Aba Bandejas ─────────────────────────────────────────────────────────────
 function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters, usadosGlobal, isDark }) {
   const S = getStyles(isDark)
@@ -280,15 +414,25 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
 
   function addFusao(bId) {
     const b = bandejas.find(b => b.id === bId)
-    upBandeja(bId, { fusoes: [...b.fusoes, { id: uid(), entrada: { tubo: 1, fibra: 1 }, saida: { tubo: 1, fibra: 1 }, tipo: 'fusao', obs: '', destino_id: '' }] })
+    const novaFusao = criarFusaoAuto({ fibraEntrada: (b.fusoes.length % 12) + 1, fibraSaida: (b.fusoes.length % 12) + 1 })
+    upBandeja(bId, { fusoes: [...b.fusoes, novaFusao] })
+    logTopoChange('fusao_criada', { fusao_id: novaFusao.id, bandeja_id: bId })
   }
   function remFusao(bId, fId) {
     upBandeja(bId, { fusoes: bandejas.find(b => b.id === bId).fusoes.filter(f => f.id !== fId) })
+    logTopoChange('fusao_removida', { fusao_id: fId, bandeja_id: bId })
   }
   function upFusao(bId, fId, p) {
     const b = bandejas.find(b => b.id === bId)
     const currentF = b.fusoes.find(f => f.id === fId)
     const updated = { ...currentF, ...p }
+
+    // Bloquear saída direta da bandeja — fluxo obrigatório: bandeja → SPLITTER → CTO
+    if (p.tipo && (p.tipo === 'saida_cto' || p.tipo === 'saida_cdo')) {
+      console.warn('[Topologia] Saída direta da bandeja para CTO/CDO não permitida. Use splitter.')
+      return
+    }
+
     upBandeja(bId, { fusoes: b.fusoes.map(f => f.id === fId ? updated : f) })
 
     if (onChangeSplitters && splitters) {
@@ -322,6 +466,8 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
   }))
   const dioGlobal = new Set([...dioLocal, ...(usadosGlobal?.dios ?? [])])
 
+  const [vistaVisual, setVistaVisual] = useState({}) // bandeja.id → boolean
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -335,18 +481,36 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
         </div>
       )}
 
-      {bandejas.map((b, bi) => (
+      {bandejas.map((b, bi) => {
+        const visual = vistaVisual[b.id] ?? false
+        return (
         <div key={b.id} style={{ ...S.sec, borderLeft: '3px solid #1f6feb' }}>
           {/* Header bandeja */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: b.fusoes.length ? 14 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: b.fusoes.length ? 10 : 0, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#58a6ff' }}>🗂️ Bandeja {bi + 1}</span>
             <input value={b.nome} onChange={e => upBandeja(b.id, { nome: e.target.value })}
-              style={{ ...S.inp, flex: 1, padding: '4px 8px', fontSize: 12, height: 28 }} />
+              style={{ ...S.inp, flex: 1, minWidth: 80, padding: '4px 8px', fontSize: 12, height: 28 }} />
+            {/* Toggle visual/tabela */}
+            <button
+              onClick={() => setVistaVisual(v => ({ ...v, [b.id]: !visual }))}
+              title={visual ? 'Vista tabela' : 'Vista visual'}
+              style={{ ...S.btnAdd, background: visual ? 'rgba(88,166,255,0.2)' : 'rgba(88,166,255,0.08)',
+                border: `1px solid ${visual ? '#58a6ff' : 'rgba(88,166,255,0.3)'}`,
+                color: '#58a6ff', padding: '4px 8px', fontSize: 13, minHeight: 28 }}>
+              {visual ? '📋' : '🖼️'}
+            </button>
             <button onClick={() => addFusao(b.id)} style={{ ...S.btnAdd, whiteSpace: 'nowrap' }}>+ Fusão</button>
             <button onClick={() => remBandeja(b.id)} style={S.btnDel}>🗑️</button>
           </div>
 
-          {b.fusoes.length > 0 && (
+          {/* Vista visual ENTRADA → FUSÕES → SAÍDA */}
+          {b.fusoes.length > 0 && visual && (
+            <div style={{ marginBottom: 12, overflowX: 'auto' }}>
+              <BandejaSvg fusoes={b.fusoes} isDark={isDark} />
+            </div>
+          )}
+
+          {b.fusoes.length > 0 && !visual && (
             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               <table style={{ minWidth: 520, borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
@@ -406,15 +570,13 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
 
                         {/* Tipo */}
                         <td style={{ padding: '5px 4px' }}>
-                          <select value={f.tipo} onChange={e => upFusao(b.id, f.id, { tipo: e.target.value, destino_id: '' })}
+                          <select value={f.tipo} onChange={e => upFusao(b.id, f.id, { tipo: e.target.value })}
                             style={{ ...S.inp, padding: '4px 4px', width: 90, fontSize: 11,
-                              borderColor: f.tipo === 'saida_cto' ? '#3fb950' : f.tipo === 'saida_cdo' ? '#8957e5' : BORDER }}>
+                              borderColor: f.tipo === 'pon' ? '#8957e5' : BORDER }}>
                             <option value="fusao">Fusão</option>
-                            <option value="pon">PON</option>
+                            <option value="pon">PON→SPL</option>
                             <option value="conector">Conector</option>
                             <option value="passthrough">Passagem</option>
-                            <option value="saida_cto">→ CTO</option>
-                            <option value="saida_cdo">→ CDO/CEO</option>
                           </select>
                         </td>
 
@@ -438,22 +600,24 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
                                   return <option key={p} value={p} disabled={occupied}>{p}{occupied ? ' [-]' : ''}</option>
                                 })}
                               </select>
+                              {/* Splitter vinculado — obrigatório para tipo pon */}
                               <select value={f.splitter_id ?? ''} onChange={e => {
                                 const sid = e.target.value || null
                                 upFusao(b.id, f.id, { splitter_id: sid })
                                 if (sid && onChangeSplitters && splitters) {
                                   onChangeSplitters(splitters.map(s => s.id === sid ? {
                                     ...s,
-                                    entrada: { ...s.entrada, fibra: f.entrada?.fibra ?? s.entrada.fibra },
+                                    entrada: { ...s.entrada, fibra: f.saida?.fibra ?? f.entrada?.fibra ?? s.entrada.fibra },
                                     pon_placa: f.pon_placa ?? null,
                                     pon_porta: f.pon_porta ?? null,
                                   } : s))
                                 }
                               }} style={{ ...S.inp, width: 80, padding: '4px 4px', fontSize: 11,
-                                borderColor: f.splitter_id ? '#e3b341' : BORDER }}>
-                                <option value="">↳ SPL</option>
+                                borderColor: f.splitter_id ? '#e3b341' : '#f85149' }}>
+                                <option value="">↳ SPL *</option>
                                 {(splitters ?? []).map((s, si) => <option key={s.id} value={s.id}>{s.nome || `SPL ${si + 1}`}</option>)}
                               </select>
+                              {!f.splitter_id && <span style={{ fontSize: 10, color: '#f85149', fontWeight: 700 }}>⚠SPL?</span>}
                               {isDup && <span title={globalDup ? 'PON em uso em outra CDO/CEO do projeto' : 'PON duplicada nesta caixa'}
                                 style={{ fontSize: 10, color: '#f85149', fontWeight: 700, whiteSpace: 'nowrap' }}>⚠{globalDup ? 'PROJ' : 'DUP'}</span>}
                               {!isDup && f.pon_placa != null && f.pon_porta != null && (
@@ -461,30 +625,6 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
                                   P{f.pon_placa}/{f.pon_porta}
                                 </span>
                               )}
-                            </div>
-                          ) : f.tipo === 'saida_cto' ? (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: '#3fb950', whiteSpace: 'nowrap', background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)', borderRadius: 5, padding: '2px 7px' }}>→ CTO</span>
-                              <input
-                                value={f.destino_id ?? ''}
-                                onChange={e => upFusao(b.id, f.id, { destino_id: e.target.value })}
-                                placeholder="ID da CTO"
-                                style={{ ...S.inp, padding: '4px 7px', fontSize: 11, minWidth: 90, borderColor: f.destino_id?.trim() ? '#3fb950' : BORDER }}
-                              />
-                              <input value={f.obs ?? ''} onChange={e => upFusao(b.id, f.id, { obs: e.target.value })}
-                                placeholder="obs" style={{ ...S.inp, padding: '4px 7px', fontSize: 11, minWidth: 60 }} />
-                            </div>
-                          ) : f.tipo === 'saida_cdo' ? (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: '#8957e5', whiteSpace: 'nowrap', background: 'rgba(137,87,229,0.1)', border: '1px solid rgba(137,87,229,0.3)', borderRadius: 5, padding: '2px 7px' }}>→ CDO</span>
-                              <input
-                                value={f.destino_id ?? ''}
-                                onChange={e => upFusao(b.id, f.id, { destino_id: e.target.value })}
-                                placeholder="ID da CDO/CEO"
-                                style={{ ...S.inp, padding: '4px 7px', fontSize: 11, minWidth: 90, borderColor: f.destino_id?.trim() ? '#8957e5' : BORDER }}
-                              />
-                              <input value={f.obs ?? ''} onChange={e => upFusao(b.id, f.id, { obs: e.target.value })}
-                                placeholder="obs" style={{ ...S.inp, padding: '4px 7px', fontSize: 11, minWidth: 60 }} />
                             </div>
                           ) : (
                             <input value={f.obs ?? ''} onChange={e => upFusao(b.id, f.id, { obs: e.target.value })}
@@ -509,16 +649,17 @@ function AbaBandejas({ bandejas, onChange, entrada, splitters, onChangeSplitters
             </p>
           )}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
 
 // ─── Aba Splitters ────────────────────────────────────────────────────────────
-function AbaSplitters({ splitters, onChange, bandejas, isDark }) {
+function AbaSplitters({ splitters, onChange, bandejas, isDark, ctos = [], caixas = [] }) {
   const S = getStyles(isDark)
   // Bypass splitters são gerados automaticamente pelas saídas diretas da bandeja — não exibir aqui
-  const nonBypass = (splitters ?? []).filter(s => !s.id?.startsWith('bypass-'))
+  const nonBypass = splitters ?? []
 
   function addSplitter() {
     const saidas = Array.from({ length: 8 }, (_, i) => ({ porta: i + 1, tipo: 'cto', cto_id: '', obs: '' }))
@@ -535,10 +676,7 @@ function AbaSplitters({ splitters, onChange, bandejas, isDark }) {
     upSplitter(sId, { saidas: s.saidas.map(sd => sd.porta === porta ? { ...sd, ...p } : sd) })
   }
 
-  // Saídas diretas da bandeja (bypass) para exibir em resumo
-  const bypassFusoes = (bandejas ?? []).flatMap(b =>
-    (b.fusoes ?? []).filter(f => f.tipo === 'saida_cto' || f.tipo === 'saida_cdo')
-  )
+  // (saídas diretas da bandeja removidas — fluxo obrigatório: bandeja → splitter → CTO)
 
   return (
     <div>
@@ -547,45 +685,7 @@ function AbaSplitters({ splitters, onChange, bandejas, isDark }) {
         <button onClick={addSplitter} style={S.btnAdd}>+ Splitter</button>
       </div>
 
-      {/* Saídas diretas da bandeja */}
-      {bypassFusoes.length > 0 && (
-        <div style={{ ...S.sec, borderLeft: '3px solid #22c55e', marginBottom: 12 }}>
-          <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#22c55e', marginBottom: 10 }}>
-            Saídas Diretas da Bandeja ({bypassFusoes.length})
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {bypassFusoes.map((f, i) => {
-              const fo = ABNT.find(a => a.idx === f.entrada?.fibra)
-              return (
-                <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-                  padding: '7px 10px', borderRadius: 7,
-                  backgroundColor: f.destino_id?.trim() ? 'rgba(34,197,94,0.07)' : BG3,
-                  border: `1px solid ${f.destino_id?.trim() ? 'rgba(34,197,94,0.3)' : BORDER}` }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
-                    background: f.tipo === 'saida_cto' ? 'rgba(34,197,94,0.15)' : 'rgba(139,87,229,0.15)',
-                    border: `1px solid ${f.tipo === 'saida_cto' ? 'rgba(34,197,94,0.4)' : 'rgba(139,87,229,0.4)'}`,
-                    color: f.tipo === 'saida_cto' ? '#22c55e' : '#8957e5' }}>
-                    {f.tipo === 'saida_cto' ? '→ CTO' : '→ CDO'}
-                  </span>
-                  {fo && (
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 5,
-                      backgroundColor: fo.hex, color: fo.text }}>
-                      FO {fo.idx} {fo.nome}
-                    </span>
-                  )}
-                  <span style={{ fontSize: 12, fontWeight: 600, color: f.destino_id?.trim() ? '#e6edf3' : '#484f58' }}>
-                    {f.destino_id?.trim() || <em style={{ color: '#484f58' }}>sem destino</em>}
-                  </span>
-                  {f.obs?.trim() && <span style={{ fontSize: 11, color: '#8b949e' }}>{f.obs}</span>}
-                  <span style={{ fontSize: 10, color: '#484f58', marginLeft: 'auto' }}>gerenciado na bandeja</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {nonBypass.length === 0 && bypassFusoes.length === 0 && (
+      {nonBypass.length === 0 && (
         <div style={{ ...S.sec, textAlign: 'center', color: '#484f58', padding: '32px' }}>
           Nenhum splitter. Clique "+ Splitter".
         </div>
@@ -641,32 +741,79 @@ function AbaSplitters({ splitters, onChange, bandejas, isDark }) {
             </div>
 
             {/* Saídas */}
-            <p style={{ ...S.lbl, color: '#3fb950', marginBottom: 8 }}>🟢 Saídas — {s.saidas.length} portas</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))', gap: 6 }}>
-              {s.saidas.map(sd => (
-                <div key={sd.porta} style={{
-                  backgroundColor: sd.cto_id?.trim() ? 'rgba(63,185,80,0.08)' : BG3,
-                  border: `1px solid ${sd.cto_id?.trim() ? 'rgba(63,185,80,0.3)' : BORDER}`,
-                  borderRadius: 7, padding: '7px 9px',
-                }}>
-                  <p style={{ ...S.lbl, color: sd.cto_id?.trim() ? '#3fb950' : '#484f58', marginBottom: 4 }}>S{sd.porta}</p>
-                  <select
-                    value={sd.tipo ?? 'cto'}
-                    onChange={e => upSaida(s.id, sd.porta, { tipo: e.target.value, cto_id: '' })}
-                    style={{ ...S.inp, marginBottom: 4, padding: '3px 6px', fontSize: 11 }}
-                  >
-                    <option value="cto">CTO</option>
-                    <option value="pon">PON</option>
-                    <option value="cdo">CDO/CEO</option>
-                    <option value="passagem">Passagem</option>
-                  </select>
-                  <input value={sd.cto_id ?? ''} onChange={e => upSaida(s.id, sd.porta, { cto_id: e.target.value })}
-                    placeholder={sd.tipo === 'pon' ? 'ID PON' : sd.tipo === 'cdo' ? 'ID CDO' : sd.tipo === 'passagem' ? 'ID/Nome' : 'ID CTO'}
-                    style={{ ...S.inp, marginBottom: 3, padding: '3px 7px', fontSize: 12 }} />
-                  <input value={sd.obs ?? ''} onChange={e => upSaida(s.id, sd.porta, { obs: e.target.value })}
-                    placeholder="Obs" style={{ ...S.inp, padding: '3px 7px', fontSize: 11 }} />
-                </div>
-              ))}
+            <p style={{ ...S.lbl, color: '#3fb950', marginBottom: 8 }}>Saídas — {s.saidas.length} portas</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 6 }}>
+              {s.saidas.map(sd => {
+                const portaHex = ABNT[(sd.porta - 1) % 12]?.hex ?? '#374151'
+                const portaText = ABNT[(sd.porta - 1) % 12]?.text ?? '#e5e7eb'
+                const mainPlaceholder =
+                  sd.tipo === 'pon'          ? 'ID PON' :
+                  sd.tipo === 'cdo'          ? 'ID CE/CDO' :
+                  sd.tipo === 'passagem'     ? 'ID/Nome' :
+                  sd.tipo === 'conector'     ? 'Porta física' :
+                  sd.tipo === 'fusao_bandeja' ? 'ID Bandeja' :
+                  'ID CTO'
+                return (
+                  <div key={sd.porta} style={{
+                    backgroundColor: sd.cto_id?.trim() ? 'rgba(63,185,80,0.08)' : BG3,
+                    border: `1px solid ${sd.cto_id?.trim() ? 'rgba(63,185,80,0.3)' : BORDER}`,
+                    borderRadius: 7, padding: '7px 9px',
+                    borderTop: `2px solid ${portaHex}`,
+                  }}>
+                    {/* Header: fibra dot + port label */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
+                      <span style={{
+                        width: 9, height: 9, borderRadius: '50%', display: 'inline-block', flexShrink: 0,
+                        background: portaHex, boxShadow: `0 0 4px ${portaHex}88`,
+                        border: `1px solid ${portaHex}aa`,
+                      }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: portaHex }}>S{sd.porta}</span>
+                    </div>
+                    {/* Tipo select */}
+                    <select
+                      value={sd.tipo ?? 'cto'}
+                      onChange={e => upSaida(s.id, sd.porta, { tipo: e.target.value, cto_id: '' })}
+                      style={{ ...S.inp, marginBottom: 4, padding: '3px 6px', fontSize: 11 }}
+                    >
+                      <option value="cto">CTO</option>
+                      <option value="pon">PON</option>
+                      <option value="cdo">CE/CDO</option>
+                      <option value="passagem">Passagem</option>
+                      <option value="conector">Conector</option>
+                      <option value="fusao_bandeja">Fusão Bandeja</option>
+                    </select>
+                    {/* Main destination ID — dropdown for CTO/CDO, free text otherwise */}
+                    {(sd.tipo === 'cto' || !sd.tipo) ? (
+                      <select value={sd.cto_id ?? ''} onChange={e => upSaida(s.id, sd.porta, { cto_id: e.target.value })}
+                        style={{ ...S.inp, marginBottom: 3, padding: '3px 7px', fontSize: 12 }}>
+                        <option value="">— Selecione CTO —</option>
+                        {ctos.map(c => (
+                          <option key={c.cto_id ?? c._id} value={c.cto_id ?? c._id}>
+                            {c.nome ?? c.cto_id ?? c._id}
+                          </option>
+                        ))}
+                      </select>
+                    ) : sd.tipo === 'cdo' ? (
+                      <select value={sd.cto_id ?? ''} onChange={e => upSaida(s.id, sd.porta, { cto_id: e.target.value })}
+                        style={{ ...S.inp, marginBottom: 3, padding: '3px 7px', fontSize: 12 }}>
+                        <option value="">— Selecione CE/CDO —</option>
+                        {caixas.map(c => (
+                          <option key={c._id} value={c._id}>
+                            {c.nome ?? c._id}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input value={sd.cto_id ?? ''} onChange={e => upSaida(s.id, sd.porta, { cto_id: e.target.value })}
+                        placeholder={mainPlaceholder}
+                        style={{ ...S.inp, marginBottom: 3, padding: '3px 7px', fontSize: 12 }} />
+                    )}
+                    {/* Obs */}
+                    <input value={sd.obs ?? ''} onChange={e => upSaida(s.id, sd.porta, { obs: e.target.value })}
+                      placeholder="Obs" style={{ ...S.inp, padding: '3px 7px', fontSize: 11 }} />
+                  </div>
+                )
+              })}
             </div>
           </div>
         )
@@ -738,9 +885,9 @@ function AbaResumo({ entrada, bandejas, splitters, cabos, isDark }) {
           { label: 'Porta', val: entrada.porta_olt ?? '—', cor: '#3fb950' },
           { label: 'Bandejas', val: bandejas.length, cor: '#58a6ff' },
           { label: 'Fusões', val: totalFusoes, cor: '#a5d6ff' },
-          { label: 'Splitters', val: splitters.filter(s => !s.id?.startsWith('bypass-')).length, cor: '#e3b341' },
+          { label: 'Splitters', val: splitters.length, cor: '#e3b341' },
           { label: 'CTOs ligadas', val: `${ligadas}/${totalSaidas}`, cor: '#3fb950' },
-          { label: 'Saídas diretas', val: bandejas.reduce((a, b) => a + (b.fusoes ?? []).filter(f => f.tipo === 'saida_cto' || f.tipo === 'saida_cdo').length, 0), cor: '#22c55e' },
+          { label: 'PONs usadas', val: bandejas.reduce((a, b) => a + (b.fusoes ?? []).filter(f => f.tipo === 'pon').length, 0), cor: '#8957e5' },
           { label: 'Cabos', val: (cabos ?? []).length, cor: '#bc8cff' },
         ].map(it => (
           <div key={it.label} style={{ backgroundColor: BG2, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '12px 14px', borderTop: `3px solid ${it.cor}` }}>
@@ -794,6 +941,529 @@ function AbaResumo({ entrada, bandejas, splitters, cabos, isDark }) {
   )
 }
 
+// ─── Mobile step editor ───────────────────────────────────────────────────────
+
+const MOBILE_STEPS = [
+  { id: 'entrada', label: 'PON / Entrada', icon: '⚡', cor: '#1f6feb' },
+  { id: 'bandeja', label: 'Bandeja',       icon: '🗂️', cor: '#58a6ff' },
+  { id: 'splitter', label: 'Splitter',     icon: '🔀', cor: '#e3b341' },
+  { id: 'saidas',  label: 'Saídas',        icon: '📡', cor: '#3fb950' },
+]
+
+function MobileCDOEditor({
+  ceId, entrada, setEntrada, bandejas, setBandejas,
+  splitters, setSplitters, olts, usadosGlobal, saving, salvar, sucesso, erro, isDark
+}) {
+  const S   = getStyles(isDark)
+  const bg  = isDark ? '#0d1117' : '#ffffff'
+  const bg2 = isDark ? '#161b22' : '#f8fafc'
+  const bg3 = isDark ? '#1c2333' : '#f1f5f9'
+  const br  = isDark ? '#30363d' : '#e2e8f0'
+  const txt = isDark ? '#e6edf3' : '#1e293b'
+  const mut = isDark ? '#8b949e' : '#64748b'
+
+  const [step, setStep] = useState(0)
+  const curStep = MOBILE_STEPS[step]
+
+  // ── touch-friendly styles ──
+  const card = {
+    backgroundColor: bg2, border: `1px solid ${br}`, borderRadius: 12,
+    padding: '14px 16px', marginBottom: 10,
+  }
+  const bigBtn = (active, color) => ({
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '14px 16px', borderRadius: 10, cursor: 'pointer',
+    backgroundColor: active ? color + '18' : bg3,
+    border: `2px solid ${active ? color : br}`,
+    width: '100%', textAlign: 'left', color: txt, fontSize: 14, fontWeight: 600,
+    marginBottom: 8,
+  })
+  const navBtn = (disabled) => ({
+    flex: 1, padding: '14px', borderRadius: 10, fontSize: 15, fontWeight: 700,
+    cursor: disabled ? 'not-allowed' : 'pointer', border: 'none',
+    background: disabled ? br : '#1f6feb', color: disabled ? mut : '#fff',
+    opacity: disabled ? 0.5 : 1, minHeight: 52,
+  })
+
+  function uid() { return Math.random().toString(36).slice(2, 9) }
+
+  // ── Step 1: Entrada/PON ──
+  function renderEntrada() {
+    const oltAtual = (olts ?? []).find(o => o.id === entrada.olt_id)
+    const dioMapa  = oltAtual?.dio_config?.mapa ?? []
+    const portaSel = entrada.porta_olt ?? null
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {/* OLT */}
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: mut, marginBottom: 8, letterSpacing: '0.07em' }}>
+          Selecionar OLT
+        </div>
+        {(olts ?? []).length === 0 && (
+          <div>
+            <label style={{ fontSize: 12, color: mut, display: 'block', marginBottom: 4 }}>ID da OLT</label>
+            <input value={entrada.olt_id} onChange={e => setEntrada({ ...entrada, olt_id: e.target.value })}
+              placeholder="ex: OLT-01"
+              style={{ ...S.inp, fontSize: 16, padding: '12px 14px', borderRadius: 10, marginBottom: 12 }} />
+          </div>
+        )}
+        {(olts ?? []).map(o => {
+          const ativa = entrada.olt_id === o.id
+          return (
+            <button key={o.id} style={bigBtn(ativa, '#1f6feb')}
+              onClick={() => setEntrada({ ...entrada, olt_id: ativa ? '' : o.id, porta_olt: null, pon: null })}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: ativa ? '#58a6ff' : txt }}>{o.nome}</div>
+                <div style={{ fontSize: 12, color: mut }}>{o.id} · {o.capacidade ?? 16} PONs</div>
+              </div>
+              {ativa && <span style={{ color: '#1f6feb', fontSize: 20 }}>✓</span>}
+            </button>
+          )
+        })}
+
+        {/* DIO ports */}
+        {oltAtual && dioMapa.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: mut, marginBottom: 8, letterSpacing: '0.07em' }}>
+              Porta DIO
+            </div>
+            {[...dioMapa].sort((a, b) => a.porta - b.porta).map(m => {
+              const sel = portaSel === m.porta
+              return (
+                <button key={m.porta} style={bigBtn(sel, '#8957e5')}
+                  onClick={() => setEntrada({ ...entrada, porta_olt: sel ? null : m.porta, pon: sel ? null : (m.pon ?? null) })}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{
+                      fontSize: 13, fontWeight: 800, color: '#f97316', fontFamily: 'monospace',
+                      background: 'rgba(249,115,22,0.15)', borderRadius: 6, padding: '4px 10px', flexShrink: 0
+                    }}>D{m.porta}</span>
+                    {m.pon != null && (
+                      <span style={{ fontSize: 13, fontWeight: 700, color: sel ? '#a78bfa' : mut }}>
+                        PON {m.pon}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 13, color: sel ? txt : mut }}>{m.local || '—'}</span>
+                  </div>
+                  {sel && <span style={{ color: '#8957e5', fontSize: 20 }}>✓</span>}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Resumo */}
+        {entrada.olt_id && (
+          <div style={{ ...card, borderColor: '#1f6feb55', background: '#1f6feb11', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: mut, marginBottom: 6, fontWeight: 700 }}>Vínculo selecionado</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ background: '#1f6feb22', border: '1px solid #1f6feb44', borderRadius: 6, padding: '4px 10px', fontSize: 13, color: '#58a6ff', fontWeight: 700 }}>
+                🖥 {entrada.olt_id}
+              </span>
+              {entrada.porta_olt != null && (
+                <span style={{ background: '#f9731622', border: '1px solid #f9731644', borderRadius: 6, padding: '4px 10px', fontSize: 13, color: '#fb923c', fontWeight: 700 }}>
+                  D{entrada.porta_olt}
+                </span>
+              )}
+              {entrada.pon != null && (
+                <span style={{ background: '#8957e522', border: '1px solid #8957e544', borderRadius: 6, padding: '4px 10px', fontSize: 13, color: '#a78bfa', fontWeight: 700 }}>
+                  PON {entrada.pon}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Step 2: Bandejas ──
+  function renderBandeja() {
+    function addBandeja() {
+      setBandejas([...bandejas, { id: uid(), nome: `Bandeja ${bandejas.length + 1}`, fusoes: [] }])
+    }
+    function addFusao(bId) {
+      const n = bandejas.find(b => b.id === bId)?.fusoes?.length ?? 0
+      const fibra = (n % 12) + 1
+      setBandejas(bandejas.map(b => b.id !== bId ? b : {
+        ...b, fusoes: [...b.fusoes, { id: uid(), tipo: 'pon', entrada: { fibra }, saida: { fibra }, pon_placa: null, pon_porta: null, splitter_id: null }]
+      }))
+    }
+    function remFusao(bId, fId) {
+      setBandejas(bandejas.map(b => b.id !== bId ? b : { ...b, fusoes: b.fusoes.filter(f => f.id !== fId) }))
+    }
+    function upFusao(bId, fId, p) {
+      if (p.tipo === 'saida_cto' || p.tipo === 'saida_cdo') return
+      setBandejas(bandejas.map(b => b.id !== bId ? b : {
+        ...b, fusoes: b.fusoes.map(f => f.id !== fId ? f : { ...f, ...p })
+      }))
+    }
+    function remBandeja(bId) { setBandejas(bandejas.filter(b => b.id !== bId)) }
+
+    return (
+      <div>
+        {bandejas.length === 0 && (
+          <div style={{ ...card, textAlign: 'center', color: mut, padding: '32px 16px' }}>
+            Nenhuma bandeja. Toque em "+ Bandeja".
+          </div>
+        )}
+        {bandejas.map((b, bi) => (
+          <div key={b.id} style={{ ...card, borderLeft: '4px solid #1f6feb' }}>
+            {/* Header bandeja */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#58a6ff', flex: 1 }}>🗂️ {b.nome}</span>
+              <button onClick={() => remBandeja(b.id)}
+                style={{ background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', color: '#f85149', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
+                🗑️
+              </button>
+            </div>
+            {/* Fusões */}
+            {b.fusoes.map((f, fi) => {
+              const entC = ABNT.find(a => a.idx === f.entrada?.fibra)
+              const saiC = ABNT.find(a => a.idx === (f.saida?.fibra ?? f.entrada?.fibra))
+              return (
+                <div key={f.id} style={{
+                  backgroundColor: bg3, borderRadius: 10, padding: '12px 14px',
+                  marginBottom: 8, border: `1px solid ${br}`,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, color: mut, fontFamily: 'monospace' }}>#{fi + 1}</span>
+                    {/* Entrada dot */}
+                    <span style={{ width: 14, height: 14, borderRadius: '50%', background: entC?.hex ?? '#374151', display: 'inline-block', border: '2px solid #fff4' }} />
+                    <span style={{ fontSize: 13, color: entC?.hex ?? mut, fontWeight: 700 }}>F{f.entrada?.fibra ?? '?'}</span>
+                    <span style={{ color: br }}>→</span>
+                    <span style={{ width: 14, height: 14, borderRadius: '50%', background: saiC?.hex ?? '#374151', display: 'inline-block', border: '2px solid #fff4' }} />
+                    <span style={{ fontSize: 13, color: saiC?.hex ?? mut, fontWeight: 700 }}>F{f.saida?.fibra ?? f.entrada?.fibra ?? '?'}</span>
+                    <span style={{ flex: 1 }} />
+                    <button onClick={() => remFusao(b.id, f.id)}
+                      style={{ background: 'none', border: 'none', color: '#f85149', fontSize: 18, cursor: 'pointer', padding: '0 4px', lineHeight: 1 }}>✕</button>
+                  </div>
+                  {/* Seletores FO */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: mut, display: 'block', marginBottom: 3 }}>FO Entrada</label>
+                      <select value={f.entrada?.fibra ?? 1}
+                        onChange={e => upFusao(b.id, f.id, { entrada: { ...f.entrada, fibra: +e.target.value } })}
+                        style={{ width: '100%', padding: '10px 8px', fontSize: 14, borderRadius: 8, border: `1px solid ${br}`, backgroundColor: entC?.hex ?? bg3, color: entC?.text ?? txt, fontWeight: 700, cursor: 'pointer' }}>
+                        {ABNT.map(c => <option key={c.idx} value={c.idx} style={{ backgroundColor: c.hex, color: c.text }}>F{c.idx} {c.nome}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: mut, display: 'block', marginBottom: 3 }}>FO Saída</label>
+                      <select value={f.saida?.fibra ?? f.entrada?.fibra ?? 1}
+                        onChange={e => upFusao(b.id, f.id, { saida: { ...f.saida, fibra: +e.target.value } })}
+                        style={{ width: '100%', padding: '10px 8px', fontSize: 14, borderRadius: 8, border: `1px solid ${br}`, backgroundColor: saiC?.hex ?? bg3, color: saiC?.text ?? txt, fontWeight: 700, cursor: 'pointer' }}>
+                        {ABNT.map(c => <option key={c.idx} value={c.idx} style={{ backgroundColor: c.hex, color: c.text }}>F{c.idx} {c.nome}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  {/* Vinculo splitter para tipo pon */}
+                  {f.tipo === 'pon' && (
+                    <div>
+                      <label style={{ fontSize: 11, color: mut, display: 'block', marginBottom: 3 }}>Splitter vinculado</label>
+                      <select value={f.splitter_id ?? ''}
+                        onChange={e => upFusao(b.id, f.id, { splitter_id: e.target.value || null })}
+                        style={{ ...S.inp, padding: '10px 8px', fontSize: 14, borderRadius: 8, borderColor: f.splitter_id ? '#e3b341' : '#f85149' }}>
+                        <option value="">— selecionar splitter *</option>
+                        {splitters.map((s, si) => <option key={s.id} value={s.id}>{s.nome || `SPL ${si + 1}`} ({s.tipo})</option>)}
+                      </select>
+                      {!f.splitter_id && <div style={{ fontSize: 11, color: '#f85149', marginTop: 3 }}>⚠ Vincule a um splitter</div>}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            <button onClick={() => addFusao(b.id)}
+              style={{ width: '100%', padding: '12px', borderRadius: 10, border: '2px dashed #1f6feb88', background: 'rgba(31,111,235,0.06)', color: '#58a6ff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+              + Fusão
+            </button>
+          </div>
+        ))}
+        <button onClick={addBandeja}
+          style={{ width: '100%', padding: '16px', borderRadius: 10, border: '2px dashed #58a6ff88', background: 'rgba(88,166,255,0.06)', color: '#58a6ff', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginTop: 4 }}>
+          + Bandeja
+        </button>
+      </div>
+    )
+  }
+
+  // ── Step 3: Splitters ──
+  function renderSplitter() {
+    function addSplitter() {
+      const saidas = Array.from({ length: 8 }, (_, i) => ({ porta: i + 1, tipo: 'cto', cto_id: '', obs: '' }))
+      setSplitters([...splitters, { id: uid(), nome: `Splitter ${splitters.length + 1}`, tipo: '1x8', entrada: { tubo: 1, fibra: 1 }, saidas }])
+    }
+    function remSplitter(id) { setSplitters(splitters.filter(s => s.id !== id)) }
+    function upSplitter(id, p) { setSplitters(splitters.map(s => s.id === id ? { ...s, ...p } : s)) }
+    function changeTipo(id, tipo) {
+      const qtd = parseInt(tipo.split('x')[1])
+      upSplitter(id, { tipo, saidas: Array.from({ length: qtd }, (_, i) => ({ porta: i + 1, tipo: 'cto', cto_id: '', obs: '' })) })
+    }
+
+    const linkedFusaoMap = new Map(
+      bandejas.flatMap(b => b.fusoes ?? []).filter(f => f.splitter_id).map(f => [f.splitter_id, f])
+    )
+
+    return (
+      <div>
+        {splitters.length === 0 && (
+          <div style={{ ...card, textAlign: 'center', color: mut, padding: '32px 16px' }}>
+            Nenhum splitter. Toque em "+ Splitter".
+          </div>
+        )}
+        {splitters.map((s, si) => {
+          const ligadas = s.saidas.filter(sd => sd.cto_id?.trim()).length
+          const entC = ABNT.find(a => a.idx === s.entrada.fibra)
+          const linked = linkedFusaoMap.get(s.id)
+          return (
+            <div key={s.id} style={{ ...card, borderLeft: `4px solid ${linked ? '#e3b341' : br}` }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#e3b341', flex: 1 }}>🔀 {s.nome}</span>
+                <button onClick={() => remSplitter(s.id)}
+                  style={{ background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', color: '#f85149', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>
+                  🗑️
+                </button>
+              </div>
+              {/* Vínculo com bandeja */}
+              {linked ? (
+                <div style={{ background: 'rgba(139,87,229,0.1)', border: '1px solid rgba(139,87,229,0.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 13, color: '#a78bfa' }}>
+                  ↳ PON: Placa {linked.pon_placa ?? '?'} / Porta {linked.pon_porta ?? '?'} · FO {linked.entrada?.fibra ?? '?'}
+                </div>
+              ) : (
+                <div style={{ background: 'rgba(248,81,73,0.08)', border: '1px solid rgba(248,81,73,0.3)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 13, color: '#f85149' }}>
+                  ⚠ Sem bandeja vinculada — crie uma fusão PON na Bandeja.
+                </div>
+              )}
+              {/* Nome */}
+              <div style={{ marginBottom: 8 }}>
+                <label style={{ fontSize: 12, color: mut, display: 'block', marginBottom: 4 }}>Nome</label>
+                <input value={s.nome} onChange={e => upSplitter(s.id, { nome: e.target.value })}
+                  style={{ ...S.inp, fontSize: 15, padding: '10px 12px', borderRadius: 10 }} />
+              </div>
+              {/* Tipo + FO entrada */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: mut, display: 'block', marginBottom: 4 }}>Tipo</label>
+                  <select value={s.tipo} onChange={e => changeTipo(s.id, e.target.value)}
+                    style={{ ...S.inp, fontSize: 15, padding: '10px 8px', borderRadius: 10 }}>
+                    {['1x2','1x4','1x8','1x16','1x32'].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: mut, display: 'block', marginBottom: 4 }}>FO Entrada</label>
+                  <select value={s.entrada.fibra}
+                    onChange={e => upSplitter(s.id, { entrada: { ...s.entrada, fibra: +e.target.value } })}
+                    style={{ width: '100%', padding: '10px 8px', fontSize: 14, borderRadius: 10, border: `1px solid ${br}`, backgroundColor: entC?.hex ?? bg3, color: entC?.text ?? txt, fontWeight: 700, cursor: 'pointer' }}>
+                    {ABNT.map(c => <option key={c.idx} value={c.idx} style={{ backgroundColor: c.hex, color: c.text }}>F{c.idx} {c.nome}</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* Status */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ background: '#e3b34122', border: '1px solid #e3b34144', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: '#e3b341', fontWeight: 700 }}>
+                  {s.tipo}
+                </span>
+                <span style={{ background: '#3fb95022', border: '1px solid #3fb95044', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: '#3fb950', fontWeight: 700 }}>
+                  {ligadas}/{s.saidas.length} CTOs
+                </span>
+              </div>
+            </div>
+          )
+        })}
+        <button onClick={addSplitter}
+          style={{ width: '100%', padding: '16px', borderRadius: 10, border: '2px dashed #e3b34188', background: 'rgba(227,179,65,0.06)', color: '#e3b341', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginTop: 4 }}>
+          + Splitter
+        </button>
+      </div>
+    )
+  }
+
+  // ── Step 4: Saídas ──
+  function renderSaidas() {
+    function upSaida(sId, porta, p) {
+      setSplitters(splitters.map(s => s.id !== sId ? s : {
+        ...s, saidas: s.saidas.map(sd => sd.porta === porta ? { ...sd, ...p } : sd)
+      }))
+    }
+
+    if (splitters.length === 0) {
+      return (
+        <div style={{ ...card, textAlign: 'center', color: mut, padding: '32px 16px' }}>
+          Nenhum splitter configurado. Volte ao passo anterior.
+        </div>
+      )
+    }
+
+    return (
+      <div>
+        {splitters.map((s, si) => {
+          const ligadas = s.saidas.filter(sd => sd.cto_id?.trim()).length
+          return (
+            <div key={s.id} style={{ ...card, borderLeft: '4px solid #3fb950' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#e3b341', flex: 1 }}>🔀 {s.nome} ({s.tipo})</span>
+                <span style={{ fontSize: 12, color: ligadas > 0 ? '#3fb950' : mut, fontWeight: 700 }}>
+                  {ligadas}/{s.saidas.length}
+                </span>
+              </div>
+              {/* Barra de ocupação */}
+              <div style={{ display: 'flex', gap: 3, marginBottom: 12 }}>
+                {s.saidas.map((sd, idx) => {
+                  const p = sd.porta ?? (idx + 1)
+                  const hex = ABNT[(p - 1) % 12]?.hex ?? '#374151'
+                  return (
+                    <div key={p} style={{ flex: 1, height: 8, borderRadius: 4,
+                      background: sd.cto_id?.trim() ? hex : br,
+                      boxShadow: sd.cto_id?.trim() ? `0 0 4px ${hex}66` : 'none' }} />
+                  )
+                })}
+              </div>
+              {/* Saídas */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {s.saidas.map((sd, idx) => {
+                  const porta = sd.porta ?? (idx + 1)
+                  const hex = ABNT[(porta - 1) % 12]?.hex ?? '#374151'
+                  const hasLink = !!sd.cto_id?.trim()
+                  return (
+                    <div key={porta} style={{
+                      padding: '10px 12px', borderRadius: 10,
+                      backgroundColor: hasLink ? hex + '14' : bg3,
+                      border: `2px solid ${hasLink ? hex + '66' : br}`,
+                    }}>
+                      {/* Main row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 14, height: 14, borderRadius: '50%', background: hex, display: 'inline-block', flexShrink: 0, boxShadow: `0 0 5px ${hex}88` }} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: hex, minWidth: 28 }}>S{porta}</span>
+                        {(sd.tipo === 'cto' || !sd.tipo) ? (
+                          <select
+                            value={sd.cto_id ?? ''}
+                            onChange={e => upSaida(s.id, porta, { cto_id: e.target.value })}
+                            style={{ flex: 1, padding: '8px 12px', fontSize: 14, borderRadius: 8, border: `1px solid ${hasLink ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none' }}
+                          >
+                            <option value="">— Selecione CTO —</option>
+                            {ctos.map(c => (
+                              <option key={c.cto_id ?? c._id} value={c.cto_id ?? c._id}>
+                                {c.nome ?? c.cto_id ?? c._id}
+                              </option>
+                            ))}
+                          </select>
+                        ) : sd.tipo === 'cdo' ? (
+                          <select
+                            value={sd.cto_id ?? ''}
+                            onChange={e => upSaida(s.id, porta, { cto_id: e.target.value })}
+                            style={{ flex: 1, padding: '8px 12px', fontSize: 14, borderRadius: 8, border: `1px solid ${hasLink ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none' }}
+                          >
+                            <option value="">— Selecione CE/CDO —</option>
+                            {caixas.map(c => (
+                              <option key={c._id} value={c._id}>
+                                {c.nome ?? c._id}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            value={sd.cto_id ?? ''}
+                            onChange={e => upSaida(s.id, porta, { cto_id: e.target.value })}
+                            placeholder={
+                              sd.tipo === 'pon'           ? 'ID PON' :
+                              sd.tipo === 'passagem'      ? 'ID/Nome' :
+                              sd.tipo === 'conector'      ? 'Porta física' :
+                              sd.tipo === 'fusao_bandeja' ? 'ID Bandeja' :
+                              'ID'
+                            }
+                            style={{ flex: 1, padding: '8px 12px', fontSize: 14, borderRadius: 8, border: `1px solid ${hasLink ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none' }}
+                          />
+                        )}
+                        {hasLink && (
+                          <span style={{ fontSize: 16, color: '#3fb950', flexShrink: 0 }}>✓</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ backgroundColor: bg, color: txt, minHeight: '100%', display: 'flex', flexDirection: 'column',
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif" }}>
+      {/* Header */}
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${br}`, backgroundColor: bg2,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: txt }}>{ceId}</div>
+          <div style={{ fontSize: 11, color: mut }}>{bandejas.length} bandeja · {splitters.length} splitter</div>
+        </div>
+        <button onClick={salvar} disabled={saving}
+          style={{ background: 'linear-gradient(135deg,#1f6feb,#1158c7)', color: '#fff', fontWeight: 700, fontSize: 13,
+            borderRadius: 10, padding: '10px 20px', cursor: saving ? 'not-allowed' : 'pointer', border: 'none',
+            opacity: saving ? 0.6 : 1, minHeight: 44 }}>
+          {saving ? '...' : '💾 Salvar'}
+        </button>
+      </div>
+
+      {/* Mensagens */}
+      {(sucesso || erro) && (
+        <div style={{ padding: '10px 16px', backgroundColor: sucesso ? 'rgba(63,185,80,0.1)' : 'rgba(248,81,73,0.1)',
+          borderBottom: `1px solid ${sucesso ? 'rgba(63,185,80,0.3)' : 'rgba(248,81,73,0.3)'}`,
+          fontSize: 13, color: sucesso ? '#3fb950' : '#f85149', flexShrink: 0 }}>
+          {sucesso || erro}
+        </div>
+      )}
+
+      {/* Step indicator */}
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${br}`, backgroundColor: bg2, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {MOBILE_STEPS.map((s, i) => {
+            const active = i === step
+            const done   = i < step
+            return (
+              <button key={s.id} onClick={() => setStep(i)} style={{
+                flex: 1, padding: '8px 4px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                backgroundColor: active ? s.cor + '22' : done ? '#3fb95011' : bg3,
+                borderTop: `3px solid ${active ? s.cor : done ? '#3fb950' : br}`,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              }}>
+                <span style={{ fontSize: 16 }}>{done && !active ? '✓' : s.icon}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: active ? s.cor : done ? '#3fb950' : mut,
+                  textAlign: 'center', lineHeight: 1.2 }}>{s.label.split(' ').slice(0, 2).join(' ')}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Step content */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: curStep.cor, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>{curStep.icon}</span>
+          <span>Passo {step + 1}: {curStep.label}</span>
+        </div>
+        {step === 0 && renderEntrada()}
+        {step === 1 && renderBandeja()}
+        {step === 2 && renderSplitter()}
+        {step === 3 && renderSaidas()}
+      </div>
+
+      {/* Nav buttons */}
+      <div style={{ display: 'flex', gap: 8, padding: '12px 16px 24px', borderTop: `1px solid ${br}`,
+        backgroundColor: bg2, flexShrink: 0 }}>
+        <button onClick={() => setStep(s => Math.max(0, s - 1))} style={navBtn(step === 0)}>
+          ← Anterior
+        </button>
+        <button onClick={() => setStep(s => Math.min(MOBILE_STEPS.length - 1, s + 1))} style={navBtn(step === MOBILE_STEPS.length - 1)}>
+          Próximo →
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 const TABS = [
   { id: 'olt',       label: 'PON/OLT',   cor: '#1f6feb' },
@@ -803,9 +1473,10 @@ const TABS = [
   { id: 'resumo',    label: 'Resumo',    cor: '#3fb950' },
 ]
 
-export default function DiagramaCDOEditor({ ceId, projetoId, capacidadeSaidas, initialDiagrama, olts }) {
+export default function DiagramaCDOEditor({ ceId, projetoId, capacidadeSaidas, initialDiagrama, olts, ctos = [], caixas = [] }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const isMobile = useMobile()
   const S = getStyles(isDark)
 
   const [aba, setAba]           = useState('bandejas')
@@ -900,6 +1571,27 @@ export default function DiagramaCDOEditor({ ceId, projetoId, capacidadeSaidas, i
     return <div style={{ ...S.wrap, padding: 24 }}><p style={{ color: '#484f58' }}>Carregando diagrama...</p></div>
   }
 
+  if (isMobile) {
+    return (
+      <MobileCDOEditor
+        ceId={ceId}
+        entrada={entrada}
+        setEntrada={setEntrada}
+        bandejas={bandejas}
+        setBandejas={setBandejas}
+        splitters={splitters}
+        setSplitters={setSplitters}
+        olts={olts}
+        usadosGlobal={usadosGlobal}
+        saving={saving}
+        salvar={salvar}
+        sucesso={sucesso}
+        erro={erro}
+        isDark={isDark}
+      />
+    )
+  }
+
   return (
     <div style={S.wrap}>
       {/* Header */}
@@ -937,7 +1629,7 @@ export default function DiagramaCDOEditor({ ceId, projetoId, capacidadeSaidas, i
       <div style={S.body}>
         {aba === 'olt'       && <AbaOLT       entrada={entrada}     onChange={setEntrada} olts={olts} splitters={splitters} bandejas={bandejas} isDark={isDark} />}
         {aba === 'bandejas'  && <AbaBandejas  bandejas={bandejas}   onChange={setBandejas} entrada={entrada} splitters={splitters} onChangeSplitters={setSplitters} usadosGlobal={usadosGlobal} isDark={isDark} />}
-        {aba === 'splitters' && <AbaSplitters splitters={splitters} onChange={setSplitters} bandejas={bandejas} isDark={isDark} />}
+        {aba === 'splitters' && <AbaSplitters splitters={splitters} onChange={setSplitters} bandejas={bandejas} isDark={isDark} ctos={ctos} caixas={caixas} />}
         {aba === 'cabos'     && <AbaCabos     cabos={cabos}         onChange={setCabos}     isDark={isDark} />}
         {aba === 'resumo'    && <AbaResumo    entrada={entrada} bandejas={bandejas} splitters={splitters} cabos={cabos} isDark={isDark} />}
       </div>
