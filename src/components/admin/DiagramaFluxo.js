@@ -1009,7 +1009,14 @@ function buildGraph(topologia, T) {
         const porta   = s.porta ?? s.num ?? (idx + 1)
         const destTipo = s.tipo ?? 'cto'           // tipo da saída (cto|cdo|passagem|pon|conector|…)
 
-        if (!s.cto_id?.trim()) continue            // sem destino configurado
+        // Verifica se o destino está configurado de acordo com o tipo
+        const hasDest =
+          destTipo === 'pon'          ? (s.pon_placa != null || s.pon_porta != null || s.obs?.trim() || s.cto_id?.trim()) :
+          destTipo === 'conector'     ? (s.obs?.trim() || s.cto_id?.trim()) :
+          destTipo === 'passagem'     ? true :
+          destTipo === 'fusao_bandeja'? true :
+          !!s.cto_id?.trim()
+        if (!hasDest) continue
 
         const portaHex = abntHex(porta)
         const edgeLabelOpts = {
@@ -1071,7 +1078,11 @@ function buildGraph(topologia, T) {
             miscSet.add(ponId)
             nodes.push({
               id: ponId, type: 'passagem', position: { x: 0, y: 0 },
-              data: { T, nome: s.obs?.trim() || s.cto_id || `PON S${porta}`, label: 'PON' },
+              data: { T,
+                nome: s.obs?.trim()
+                  || (s.pon_placa != null && s.pon_porta != null ? `P${s.pon_placa}/PON${s.pon_porta}` : null)
+                  || s.cto_id || `PON S${porta}`,
+                label: 'PON' },
             })
           }
           edge(splNodeId, ponId,
@@ -1088,7 +1099,7 @@ function buildGraph(topologia, T) {
             miscSet.add(conId)
             nodes.push({
               id: conId, type: 'passagem', position: { x: 0, y: 0 },
-              data: { T, nome: s.obs?.trim() || s.cto_id || `CON S${porta}`, label: 'CON' },
+              data: { T, nome: s.obs?.trim() || s.cto_id?.trim() || `CON S${porta}`, label: 'CON' },
             })
           }
           edge(splNodeId, conId,
@@ -1200,15 +1211,15 @@ function buildGraph(topologia, T) {
 
 function calcCTOHeight(bandejas = [], splitters = []) {
   if (!bandejas.length && !splitters.length) return NODE_H.cto
-  // header(36) + body(70) + section-border+padding(13) = 119px baseline
-  let h = 122
+  // header(36) + body(fibra+bar+counter ≈ 74) + section-divider+padding(15) = 125px baseline
+  let h = 125
   for (const b of bandejas) {
     const n = Math.max(1, b.fusoes?.length ?? 0)
-    // bandeja-margin(5) + bandeja-header(22) + fusoes-container-overhead(8) + n*19px per fusão row
-    h += 35 + n * 19
+    // marginBottom(5) + bandeja-header(24) + container-padding(4) + n*22px per fusão row
+    h += 33 + n * 22
   }
-  // Splitters section: 4px top + 18px per splitter
-  if (splitters.length > 0) h += 4 + splitters.length * 18
+  // Splitters section: 4px top + 20px per splitter
+  if (splitters.length > 0) h += 4 + splitters.length * 20
   return Math.max(NODE_H.cto, h)
 }
 
@@ -1232,7 +1243,7 @@ function groupByColumn(nodes, tol = 80) {
 
 // Garante espaçamento vertical mínimo dentro de cada coluna,
 // sem modificar a ordem relativa dos nós (apenas empurra para baixo).
-function resolveColumnOverlaps(nodes, minGap = 36) {
+function resolveColumnOverlaps(nodes, minGap = 40) {
   const colMap = groupByColumn(nodes)
   for (const col of colMap.values()) {
     col.sort((a, b) => a.position.y - b.position.y)
@@ -1253,7 +1264,7 @@ function resolveColumnOverlaps(nodes, minGap = 36) {
 
 // Detecta e resolve sobreposições entre QUALQUER par de nós (cruzamento entre colunas).
 // Usa iteração com limite para convergência.
-function resolveAllOverlaps(nodes, minGap = 36, maxIter = 40) {
+function resolveAllOverlaps(nodes, minGap = 40, maxIter = 40) {
   const nw = n => NODE_W[n.type] ?? 220
   const nh = n => calcH(n)
 
@@ -1333,7 +1344,7 @@ function dagreLayout(nodes, edges) {
   //   • Folhas recebem Y sequencial (sem sobreposição garantida por construção)
   //   • Pais são centralizados entre o primeiro e o último filho
   // Filhos são ordenados por número de porta/fibra → fluxo F1 no topo, F8 embaixo.
-  const TREE_GAP = 24   // gap mínimo entre nós irmãos
+  const TREE_GAP = 36   // gap mínimo entre nós irmãos
 
   // Mapa de filhos: nodeId → [{childId, order}]  (order = porta/fibra para ordenar)
   const childMap = new Map()
@@ -1357,14 +1368,17 @@ function dagreLayout(nodes, edges) {
   // nodeById para acesso rápido
   const nodeById = new Map(laid.map(n => [n.id, n]))
 
-  // Altura total da subárvore enraizada em `id` (inclui gaps entre irmãos)
+  // Altura total da subárvore enraizada em `id` (inclui gaps entre irmãos).
+  // Garante que o nó pai nunca seja menor que sua própria altura visual —
+  // sem isso um splitter mais alto que seus CTOs causa sobreposição com o irmão abaixo.
   function subtreeH(id) {
     const node = nodeById.get(id)
     if (!node) return 0
     const kids = childMap.get(id) ?? []
     if (kids.length === 0) return calcH(node)
     const kidsTotal = kids.reduce((s, k) => s + subtreeH(k.id), 0)
-    return kidsTotal + (kids.length - 1) * TREE_GAP
+    const kidsH = kidsTotal + (kids.length - 1) * TREE_GAP
+    return Math.max(kidsH, calcH(node))
   }
 
   // Atribui Y às subárvores de forma descendente.
@@ -1406,7 +1420,11 @@ function dagreLayout(nodes, edges) {
       node.position = { ...node.position, y: topY }
     }
 
-    return cursor - TREE_GAP  // bottom da subárvore (cursor já adiantado 1 gap a mais)
+    // Bottom real = max(último filho, borda inferior do nó pai).
+    // Essencial quando o nó pai é mais alto que a soma dos filhos (ex: splitter 1x32 com 2 CTOs).
+    const kidsBottom = cursor - TREE_GAP
+    const nodeBottom = node.position.y + h
+    return Math.max(kidsBottom, nodeBottom)
   }
 
   // Processar raízes (nós sem pai) de cima para baixo pela posição X do Dagre

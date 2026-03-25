@@ -805,6 +805,27 @@ function AbaSplitters({ splitters, onChange, bandejas, isDark, ctos = [], caixas
                           </option>
                         ))}
                       </select>
+                    ) : sd.tipo === 'pon' ? (
+                      /* PON: Placa OLT + Porta PON — sem ID */
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', width: '100%', marginBottom: 3 }}>
+                        <span style={{ fontSize: 10, color: '#8b949e', whiteSpace: 'nowrap' }}>Placa</span>
+                        <input type="number" min={1} max={32}
+                          value={sd.pon_placa ?? ''}
+                          onChange={e => upSaida(s.id, sd.porta, { pon_placa: e.target.value ? +e.target.value : null })}
+                          placeholder="1"
+                          style={{ ...S.inp, width: 48, padding: '3px 6px', fontSize: 12 }} />
+                        <span style={{ fontSize: 10, color: '#8b949e', whiteSpace: 'nowrap' }}>Porta</span>
+                        <input type="number" min={1} max={16}
+                          value={sd.pon_porta ?? ''}
+                          onChange={e => upSaida(s.id, sd.porta, { pon_porta: e.target.value ? +e.target.value : null })}
+                          placeholder="1"
+                          style={{ ...S.inp, width: 48, padding: '3px 6px', fontSize: 12 }} />
+                        {sd.pon_placa != null && sd.pon_porta != null && (
+                          <span style={{ fontSize: 10, color: '#3fb950', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            P{sd.pon_placa}/PON{sd.pon_porta}
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <input value={sd.cto_id ?? ''} onChange={e => upSaida(s.id, sd.porta, { cto_id: e.target.value })}
                         placeholder={mainPlaceholder}
@@ -1008,7 +1029,7 @@ const MOBILE_STEPS = [
 
 function MobileCDOEditor({
   ceId, entrada, setEntrada, bandejas, setBandejas,
-  splitters, setSplitters, olts, usadosGlobal, saving, salvar, sucesso, erro, isDark
+  splitters, setSplitters, olts, ctos = [], caixas = [], usadosGlobal, saving, salvar, sucesso, erro, isDark
 }) {
   const S   = getStyles(isDark)
   const bg  = isDark ? '#0d1117' : '#ffffff'
@@ -1377,24 +1398,45 @@ function MobileCDOEditor({
               {/* Saídas */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {s.saidas.map((sd, idx) => {
-                  const porta = sd.porta ?? (idx + 1)
-                  const hex = ABNT[(porta - 1) % 12]?.hex ?? '#374151'
-                  const hasLink = !!sd.cto_id?.trim()
+                  const porta   = sd.porta ?? (idx + 1)
+                  const tipo    = sd.tipo ?? 'cto'
+                  const hex     = ABNT[(porta - 1) % 12]?.hex ?? '#374151'
+                  const hasLink = !!(
+                    sd.cto_id?.trim() ||
+                    (tipo === 'pon' && sd.pon_placa != null && sd.pon_porta != null) ||
+                    tipo === 'passagem' || tipo === 'conector'
+                  )
                   return (
                     <div key={porta} style={{
                       padding: '10px 12px', borderRadius: 10,
                       backgroundColor: hasLink ? hex + '14' : bg3,
                       border: `2px solid ${hasLink ? hex + '66' : br}`,
                     }}>
-                      {/* Main row */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {/* Porta + tipo selector */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         <span style={{ width: 14, height: 14, borderRadius: '50%', background: hex, display: 'inline-block', flexShrink: 0, boxShadow: `0 0 5px ${hex}88` }} />
                         <span style={{ fontSize: 13, fontWeight: 700, color: hex, minWidth: 28 }}>S{porta}</span>
-                        {(sd.tipo === 'cto' || !sd.tipo) ? (
+                        <select
+                          value={tipo}
+                          onChange={e => upSaida(s.id, porta, { tipo: e.target.value, cto_id: '' })}
+                          style={{ flex: 1, padding: '6px 10px', fontSize: 13, borderRadius: 8, border: `1px solid ${hex}66`, backgroundColor: bg, color: txt, fontWeight: 600, outline: 'none' }}
+                        >
+                          <option value="cto">CTO</option>
+                          <option value="pon">PON</option>
+                          <option value="cdo">CE/CDO</option>
+                          <option value="passagem">Continuidade/FO</option>
+                          <option value="conector">Conector</option>
+                          <option value="fusao_bandeja">Fusão Bandeja</option>
+                        </select>
+                        {hasLink && <span style={{ fontSize: 16, color: '#3fb950', flexShrink: 0 }}>✓</span>}
+                      </div>
+                      {/* Destino */}
+                      <div style={{ gap: 8, width: '100%' }}>
+                        {tipo === 'cto' ? (
                           <select
                             value={sd.cto_id ?? ''}
                             onChange={e => upSaida(s.id, porta, { cto_id: e.target.value })}
-                            style={{ flex: 1, padding: '8px 12px', fontSize: 14, borderRadius: 8, border: `1px solid ${hasLink ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none' }}
+                            style={{ width: '100%', padding: '8px 12px', fontSize: 14, borderRadius: 8, border: `1px solid ${sd.cto_id?.trim() ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none' }}
                           >
                             <option value="">— Selecione CTO —</option>
                             {ctos.map(c => (
@@ -1403,11 +1445,11 @@ function MobileCDOEditor({
                               </option>
                             ))}
                           </select>
-                        ) : sd.tipo === 'cdo' ? (
+                        ) : tipo === 'cdo' ? (
                           <select
                             value={sd.cto_id ?? ''}
                             onChange={e => upSaida(s.id, porta, { cto_id: e.target.value })}
-                            style={{ flex: 1, padding: '8px 12px', fontSize: 14, borderRadius: 8, border: `1px solid ${hasLink ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none' }}
+                            style={{ width: '100%', padding: '8px 12px', fontSize: 14, borderRadius: 8, border: `1px solid ${sd.cto_id?.trim() ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none' }}
                           >
                             <option value="">— Selecione CE/CDO —</option>
                             {caixas.map(c => (
@@ -1416,24 +1458,63 @@ function MobileCDOEditor({
                               </option>
                             ))}
                           </select>
+                        ) : tipo === 'pon' ? (
+                          /* PON: Placa OLT + Porta PON */
+                          <div style={{ display: 'flex', gap: 10 }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 11, color: mut, marginBottom: 4 }}>Placa OLT</div>
+                              <input
+                                type="number" min={1} max={32}
+                                value={sd.pon_placa ?? ''}
+                                onChange={e => upSaida(s.id, porta, { pon_placa: e.target.value ? +e.target.value : null })}
+                                placeholder="Ex: 1"
+                                style={{ width: '100%', padding: '10px 12px', fontSize: 15, borderRadius: 8, border: `1px solid ${sd.pon_placa != null ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none', boxSizing: 'border-box' }}
+                              />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 11, color: mut, marginBottom: 4 }}>Porta PON</div>
+                              <input
+                                type="number" min={1} max={16}
+                                value={sd.pon_porta ?? ''}
+                                onChange={e => upSaida(s.id, porta, { pon_porta: e.target.value ? +e.target.value : null })}
+                                placeholder="Ex: 1"
+                                style={{ width: '100%', padding: '10px 12px', fontSize: 15, borderRadius: 8, border: `1px solid ${sd.pon_porta != null ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none', boxSizing: 'border-box' }}
+                              />
+                            </div>
+                          </div>
+                        ) : tipo === 'passagem' ? (
+                          <div style={{ padding: '10px 12px', fontSize: 13, borderRadius: 8, border: `1px solid ${hex}44`, backgroundColor: hex + '0a', color: txt }}>
+                            Continuidade da fibra — sem emenda
+                          </div>
+                        ) : tipo === 'conector' ? (
+                          /* Conector: etiqueta do ponto físico */
+                          <div>
+                            <div style={{ fontSize: 11, color: mut, marginBottom: 4 }}>Etiqueta / ponto físico</div>
+                            <input
+                              value={sd.obs ?? ''}
+                              onChange={e => upSaida(s.id, porta, { obs: e.target.value })}
+                              placeholder="Ex: A1, Rack-B3..."
+                              style={{ width: '100%', padding: '10px 12px', fontSize: 14, borderRadius: 8, border: `1px solid ${sd.obs?.trim() ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none', boxSizing: 'border-box' }}
+                            />
+                          </div>
                         ) : (
                           <input
                             value={sd.cto_id ?? ''}
                             onChange={e => upSaida(s.id, porta, { cto_id: e.target.value })}
-                            placeholder={
-                              sd.tipo === 'pon'           ? 'ID PON' :
-                              sd.tipo === 'passagem'      ? 'ID/Nome' :
-                              sd.tipo === 'conector'      ? 'Porta física' :
-                              sd.tipo === 'fusao_bandeja' ? 'ID Bandeja' :
-                              'ID'
-                            }
-                            style={{ flex: 1, padding: '8px 12px', fontSize: 14, borderRadius: 8, border: `1px solid ${hasLink ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none' }}
+                            placeholder="ID Bandeja"
+                            style={{ width: '100%', padding: '8px 12px', fontSize: 14, borderRadius: 8, border: `1px solid ${sd.cto_id?.trim() ? hex + '88' : br}`, backgroundColor: bg, color: txt, outline: 'none' }}
                           />
                         )}
-                        {hasLink && (
-                          <span style={{ fontSize: 16, color: '#3fb950', flexShrink: 0 }}>✓</span>
-                        )}
                       </div>
+                      {/* Obs — não exibir para conector (já usa obs como etiqueta) */}
+                      {tipo !== 'conector' && (
+                        <input
+                          value={sd.obs ?? ''}
+                          onChange={e => upSaida(s.id, porta, { obs: e.target.value })}
+                          placeholder="Observação"
+                          style={{ width: '100%', marginTop: 6, padding: '6px 10px', fontSize: 12, borderRadius: 8, border: `1px solid ${br}`, backgroundColor: bg, color: txt, outline: 'none', boxSizing: 'border-box' }}
+                        />
+                      )}
                       {/* Cascata CTOs — mobile */}
                       {(sd.tipo === 'cto' || !sd.tipo) && sd.cto_id?.trim() && (
                         <div style={{ marginTop: 8, paddingLeft: 10, borderLeft: `2px solid ${hex}44` }}>
@@ -1696,6 +1777,8 @@ export default function DiagramaCDOEditor({ ceId, projetoId, capacidadeSaidas, i
         splitters={splitters}
         setSplitters={setSplitters}
         olts={olts}
+        ctos={ctos}
+        caixas={caixas}
         usadosGlobal={usadosGlobal}
         saving={saving}
         salvar={salvar}
