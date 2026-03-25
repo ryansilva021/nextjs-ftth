@@ -664,7 +664,68 @@ function applyDagreLayout(nodes, edges) {
     return base
   })
 
+  // ── Anti-overlap: garantir espaçamento mínimo em cada coluna e entre colunas
+  resolveTopologyOverlaps(positionedNodes)
+
   return { nodes: positionedNodes, edges: remappedEdges }
+}
+
+// ── Anti-overlap para topologia ───────────────────────────────────────────────
+function resolveTopologyOverlaps(nodes, minGap = 30, maxIter = 50) {
+  // Agrupa por coluna X (tolerância 80px para nós de larguras diferentes)
+  function colKey(n) { return Math.round(n.position.x / 80) * 80 }
+
+  // Passo 1: dentro de cada coluna, garantir espaçamento vertical
+  const colMap = new Map()
+  for (const n of nodes) {
+    const k = colKey(n)
+    if (!colMap.has(k)) colMap.set(k, [])
+    colMap.get(k).push(n)
+  }
+  for (const col of colMap.values()) {
+    col.sort((a, b) => a.position.y - b.position.y)
+    for (let i = 1; i < col.length; i++) {
+      const prev = col[i - 1]
+      const curr = col[i]
+      const { h: ph } = getNodeDims(prev)
+      const needed = prev.position.y + ph + minGap
+      if (curr.position.y < needed) {
+        const shift = needed - curr.position.y
+        for (let j = i; j < col.length; j++) {
+          col[j].position = { ...col[j].position, y: col[j].position.y + shift }
+        }
+      }
+    }
+  }
+
+  // Passo 2: anti-overlap global com iteração
+  let changed = true
+  let iter = 0
+  while (changed && iter < maxIter) {
+    changed = false
+    iter++
+    nodes.sort((a, b) => a.position.x !== b.position.x
+      ? a.position.x - b.position.x : a.position.y - b.position.y)
+
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j]
+        const { w: aw, h: ah } = getNodeDims(a)
+        const { w: bw, h: bh } = getNodeDims(b)
+        const overlapX = a.position.x < b.position.x + bw + minGap &&
+                         a.position.x + aw + minGap > b.position.x
+        const overlapY = a.position.y < b.position.y + bh + minGap &&
+                         a.position.y + ah + minGap > b.position.y
+        if (overlapX && overlapY) {
+          const push = (a.position.y + ah + minGap) - b.position.y
+          if (push > 0) {
+            b.position = { ...b.position, y: b.position.y + push }
+            changed = true
+          }
+        }
+      }
+    }
+  }
 }
 
 // ── 3. RENDER LAYER — custom nodes ──────────────────────────────────────────

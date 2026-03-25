@@ -259,6 +259,12 @@ export async function saveDiagramaCaixa(data) {
     for (const saida of (spl.saidas ?? [])) {
       if ((saida.tipo === 'cto' || !saida.tipo) && saida.cto_id?.trim()) {
         ctoLinks.push({ cto_id: saida.cto_id.trim(), cdo_id: ce_id, splitter_cto: spl.nome?.trim() || null })
+        // Cascata CTOs também devem ter cdo_id vinculado ao mesmo CDO
+        // Suporta string[] (legado) e {cto_id, fibra}[] (novo formato)
+        for (const cRaw of (saida.ctos_cascata ?? [])) {
+          const cId = typeof cRaw === 'string' ? cRaw : cRaw?.cto_id
+          if (cId?.trim()) ctoLinks.push({ cto_id: cId.trim(), cdo_id: ce_id, splitter_cto: spl.nome?.trim() || null })
+        }
       }
     }
   }

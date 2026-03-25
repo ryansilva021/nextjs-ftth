@@ -544,8 +544,25 @@ function CTONode({ data }) {
           {bandejas.map(b => {
             const fusoes = b.fusoes ?? []
             const ativas = fusoes.filter(f => f.tipo !== 'livre').length
+            // Handle de saída alinhado ao header da bandeja
+            const bdjHex = ativas > 0 ? T.ctoBdr : T.border
             return (
-              <div key={b.id} style={{ marginBottom: 5 }}>
+              <div key={b.id} style={{ marginBottom: 5, position: 'relative', overflow: 'visible' }}>
+                {/* Handle de saída da bandeja — posicionado no header */}
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={`bdj-${b.id}`}
+                  style={{
+                    ...HANDLE_BASE,
+                    width: 10, height: 10,
+                    position: 'absolute', right: -16, top: 9,
+                    background: bdjHex,
+                    boxShadow: ativas > 0 ? `0 0 5px ${bdjHex}99` : 'none',
+                    opacity: ativas > 0 ? 1 : 0.4,
+                    zIndex: 10,
+                  }}
+                />
                 {/* Bandeja header */}
                 <div style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -592,6 +609,7 @@ function CTONode({ data }) {
                       f.tipo === 'cascata'  ? '#0891b2' :
                       f.tipo === 'direto'   ? '#16a34a' : T.muted
 
+                    const isCascata = f.tipo === 'cascata' && f.ref_id?.trim()
                     return (
                       <div
                         key={f.id}
@@ -599,7 +617,7 @@ function CTONode({ data }) {
                         style={{
                           display: 'flex', alignItems: 'center', gap: 4,
                           padding: '2px 2px', marginBottom: 1,
-                          borderRadius: 3,
+                          borderRadius: 3, position: 'relative', overflow: 'visible',
                           backgroundColor: vivo ? `${tipoColor}0c` : 'transparent',
                           opacity: vivo ? 1 : 0.45,
                         }}
@@ -628,6 +646,24 @@ function CTONode({ data }) {
                         }}>
                           {tipoText}{target ? `: ${target}` : ''}
                         </span>
+
+                        {/* Handle inline — cascata: aresta sai desta linha de fusão */}
+                        {isCascata && (
+                          <Handle
+                            type="source"
+                            position={Position.Right}
+                            id={`fus-${f.id}`}
+                            style={{
+                              ...HANDLE_BASE,
+                              width: 9, height: 9,
+                              position: 'absolute', right: -16, top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: '#0891b2',
+                              boxShadow: '0 0 5px #0891b299',
+                              zIndex: 10,
+                            }}
+                          />
+                        )}
                       </div>
                     )
                   })}
@@ -680,9 +716,10 @@ function buildGraph(topologia, T) {
 
   const nodes = []
   const edges = []
-  const ctoSet   = new Set()   // tracks cto-* node ids
-  const cdoSet   = new Set()   // tracks cdo-* node ids (by caixa.id)
-  const miscSet  = new Set()   // tracks passagem-* and other misc node ids
+  const ctoSet          = new Set()   // tracks cto-* node ids
+  const cdoSet          = new Set()   // tracks cdo-* node ids (by caixa.id)
+  const miscSet         = new Set()   // tracks passagem-* and other misc node ids
+  const ctoFusoesVisited = new Set()  // guards expandCTOFusoes against re-entry
   const allCTOs   = topologia[0]._allCTOs   ?? []
   const allCaixas = topologia[0]._allCaixas ?? []
 
@@ -693,6 +730,209 @@ function buildGraph(topologia, T) {
 
   function lookupCTO(id) {
     return allCTOs.find(c => String(c.cto_id) === String(id) || String(c._id) === String(id))
+  }
+
+  // ── Mapa global de cascata: ctoId → lista de CTOs que seguem em cascata ──
+  // Construído a partir de TODOS os CDOs/CEOs antes de processar a topologia.
+  // Permite seguir a cadeia completa mesmo quando cada nível está em CDOs diferentes.
+  // String(ctoId) → { ctos: [{cto_id, fibra}...], porta: N }
+  // Normaliza tanto string[] (legado) quanto {cto_id, fibra}[] (novo formato)
+  const cascataMap = new Map()
+  for (const caixa of allCaixas) {
+    for (const spl of (caixa.diagrama?.splitters ?? [])) {
+      for (const saida of (spl.saidas ?? [])) {
+        const mainId = String(saida.cto_id ?? '').trim()
+        if (!mainId) continue
+        const lista = (saida.ctos_cascata ?? [])
+          .map(x => typeof x === 'string' ? { cto_id: x, fibra: null } : x)
+          .filter(x => x?.cto_id?.trim())
+        if (lista.length > 0) {
+          cascataMap.set(mainId, { ctos: lista, porta: saida.porta ?? saida.num ?? 1 })
+        }
+      }
+    }
+  }
+
+  // Busca a fibra de saída da bandeja da CTO (para herança na cascata).
+  // Suporta fusões de CDO (f.saida?.fibra / f.entrada?.fibra)
+  // e fusões de CTO  (f.cor como identificador da fibra).
+  function getOutFibra(ctoData, entradaFibra) {
+    // 1. Correspondência exata entrada → saída (formato CDO)
+    for (const bdj of (ctoData?.diagrama?.bandejas ?? [])) {
+      for (const f of (bdj.fusoes ?? [])) {
+        if (f.saida?.fibra != null && f.entrada?.fibra === entradaFibra) return f.saida.fibra
+      }
+    }
+    // 2. Correspondência por f.cor === entradaFibra (formato CTO)
+    for (const bdj of (ctoData?.diagrama?.bandejas ?? [])) {
+      for (const f of (bdj.fusoes ?? [])) {
+        if (f.cor != null && f.cor === entradaFibra && f.tipo !== 'livre') return f.cor
+      }
+    }
+    // 3. Qualquer fusão com saída definida (formato CDO)
+    for (const bdj of (ctoData?.diagrama?.bandejas ?? [])) {
+      for (const f of (bdj.fusoes ?? [])) {
+        if (f.saida?.fibra != null) return f.saida.fibra
+      }
+    }
+    // 4. Qualquer fusão ativa (formato CTO — usa f.cor)
+    for (const bdj of (ctoData?.diagrama?.bandejas ?? [])) {
+      for (const f of (bdj.fusoes ?? [])) {
+        if (f.cor != null && f.tipo !== 'livre') return f.cor
+      }
+    }
+    return entradaFibra
+  }
+
+  // ── Segue a cadeia de cascata recursivamente ──
+  // fromNodeId: id do nó React Flow da CTO origem
+  // fromRawId : cto_id original (para lookup e cascataMap)
+  // fromFibra : fibra de entrada da CTO origem
+  const cascadeVisited = new Set()
+  function followCascade(fromNodeId, fromRawId, fromFibra) {
+    const key = String(fromRawId)
+    if (cascadeVisited.has(key)) return    // evita ciclos
+    cascadeVisited.add(key)
+
+    const info = cascataMap.get(key)
+    if (!info || info.ctos.length === 0) return
+
+    let prevNodeId = fromNodeId
+    let prevRawId  = fromRawId
+    let prevFibra  = fromFibra
+
+    for (const cItem of info.ctos) {
+      // Suporta string (legado) e objeto {cto_id, fibra} (novo)
+      const cCtoId = typeof cItem === 'string' ? cItem : cItem?.cto_id
+      if (!cCtoId?.trim()) continue
+      const cKey = String(cCtoId)
+
+      const prevCTOData = lookupCTO(prevRawId)
+      const chosenFibra = typeof cItem === 'object' ? cItem.fibra : null
+
+      // Procura a fusão de bandeja na CTO anterior que aponta para esta CTO em cascata.
+      // Se encontrada: usa f.cor como cor da fibra e fus-${f.id} como handle de saída.
+      let matchBdjId = null, matchFusId = null, matchFibra = null
+      outer: for (const bdj of (prevCTOData?.diagrama?.bandejas ?? [])) {
+        for (const f of (bdj.fusoes ?? [])) {
+          if (f.tipo === 'cascata' && String(f.ref_id ?? '').trim() === String(cCtoId).trim()) {
+            matchBdjId  = bdj.id
+            matchFusId  = f.id
+            matchFibra  = f.cor ?? f.saida?.fibra ?? null
+            break outer
+          }
+        }
+      }
+
+      // Prioridade: 1) fibra escolhida pelo usuário  2) fusão de bandeja  3) herança getOutFibra
+      const outFibra  = chosenFibra != null ? chosenFibra
+                      : matchFibra  != null ? matchFibra
+                      : getOutFibra(prevCTOData, prevFibra)
+      const outHex    = abntHex(outFibra)
+
+      // Handle de saída: fusão específica > bandeja ativa > genérico
+      const srcHandle = matchFusId  ? `fus-${matchFusId}`
+                      : matchBdjId  ? `bdj-${matchBdjId}`
+                      : (() => {
+                          const prevBandejas = prevCTOData?.diagrama?.bandejas ?? []
+                          const ab = prevBandejas.find(b => (b.fusoes ?? []).some(f => f.tipo !== 'livre'))
+                          return ab ? `bdj-${ab.id}` : 'out'
+                        })()
+
+      // Criar nó se ainda não existe
+      if (!ctoSet.has(cKey)) {
+        ctoSet.add(cKey)
+        const cData = lookupCTO(cCtoId) ?? { cto_id: cCtoId, nome: `CTO ${cCtoId}` }
+        nodes.push({
+          id: `cto-${cKey}`, type: 'cto', position: { x: 0, y: 0 },
+          data: {
+            T,
+            nome:         cData.nome,
+            cto_id:       cData.cto_id ?? cCtoId,
+            capacidade:   cData.capacidade ?? 16,
+            ocupacao:     cData.ocupacao   ?? 0,
+            fibraEntrada: outFibra,
+            bandejas:     cData.diagrama?.bandejas  ?? [],
+            splitters:    cData.diagrama?.splitters ?? [],
+          },
+        })
+      }
+
+      // Aresta tracejada: prev CTO (saindo da bandeja) → próxima CTO em cascata
+      edge(prevNodeId, `cto-${cKey}`,
+        { ...T.drop, stroke: outHex, strokeWidth: 1.5, strokeDasharray: '6,3' },
+        {
+          sourceHandle: srcHandle, targetHandle: 'in',
+          label: `F${outFibra}`,
+          labelStyle:   { fill: outHex, fontSize: 9, fontWeight: 700 },
+          labelBgStyle: { fill: T.ctoBg + 'cc', borderRadius: 3 },
+        }
+      )
+
+      // Seguir recursivamente a cascata DESTA CTO também
+      followCascade(`cto-${cKey}`, cCtoId, outFibra)
+      // Expandir fusões de bandeja desta CTO (cascata via fusão tipo='cascata')
+      expandCTOFusoes(`cto-${cKey}`, cCtoId, lookupCTO(cCtoId))
+
+      prevNodeId = `cto-${cKey}`
+      prevRawId  = cCtoId
+      prevFibra  = outFibra
+    }
+  }
+
+  // ── Expande CTOs referenciadas em fusões de bandeja (tipo='cascata') ──
+  // Cria nós CTO + arestas saindo do handle da bandeja (bdj-${id})
+  // para cada fusão com tipo='cascata' e ref_id preenchido.
+  function expandCTOFusoes(nodeId, rawId, ctoData) {
+    const visitKey = `fuse-${String(rawId)}`
+    if (ctoFusoesVisited.has(visitKey)) return
+    ctoFusoesVisited.add(visitKey)
+
+    for (const bdj of (ctoData?.diagrama?.bandejas ?? [])) {
+      for (const f of (bdj.fusoes ?? [])) {
+        if (f.tipo !== 'cascata' || !f.ref_id?.trim()) continue
+        const targetKey = String(f.ref_id.trim())
+        const outFibra  = f.saida?.fibra ?? f.cor ?? null
+        const fHex      = abntHex(outFibra)
+        // Usar handle inline da fusão (fus-${f.id}) quando disponível,
+        // senão usar handle da bandeja (bdj-${bdj.id})
+        const srcHandle = f.id ? `fus-${f.id}` : `bdj-${bdj.id}`
+
+        if (!ctoSet.has(targetKey)) {
+          ctoSet.add(targetKey)
+          const tData = lookupCTO(f.ref_id) ?? { cto_id: f.ref_id, nome: `CTO ${f.ref_id}` }
+          nodes.push({
+            id: `cto-${targetKey}`, type: 'cto', position: { x: 0, y: 0 },
+            data: {
+              T,
+              nome:         tData.nome,
+              cto_id:       tData.cto_id ?? f.ref_id,
+              capacidade:   tData.capacidade ?? 16,
+              ocupacao:     tData.ocupacao   ?? 0,
+              fibraEntrada: outFibra,
+              bandejas:     tData.diagrama?.bandejas  ?? [],
+              splitters:    tData.diagrama?.splitters ?? [],
+            },
+          })
+        }
+
+        edge(nodeId, `cto-${targetKey}`,
+          { ...T.drop, stroke: fHex, strokeWidth: 1.5, strokeDasharray: '6,3' },
+          {
+            sourceHandle: srcHandle, targetHandle: 'in',
+            ...(outFibra != null ? {
+              label: `F${outFibra}`,
+              labelStyle:   { fill: fHex, fontSize: 9, fontWeight: 700 },
+              labelBgStyle: { fill: T.ctoBg + 'cc', borderRadius: 3 },
+            } : {}),
+          }
+        )
+
+        // Recursão: expandir fusões + ctos_cascata desta CTO também
+        expandCTOFusoes(`cto-${targetKey}`, f.ref_id, lookupCTO(f.ref_id))
+        followCascade(`cto-${targetKey}`, f.ref_id, outFibra ?? 1)
+      }
+    }
   }
 
   function lookupCDO(id) {
@@ -824,8 +1064,42 @@ function buildGraph(topologia, T) {
           continue
         }
 
-        // ── Tipos não gráficos (pon, conector, fusao_bandeja) ── skip visual
-        if (destTipo !== 'cto' && destTipo !== 'ce') continue
+        // ── PON — terminal de cliente ──
+        if (destTipo === 'pon') {
+          const ponId = `pon-${splNodeId}-${porta}`
+          if (!miscSet.has(ponId)) {
+            miscSet.add(ponId)
+            nodes.push({
+              id: ponId, type: 'passagem', position: { x: 0, y: 0 },
+              data: { T, nome: s.obs?.trim() || s.cto_id || `PON S${porta}`, label: 'PON' },
+            })
+          }
+          edge(splNodeId, ponId,
+            { ...T.drop, stroke: portaHex, strokeWidth: 1.5 },
+            { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+          )
+          continue
+        }
+
+        // ── Conector — ponto físico de junção ──
+        if (destTipo === 'conector') {
+          const conId = `con-${splNodeId}-${porta}`
+          if (!miscSet.has(conId)) {
+            miscSet.add(conId)
+            nodes.push({
+              id: conId, type: 'passagem', position: { x: 0, y: 0 },
+              data: { T, nome: s.obs?.trim() || s.cto_id || `CON S${porta}`, label: 'CON' },
+            })
+          }
+          edge(splNodeId, conId,
+            { ...T.drop, stroke: portaHex, strokeWidth: 1.5, strokeDasharray: '4,3' },
+            { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+          )
+          continue
+        }
+
+        // ── fusao_bandeja — skip visual ──
+        if (destTipo === 'fusao_bandeja') continue
 
         // ── CTO (padrão) ──
         const ctoKey = String(s.cto_id)
@@ -851,6 +1125,55 @@ function buildGraph(topologia, T) {
           { ...T.drop, stroke: portaHex, strokeWidth: 2 },
           { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
         )
+
+        // ── Cascata via ctos_cascata (pré-mapa global) ──
+        followCascade(`cto-${ctoKey}`, s.cto_id, porta)
+        // ── Cascata via fusões de bandeja (tipo='cascata') ──
+        expandCTOFusoes(`cto-${ctoKey}`, s.cto_id, lookupCTO(s.cto_id))
+      }
+    }
+
+    // ── CDO bandejas: fusões saida_cto → CTO direto (sem splitter) ──
+    // Cria CTO + aresta para cada fusão com tipo='saida_cto' e destino_id preenchido.
+    for (const bdj of bandejas) {
+      for (const f of (bdj.fusoes ?? [])) {
+        if (f.tipo !== 'saida_cto' || !f.destino_id?.trim()) continue
+        const ctoKey  = String(f.destino_id.trim())
+        const outFibra = f.saida?.fibra ?? f.entrada?.fibra ?? null
+        const fHex    = abntHex(outFibra)
+
+        if (!ctoSet.has(ctoKey)) {
+          ctoSet.add(ctoKey)
+          const cData = lookupCTO(f.destino_id) ?? { cto_id: f.destino_id, nome: `CTO ${f.destino_id}` }
+          nodes.push({
+            id: `cto-${ctoKey}`, type: 'cto', position: { x: 0, y: 0 },
+            data: {
+              T,
+              nome:         cData.nome,
+              cto_id:       cData.cto_id ?? f.destino_id,
+              capacidade:   cData.capacidade ?? 16,
+              ocupacao:     cData.ocupacao   ?? 0,
+              fibraEntrada: outFibra,
+              bandejas:     cData.diagrama?.bandejas  ?? [],
+              splitters:    cData.diagrama?.splitters ?? [],
+            },
+          })
+        }
+
+        edge(cdoId, `cto-${ctoKey}`,
+          { ...T.drop, stroke: fHex, strokeWidth: 1.5 },
+          {
+            sourceHandle: 'out', targetHandle: 'in',
+            ...(outFibra != null ? {
+              label: `F${outFibra}`,
+              labelStyle:   { fill: fHex, fontSize: 9, fontWeight: 700 },
+              labelBgStyle: { fill: T.ctoBg + 'cc', borderRadius: 3 },
+            } : {}),
+          }
+        )
+
+        followCascade(`cto-${ctoKey}`, f.destino_id, outFibra ?? 1)
+        expandCTOFusoes(`cto-${ctoKey}`, f.destino_id, lookupCTO(f.destino_id))
       }
     }
   }
@@ -877,14 +1200,15 @@ function buildGraph(topologia, T) {
 
 function calcCTOHeight(bandejas = [], splitters = []) {
   if (!bandejas.length && !splitters.length) return NODE_H.cto
-  // Per-bandeja: 22px header + n_fusoes * 15px (badge row + margin) + 8px gap
-  let h = 96
+  // header(36) + body(70) + section-border+padding(13) = 119px baseline
+  let h = 122
   for (const b of bandejas) {
     const n = Math.max(1, b.fusoes?.length ?? 0)
-    h += 22 + n * 15 + 8
+    // bandeja-margin(5) + bandeja-header(22) + fusoes-container-overhead(8) + n*19px per fusão row
+    h += 35 + n * 19
   }
-  // Splitters section: 4px top margin + 16px per splitter
-  if (splitters.length > 0) h += 4 + splitters.length * 16
+  // Splitters section: 4px top + 18px per splitter
+  if (splitters.length > 0) h += 4 + splitters.length * 18
   return Math.max(NODE_H.cto, h)
 }
 
@@ -895,10 +1219,93 @@ function calcH(node) {
   return NODE_H[node.type] ?? 140
 }
 
+// Agrupa nós pela coluna X (tolerância 80px — rank do Dagre LR)
+function groupByColumn(nodes, tol = 80) {
+  const map = new Map()
+  for (const n of nodes) {
+    const key = Math.round(n.position.x / tol) * tol
+    if (!map.has(key)) map.set(key, [])
+    map.get(key).push(n)
+  }
+  return map
+}
+
+// Garante espaçamento vertical mínimo dentro de cada coluna,
+// sem modificar a ordem relativa dos nós (apenas empurra para baixo).
+function resolveColumnOverlaps(nodes, minGap = 36) {
+  const colMap = groupByColumn(nodes)
+  for (const col of colMap.values()) {
+    col.sort((a, b) => a.position.y - b.position.y)
+    for (let i = 1; i < col.length; i++) {
+      const prev = col[i - 1]
+      const curr = col[i]
+      const prevBottom = prev.position.y + calcH(prev)
+      const needed = prevBottom + minGap
+      if (curr.position.y < needed) {
+        const shift = needed - curr.position.y
+        for (let j = i; j < col.length; j++) {
+          col[j].position = { ...col[j].position, y: col[j].position.y + shift }
+        }
+      }
+    }
+  }
+}
+
+// Detecta e resolve sobreposições entre QUALQUER par de nós (cruzamento entre colunas).
+// Usa iteração com limite para convergência.
+function resolveAllOverlaps(nodes, minGap = 36, maxIter = 40) {
+  const nw = n => NODE_W[n.type] ?? 220
+  const nh = n => calcH(n)
+
+  let changed = true
+  let iter = 0
+  while (changed && iter < maxIter) {
+    changed = false
+    iter++
+    // Processar do topo para baixo, da esquerda para a direita
+    nodes.sort((a, b) => a.position.x !== b.position.x
+      ? a.position.x - b.position.x
+      : a.position.y - b.position.y)
+
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j]
+        const ax2 = a.position.x + nw(a)
+        const ay2 = a.position.y + nh(a)
+        const bx2 = b.position.x + nw(b)
+        const by2 = b.position.y + nh(b)
+
+        const overlapX = a.position.x < bx2 + minGap && ax2 + minGap > b.position.x
+        const overlapY = a.position.y < by2 + minGap && ay2 + minGap > b.position.y
+
+        if (overlapX && overlapY) {
+          // Nós na mesma coluna: empurrar b para baixo
+          if (Math.abs(a.position.x - b.position.x) < 60) {
+            const push = ay2 + minGap - b.position.y
+            if (push > 0) {
+              b.position = { ...b.position, y: b.position.y + push }
+              changed = true
+            }
+          } else {
+            // Colunas adjacentes: reduzir sobreposição vertical empurrando b para baixo
+            const overlapAmt = Math.min(ay2 - b.position.y, by2 - a.position.y)
+            if (overlapAmt > 0) {
+              b.position = { ...b.position, y: b.position.y + overlapAmt + minGap }
+              changed = true
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 function dagreLayout(nodes, edges) {
   const g = new Dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: 'LR', nodesep: 55, ranksep: 200, edgesep: 30 })
+  // ranksep calculado para garantir gap real de ≥ 30px entre colunas mais largas
+  // (splitter=195, cto=240 → ranksep mínimo = 30 + 97 + 120 = 247 → usamos 300)
+  g.setGraph({ rankdir: 'LR', nodesep: 80, ranksep: 300, edgesep: 30 })
 
   for (const n of nodes) {
     g.setNode(n.id, { width: NODE_W[n.type] ?? 220, height: calcH(n) })
@@ -920,30 +1327,101 @@ function dagreLayout(nodes, edges) {
     }
   })
 
-  // Pós-processamento: ordenar CTOs dentro de cada coluna por porta (F1→F8)
-  // Dagre já tenta minimizar cruzamentos, mas não garante ordenação por fibraEntrada.
-  const ctoNodes = laid.filter(n => n.type === 'cto')
-  if (ctoNodes.length > 1) {
-    // Agrupar CTOs pela mesma coluna (mesmo X, tolerância de 20px)
-    const groups = new Map()
-    for (const n of ctoNodes) {
-      const xKey = Math.round(n.position.x / 20) * 20
-      if (!groups.has(xKey)) groups.set(xKey, [])
-      groups.get(xKey).push(n)
+  // ── Pós-processamento: layout de árvore para Y
+  // X vem do Dagre (ranking correto esq→dir).
+  // Y é atribuído por travessia DFS top-down:
+  //   • Folhas recebem Y sequencial (sem sobreposição garantida por construção)
+  //   • Pais são centralizados entre o primeiro e o último filho
+  // Filhos são ordenados por número de porta/fibra → fluxo F1 no topo, F8 embaixo.
+  const TREE_GAP = 24   // gap mínimo entre nós irmãos
+
+  // Mapa de filhos: nodeId → [{childId, order}]  (order = porta/fibra para ordenar)
+  const childMap = new Map()
+  const hasParent = new Set()
+  for (const e of edges) {
+    if (!childMap.has(e.source)) childMap.set(e.source, [])
+    // Determina ordem: handle 's-N' → porta N; label 'FN' → fibra N
+    let order = 999
+    const splM = e.sourceHandle?.match(/^s-(\d+)$/)
+    if (splM) order = parseInt(splM[1], 10)
+    else {
+      const lblM = String(e.label ?? '').match(/F(\d+)/)
+      if (lblM) order = parseInt(lblM[1], 10)
     }
-    for (const group of groups.values()) {
-      if (group.length <= 1) continue
-      // Y positions ocupadas por este grupo, ordenadas de cima para baixo
-      const ys = group.map(n => n.position.y).sort((a, b) => a - b)
-      // Ordenar o grupo por fibraEntrada (porta), depois redistribuir os Ys
-      const sorted = group.slice().sort((a, b) =>
-        (a.data?.fibraEntrada ?? 99) - (b.data?.fibraEntrada ?? 99)
-      )
-      sorted.forEach((n, i) => {
-        const node = laid.find(l => l.id === n.id)
-        if (node) node.position.y = ys[i]
-      })
+    childMap.get(e.source).push({ id: e.target, order })
+    hasParent.add(e.target)
+  }
+  // Ordenar filhos por porta/fibra em todos os nós
+  for (const kids of childMap.values()) kids.sort((a, b) => a.order - b.order)
+
+  // nodeById para acesso rápido
+  const nodeById = new Map(laid.map(n => [n.id, n]))
+
+  // Altura total da subárvore enraizada em `id` (inclui gaps entre irmãos)
+  function subtreeH(id) {
+    const node = nodeById.get(id)
+    if (!node) return 0
+    const kids = childMap.get(id) ?? []
+    if (kids.length === 0) return calcH(node)
+    const kidsTotal = kids.reduce((s, k) => s + subtreeH(k.id), 0)
+    return kidsTotal + (kids.length - 1) * TREE_GAP
+  }
+
+  // Atribui Y às subárvores de forma descendente.
+  // `topY` é o Y do topo disponível para esta subárvore.
+  // Retorna o Y do bottom desta subárvore.
+  const visited = new Set()
+  function assignTreeY(id, topY) {
+    if (visited.has(id)) return topY
+    visited.add(id)
+    const node = nodeById.get(id)
+    if (!node) return topY
+    const kids = (childMap.get(id) ?? []).filter(k => nodeById.has(k.id))
+    const h = calcH(node)
+
+    if (kids.length === 0) {
+      // Folha: posiciona no topo disponível
+      node.position = { ...node.position, y: topY }
+      return topY + h
     }
+
+    // Distribui filhos sequencialmente a partir de topY
+    let cursor = topY
+    const kidCenters = []
+    for (const k of kids) {
+      const kh = subtreeH(k.id)
+      const kidNode = nodeById.get(k.id)
+      if (!kidNode) continue
+      const bottom = assignTreeY(k.id, cursor)
+      // Centro vertical desta subárvore filho
+      kidCenters.push(cursor + kh / 2)
+      cursor = bottom + TREE_GAP
+    }
+
+    // Centraliza este nó entre o centro do primeiro e do último filho
+    if (kidCenters.length > 0) {
+      const midY = (kidCenters[0] + kidCenters[kidCenters.length - 1]) / 2
+      node.position = { ...node.position, y: midY - h / 2 }
+    } else {
+      node.position = { ...node.position, y: topY }
+    }
+
+    return cursor - TREE_GAP  // bottom da subárvore (cursor já adiantado 1 gap a mais)
+  }
+
+  // Processar raízes (nós sem pai) de cima para baixo pela posição X do Dagre
+  const roots = laid.filter(n => !hasParent.has(n.id)).sort((a, b) => a.position.x - b.position.x)
+  let startY = 0
+  for (const root of roots) {
+    const bottom = assignTreeY(root.id, startY)
+    startY = bottom + TREE_GAP * 2
+  }
+
+  // Garantir que nenhum nó ficou com Y negativo (centralizar se necessário)
+  const minY = Math.min(...laid.map(n => n.position.y))
+  if (minY < 0) {
+    const shift = -minY + 20
+    for (const n of laid) n.position = { ...n.position, y: n.position.y + shift }
   }
 
   return laid
