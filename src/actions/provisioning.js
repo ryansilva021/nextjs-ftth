@@ -383,6 +383,74 @@ export async function autoFindONUs() {
   return novos
 }
 
+// ─── syncClientWithCto ────────────────────────────────────────────────────────
+
+/**
+ * Ensures a provisioned ONU's client name is written to its assigned CTO port.
+ * Call this after provisioning to guarantee NOC ↔ CTO consistency.
+ *
+ * @param {string} serial - ONU serial number (case-insensitive)
+ */
+export async function syncClientWithCto(serial) {
+  const session = await requireActiveEmpresa(NOC_ALLOWED)
+  const { projeto_id } = session.user
+
+  await connectDB()
+
+  const onu = await ONU.findOne({ projeto_id, serial: serial.toUpperCase().trim() }).lean()
+  if (!onu) throw new Error(`ONU ${serial} não encontrada`)
+
+  if (onu.status === 'cancelled') {
+    throw new Error(`ONU ${serial} está cancelada — sem sincronização`)
+  }
+
+  const cliente = onu.cliente?.trim()
+  if (!cliente) throw new Error(`ONU ${serial} sem nome de cliente`)
+
+  // Find the CTO and check if the client is already written
+  const cto_id = onu.cto_id
+  if (!cto_id) {
+    // No CTO assigned — try to find one and allocate
+    const found = await _findAvailableCTO(projeto_id)
+    if (!found) throw new Error('Nenhuma CTO com porta disponível')
+    const { cto, splitterIdx, saidaIdx } = found
+    await _allocateCTOPort(projeto_id, cto.cto_id, splitterIdx, saidaIdx, cliente)
+    await ONU.updateOne({ projeto_id, serial: onu.serial }, { $set: { cto_id: cto.cto_id, cto_port: saidaIdx + 1 } })
+    await nocLog(projeto_id, 'SYNC', `Cliente ${cliente} vinculado à CTO ${cto.cto_id} porta ${saidaIdx + 1}`, 'success')
+    return { synced: true, cto_id: cto.cto_id, cto_port: saidaIdx + 1 }
+  }
+
+  // Check if already written in the diagrama
+  const cto = await CTO.findOne({ projeto_id, cto_id }).lean()
+  if (!cto) throw new Error(`CTO ${cto_id} não encontrada`)
+
+  const splitters = cto.diagrama?.splitters ?? []
+  let alreadySynced = false
+  let freeSi = null, freePi = null
+
+  for (let si = 0; si < splitters.length; si++) {
+    const saidas = splitters[si].saidas ?? []
+    for (let pi = 0; pi < saidas.length; pi++) {
+      const name = saidas[pi]?.cliente?.trim()
+      if (name === cliente) { alreadySynced = true; break }
+      if (!name && freeSi === null) { freeSi = si; freePi = pi }
+    }
+    if (alreadySynced) break
+  }
+
+  if (alreadySynced) {
+    return { synced: false, reason: 'already_synced' }
+  }
+
+  if (freeSi === null) throw new Error(`CTO ${cto_id} não tem portas livres`)
+
+  await _allocateCTOPort(projeto_id, cto_id, freeSi, freePi, cliente)
+  await ONU.updateOne({ projeto_id, serial: onu.serial }, { $set: { cto_port: freePi + 1 } })
+  await nocLog(projeto_id, 'SYNC', `[SYNC] Cliente ${cliente} vinculado à CTO ${cto_id} porta ${freePi + 1}`, 'success')
+
+  return { synced: true, cto_id, cto_port: freePi + 1 }
+}
+
 // ─── manualCancel ─────────────────────────────────────────────────────────────
 
 export async function manualCancel(serial) {

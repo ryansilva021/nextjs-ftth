@@ -277,6 +277,214 @@ export class HuaweiOltAdapter {
       return []
     }
   }
+
+  /**
+   * Returns basic OLT hardware and software information.
+   * Real: runs `display version` and parses Version and Uptime fields.
+   *
+   * @returns {Promise<{ modelo: string, versao: string, uptime: string, slots: number, mock?: boolean }>}
+   */
+  async getOltInfo() {
+    if (this.isMock) {
+      return {
+        modelo:  'Huawei MA5800-X7',
+        versao:  'V800R021C10',
+        uptime:  '15d 4h 32m',
+        slots:   8,
+        mock:    true,
+      }
+    }
+
+    try {
+      const output = await this.sendCmd('display version', 1500)
+
+      const versaoMatch = output.match(/Version\s*[:\s]+(\S+)/i)
+      const uptimeMatch = output.match(/Uptime\s*[:\s]+(.+)/i)
+
+      return {
+        modelo:  this.olt.ip,
+        versao:  versaoMatch ? versaoMatch[1] : 'unknown',
+        uptime:  uptimeMatch ? uptimeMatch[1].trim() : 'unknown',
+        slots:   8,
+      }
+    } catch (err) {
+      console.error('[HuaweiAdapter] getOltInfo error:', err.message)
+      return { modelo: 'unknown', versao: 'unknown', uptime: 'unknown', slots: 0, error: err.message }
+    }
+  }
+
+  /**
+   * Returns the list of GPON PON ports and their current state.
+   * Real: runs `display port state all` and parses slot/port/status from each line.
+   *
+   * @returns {Promise<Array<{ slot: number, port: number, pon: string, onus: number, capacidade: number, status: string }>>}
+   */
+  async getPonPorts() {
+    if (this.isMock) {
+      return [
+        { slot: 0, port: 0, pon: '0/0/0', onus: 12, capacidade: 128, status: 'online'  },
+        { slot: 0, port: 1, pon: '0/0/1', onus: 8,  capacidade: 128, status: 'online'  },
+        { slot: 0, port: 2, pon: '0/0/2', onus: 3,  capacidade: 128, status: 'online'  },
+        { slot: 0, port: 3, pon: '0/0/3', onus: 0,  capacidade: 128, status: 'offline' },
+      ]
+    }
+
+    try {
+      const output = await this.sendCmd('display port state all', 2000)
+      const results = []
+
+      for (const line of output.split('\n')) {
+        // Match lines containing port references like "0/0/0" or "0/ 0/ 0"
+        const m = line.match(/(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)/)
+        if (!m) continue
+
+        const slot   = parseInt(m[1], 10)
+        const port   = parseInt(m[3], 10)
+        const pon    = `${m[1]}/${m[2]}/${m[3]}`
+        const online = /online|up/i.test(line)
+
+        results.push({
+          slot,
+          port,
+          pon,
+          onus:       0,
+          capacidade: 128,
+          status:     online ? 'online' : 'offline',
+        })
+      }
+
+      return results
+    } catch (err) {
+      console.error('[HuaweiAdapter] getPonPorts error:', err.message)
+      return []
+    }
+  }
+
+  /**
+   * Returns all ONUs provisioned on a given GPON port.
+   * Real: runs `display ont info <slot> <port> all` and parses each ONU row.
+   *
+   * @param {number} slot
+   * @param {number} port
+   * @returns {Promise<Array<{ onuId: number, serial: string, cliente: string, status: string, rx: number|null, tx: number|null }>>}
+   */
+  async getOnus(slot, port) {
+    if (this.isMock) {
+      return [
+        { onuId: 0, serial: 'HWTCE1234567A', cliente: 'João Silva',   status: 'online',  rx: -18.5, tx: 2.3  },
+        { onuId: 1, serial: 'HWTCE2345678B', cliente: 'Maria Santos', status: 'online',  rx: -22.1, tx: 2.1  },
+        { onuId: 2, serial: 'ZTEG9ABCDEF01', cliente: 'Pedro Alves',  status: 'offline', rx: null,  tx: null },
+      ]
+    }
+
+    try {
+      const output = await this.sendCmd(`display ont info ${slot} ${port} all`, 2000)
+      const results = []
+
+      for (const line of output.split('\n')) {
+        // Pattern: leading whitespace, ONT-ID, serial, run-state
+        const m = line.match(/\s*(\d+)\s+(\S+)\s+(\w+)/)
+        if (!m) continue
+
+        const onuId  = parseInt(m[1], 10)
+        const serial = m[2].toUpperCase()
+        const status = m[3].toLowerCase()
+
+        // Only include lines that look like valid ONU entries (serial >= 8 chars)
+        if (serial.length < 8) continue
+
+        results.push({ onuId, serial, cliente: '', status, rx: null, tx: null })
+      }
+
+      return results
+    } catch (err) {
+      console.error('[HuaweiAdapter] getOnus error:', err.message)
+      return []
+    }
+  }
+
+  /**
+   * Returns full detail for a single ONU, including optical power readings.
+   * Real: runs `display ont info` and `display ont optical-info`, then merges both outputs.
+   *
+   * @param {number} slot
+   * @param {number} port
+   * @param {number} onuId
+   * @returns {Promise<{ onuId: number, serial: string, cliente: string, status: string, rx: number|null, tx: number|null, pon: string, mac: string, distancia: string, mock?: boolean }>}
+   */
+  async getOnuDetail(slot, port, onuId) {
+    if (this.isMock) {
+      return {
+        onuId,
+        serial:    'HWTCE1234567A',
+        cliente:   'Mock Cliente',
+        status:    'online',
+        rx:        -18.5,
+        tx:        2.3,
+        pon:       `${slot}/${port}`,
+        mac:       'AA:BB:CC:DD:EE:FF',
+        distancia: '1.2km',
+        mock:      true,
+      }
+    }
+
+    try {
+      const [infoOut, optOut] = await Promise.all([
+        this.sendCmd(`display ont info ${slot} ${port} ${onuId}`, 2000),
+        this.sendCmd(`display ont optical-info ${slot} ${port} ${onuId}`, 2000),
+      ])
+
+      const serialMatch   = infoOut.match(/SN\s*[:\s]+([A-Z0-9]{8,16})/i)
+      const statusMatch   = infoOut.match(/Run state\s*[:\s]+(\S+)/i)
+      const macMatch      = infoOut.match(/MAC\s*[:\s]+([\da-fA-F:]{17})/i)
+      const distMatch     = infoOut.match(/Distance\s*[:\s]+([\d.]+\s*(?:km|m))/i)
+      const rxMatch       = optOut.match(/Rx.*?(-?\d+\.\d+)\s*dBm/i)
+      const txMatch       = optOut.match(/Tx.*?(-?\d+\.\d+)\s*dBm/i)
+
+      return {
+        onuId,
+        serial:    serialMatch   ? serialMatch[1].toUpperCase()    : 'unknown',
+        cliente:   '',
+        status:    statusMatch   ? statusMatch[1].toLowerCase()     : 'unknown',
+        rx:        rxMatch       ? parseFloat(rxMatch[1])           : null,
+        tx:        txMatch       ? parseFloat(txMatch[1])           : null,
+        pon:       `${slot}/${port}`,
+        mac:       macMatch      ? macMatch[1].toUpperCase()        : null,
+        distancia: distMatch     ? distMatch[1].trim()              : null,
+      }
+    } catch (err) {
+      console.error('[HuaweiAdapter] getOnuDetail error:', err.message)
+      return { onuId, serial: 'unknown', cliente: '', status: 'error', rx: null, tx: null, pon: `${slot}/${port}`, mac: null, distancia: null, error: err.message }
+    }
+  }
+
+  /**
+   * Sends a reset command to an ONU.
+   * Real: enters enable → config → interface gpon → ont reset → quit.
+   *
+   * @param {number} slot
+   * @param {number} port
+   * @param {number} onuId
+   * @returns {Promise<{ success: boolean, mock?: boolean }>}
+   */
+  async rebootOnu(slot, port, onuId) {
+    if (this.isMock) {
+      console.log(`[HuaweiAdapter][MOCK] rebootOnu slot=${slot}/${port} id=${onuId}`)
+      return { success: true, mock: true }
+    }
+
+    try {
+      await this.sendCmd('enable',                    500)
+      await this.sendCmd('config',                    500)
+      await this.sendCmd(`interface gpon 0/${slot}`,  500)
+      await this.sendCmd(`ont reset ${port} ${onuId}`, 3000)
+      await this.sendCmd('quit',                      500)
+      return { success: true }
+    } catch (err) {
+      console.error('[HuaweiAdapter] rebootOnu error:', err.message)
+      return { success: false, error: err.message }
+    }
+  }
 }
 
 // ─── Auto-Find parser ─────────────────────────────────────────────────────────

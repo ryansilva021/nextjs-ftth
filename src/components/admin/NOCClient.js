@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import OltMgmtTab from './OltMgmtTab'
 
 // ─── Style constants ──────────────────────────────────────────────────────────
 
@@ -169,7 +170,7 @@ function Spinner() {
   return (
     <span style={{
       display: 'inline-block', width: 14, height: 14,
-      border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff',
+      border: '2px solid var(--border-color)', borderTopColor: 'var(--foreground)',
       borderRadius: '50%', animation: 'noc-spin 0.7s linear infinite',
       verticalAlign: 'middle',
     }} />
@@ -189,9 +190,9 @@ function FeedbackBanner({ feedback }) {
   return (
     <div style={{
       padding: '10px 16px', borderRadius: 8, marginBottom: 12,
-      backgroundColor: feedback.type === 'success' ? '#052e16' : '#3d0a0a',
-      border: `1px solid ${feedback.type === 'success' ? '#166534' : '#7f1d1d'}`,
-      color: feedback.type === 'success' ? '#86efac' : '#fca5a5',
+      backgroundColor: feedback.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+      border: `1px solid ${feedback.type === 'success' ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
+      color: feedback.type === 'success' ? '#16a34a' : '#dc2626',
       fontSize: 13,
     }}>
       {feedback.message}
@@ -589,8 +590,9 @@ function CTOCard({ cto }) {
             </p>
           ) : (
             ports.map((p) => {
-              const occupied = p.status === 'OCUPADO'
-              const dotColor = occupied ? '#ef4444' : '#22c55e'
+              const occupied  = p.status === 'OCUPADO'
+              const dotColor  = occupied ? '#ef4444' : '#22c55e'
+              const sqColor   = p.client?.signal_quality ? SIGNAL_QUALITY[p.client.signal_quality]?.color : null
               return (
                 <div
                   key={p.port_number}
@@ -622,6 +624,13 @@ function CTOCard({ cto }) {
                     </span>
                   ) : (
                     <span style={{ color: 'var(--text-muted)', flex: 1 }}>Livre</span>
+                  )}
+
+                  {/* RX power badge for occupied ports */}
+                  {occupied && p.client?.rx_power != null && (
+                    <span style={{ fontSize: 10, color: sqColor ?? 'var(--text-muted)', fontFamily: 'monospace', flexShrink: 0 }}>
+                      {p.client.rx_power.toFixed(1)} dBm
+                    </span>
                   )}
 
                   {/* Splitter label */}
@@ -1330,6 +1339,7 @@ export default function NOCClient({ stats, userRole }) {
     { id: 'topologia',   label: 'Topologia' },
     { id: 'sgp',         label: 'SGP' },
     { id: 'autofind',    label: 'Auto-Find' },
+    { id: 'olt-mgmt',    label: 'Gerenciar OLTs' },
   ]
 
   return (
@@ -1381,6 +1391,7 @@ export default function NOCClient({ stats, userRole }) {
       {activeTab === 'topologia'   && <TopologiaTab ctos={ctos} olts={olts} />}
       {activeTab === 'sgp'         && <SGPTab sgpStatus={sgpStatus} onLog={addLog} />}
       {activeTab === 'autofind'    && <AutoFindTab olts={olts} onLog={addLog} />}
+      {activeTab === 'olt-mgmt'    && <OltMgmtTab olts={olts} onLog={addLog} />}
 
       {/* Log terminal — always visible */}
       <LogTerminal logs={logs} />
