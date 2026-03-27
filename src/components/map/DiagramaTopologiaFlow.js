@@ -169,6 +169,7 @@ function buildGraphData(topologia) {
       type: isCE ? 'ceNode' : 'cdoNode',
       position: { x: 0, y: 0 },
       data: {
+        _nodeId:       id,
         nome:          caixa?.nome ?? id,
         tipo:          caixa?.tipo ?? (destTipo ?? 'CDO').toUpperCase(),
         portaOlt:      entrada.porta_olt ?? caixa?.porta_olt ?? null,
@@ -192,6 +193,7 @@ function buildGraphData(topologia) {
       type: 'ctoNode',
       position: { x: 0, y: 0 },
       data: {
+        _nodeId:    id,
         nome:       cto?.nome ?? id,
         ctoId:      cto?.cto_id ?? id,
         capacidade: cto?.capacidade ?? null,
@@ -844,13 +846,35 @@ const OLTNode = memo(({ data }) => {
 })
 OLTNode.displayName = 'OLTNode'
 
+// ── Collapse toggle button (shared by CDO, CE, CTO) ──────────────────────────
+function CollapseBtn({ collapsed, onToggle, accentColor }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onToggle?.() }}
+      title={collapsed ? 'Expandir' : 'Minimizar'}
+      style={{
+        width: 16, height: 16, borderRadius: 3,
+        background: accentColor + '22',
+        border: `1px solid ${accentColor}55`,
+        color: accentColor, fontSize: 10, fontWeight: 800,
+        cursor: 'pointer', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', flexShrink: 0, lineHeight: 1,
+        padding: 0,
+      }}
+    >
+      {collapsed ? '+' : '−'}
+    </button>
+  )
+}
+
 // ── CDO Node (splitters + bandejas de fusão) ──────────────────────────────────
 const CDONode = memo(({ data }) => {
+  const collapsed     = data.collapsed ?? false
   const splitterCount = data.splitterCount ?? 0
   const splFibras     = data.splFibras ?? []
   const splitters     = data.splitters ?? []
   const bandejas      = data.bandejas  ?? []
-  const totalH        = cdoHeight(splitterCount, bandejas)
+  const totalH        = collapsed ? CDO_HEADER_H : cdoHeight(splitterCount, bandejas)
 
   // Handle Y position: always in the splitter section (fixed height per splitter row)
   function handleTop(si) {
@@ -890,25 +914,26 @@ const CDONode = memo(({ data }) => {
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
-          {(data.placa != null || data.pon != null) && (
+          {(data.placa != null || data.pon != null) && !collapsed && (
             <span style={{ fontSize: 9, color: '#67e8f9', background: 'rgba(8,145,178,0.15)',
               padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>
               {data.placa != null ? `Pl${data.placa} ` : ''}PON {data.pon ?? '?'}
             </span>
           )}
-          {data.portaOlt != null && (
+          {data.portaOlt != null && !collapsed && (
             <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>Porta {data.portaOlt}</span>
           )}
-          {!data._mobile && (
+          {!data._mobile && !collapsed && (
             <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.2)' }}>
               {splitterCount} spl · {bandejas.length} bdj
             </span>
           )}
+          <CollapseBtn collapsed={collapsed} onToggle={() => data.onToggleCollapse?.(data._nodeId)} accentColor="#0891b2" />
         </div>
       </div>
 
       {/* ── Seção Splitters (compacta, altura fixa por splitter) ── */}
-      {splitters.map((spl, si) => {
+      {!collapsed && splitters.map((spl, si) => {
         const fibra    = splFibras[si] ?? (si * 2 + 1)
         const color    = fiberColor(fibra)
         const ratio    = parseSplitterRatio(spl.tipo)
@@ -956,14 +981,14 @@ const CDONode = memo(({ data }) => {
         )
       })}
 
-      {splitterCount === 0 && bandejas.length === 0 && (
+      {!collapsed && splitterCount === 0 && bandejas.length === 0 && (
         <div style={{ padding: '12px', textAlign: 'center' }}>
           <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)' }}>Sem splitters</span>
         </div>
       )}
 
       {/* ── Seção Bandejas (com fusões — fonte única de verdade) ── */}
-      {bandejas.length > 0 && (
+      {!collapsed && bandejas.length > 0 && (
         <div style={{ borderTop: '1px solid rgba(8,145,178,0.15)' }}>
           {bandejas.map((bdj, bi) => {
             const fusoes = bdj.fusoes ?? []
@@ -1090,50 +1115,59 @@ const CDONode = memo(({ data }) => {
 CDONode.displayName = 'CDONode'
 
 // ── CE Node (cascata) ─────────────────────────────────────────────────────────
-const CENode = memo(({ data }) => (
-  <div style={{
-    background:    '#0a0520',
-    border:        '2px dashed #7c3aed',
-    borderRadius:  10,
-    width:         CE_WIDTH,
-    fontFamily:    'inherit',
-    overflow:      'hidden',
-    boxShadow:     '0 0 0 1px rgba(124,58,237,0.1)',
-  }}>
-    <Handle type="target" position={Position.Left} id="in"
-      style={{ background: '#7c3aed', border: 'none', width: 9, height: 9 }} />
-
+const CENode = memo(({ data }) => {
+  const collapsed = data.collapsed ?? false
+  return (
     <div style={{
-      background:   'rgba(124,58,237,0.12)',
-      borderBottom: '1px solid rgba(124,58,237,0.2)',
-      padding:      '7px 11px',
+      background:    '#0a0520',
+      border:        '2px dashed #7c3aed',
+      borderRadius:  10,
+      width:         CE_WIDTH,
+      fontFamily:    'inherit',
+      overflow:      'hidden',
+      boxShadow:     '0 0 0 1px rgba(124,58,237,0.1)',
     }}>
-      <div style={{ fontSize: 8, color: '#7c3aed', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-        CI/CDO · CASCATA
-      </div>
-      <div style={{ fontSize: 13, fontWeight: 800, color: '#e9d5ff', marginTop: 2 }}>
-        {data.nome}
-      </div>
-    </div>
+      <Handle type="target" position={Position.Left} id="in"
+        style={{ background: '#7c3aed', border: 'none', width: 9, height: 9 }} />
 
-    <div style={{ padding: '7px 11px 10px' }}>
-      {data.pon != null && (
-        <span style={{ fontSize: 10, color: '#c4b5fd', background: 'rgba(124,58,237,0.12)',
-          padding: '1px 7px', borderRadius: 10, fontWeight: 700 }}>
-          PON {data.pon}
-        </span>
-      )}
-      {data.portaOlt != null && (
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
-          Porta OLT: {data.portaOlt}
+      <div style={{
+        background:   'rgba(124,58,237,0.12)',
+        borderBottom: '1px solid rgba(124,58,237,0.2)',
+        padding:      '7px 11px',
+        display:      'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6,
+      }}>
+        <div>
+          <div style={{ fontSize: 8, color: '#7c3aed', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            CI/CDO · CASCATA
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#e9d5ff', marginTop: 2 }}>
+            {data.nome}
+          </div>
+        </div>
+        <CollapseBtn collapsed={collapsed} onToggle={() => data.onToggleCollapse?.(data._nodeId)} accentColor="#7c3aed" />
+      </div>
+
+      {!collapsed && (
+        <div style={{ padding: '7px 11px 10px' }}>
+          {data.pon != null && (
+            <span style={{ fontSize: 10, color: '#c4b5fd', background: 'rgba(124,58,237,0.12)',
+              padding: '1px 7px', borderRadius: 10, fontWeight: 700 }}>
+              PON {data.pon}
+            </span>
+          )}
+          {data.portaOlt != null && (
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
+              Porta OLT: {data.portaOlt}
+            </div>
+          )}
         </div>
       )}
-    </div>
 
-    <Handle type="source" position={Position.Right} id="out-0"
-      style={{ background: '#7c3aed', border: 'none', width: 9, height: 9 }} />
-  </div>
-))
+      <Handle type="source" position={Position.Right} id="out-0"
+        style={{ background: '#7c3aed', border: 'none', width: 9, height: 9 }} />
+    </div>
+  )
+})
 CENode.displayName = 'CENode'
 
 // ── Splitter Node ──────────────────────────────────────────────────────────────
@@ -1228,8 +1262,9 @@ SplitterNode.displayName = 'SplitterNode'
 
 // ── CTO Node ──────────────────────────────────────────────────────────────────
 const CTONode = memo(({ data }) => {
-  const bandejas = data.bandejas ?? []
-  const entrada  = data.entrada  ?? null
+  const bandejas  = data.bandejas ?? []
+  const entrada   = data.entrada  ?? null
+  const collapsed = data.collapsed ?? false
 
   return (
     <div style={{
@@ -1249,44 +1284,56 @@ const CTONode = memo(({ data }) => {
         background:   'rgba(22,163,74,0.12)',
         borderBottom: '1px solid rgba(22,163,74,0.2)',
         padding:      '5px 10px',
-        display:      'flex', alignItems: 'center', justifyContent: 'space-between',
+        display:      'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4,
       }}>
-        <span style={{ fontSize: 8, color: '#16a34a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>CTO</span>
-        {data.capacidade != null && (
-          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)' }}>{data.capacidade}p</span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span style={{ fontSize: 8, color: '#16a34a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>CTO</span>
+          {collapsed && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#86efac', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {data.nome}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          {data.capacidade != null && !collapsed && (
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)' }}>{data.capacidade}p</span>
+          )}
+          <CollapseBtn collapsed={collapsed} onToggle={() => data.onToggleCollapse?.(data._nodeId)} accentColor="#16a34a" />
+        </div>
       </div>
 
       {/* Body — minHeight garante alinhamento dos handles com as rows das bandejas */}
-      <div style={{ padding: '6px 10px 8px', minHeight: 52 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#86efac', lineHeight: 1.2 }}>
-          {data.nome}
+      {!collapsed && (
+        <div style={{ padding: '6px 10px 8px', minHeight: 52 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#86efac', lineHeight: 1.2 }}>
+            {data.nome}
+          </div>
+          {!data._mobile && data.ctoId && data.ctoId !== data.nome && (
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace', marginTop: 2 }}>
+              {data.ctoId}
+            </div>
+          )}
+          {/* FO de entrada */}
+          {!data._mobile && entrada?.cdo_id && (
+            <div style={{ fontSize: 7.5, color: 'rgba(100,220,140,0.5)', marginTop: 3, display: 'flex', gap: 3, alignItems: 'center' }}>
+              <span>↑</span>
+              <span style={{ fontFamily: 'monospace' }}>{entrada.cdo_id}</span>
+              {entrada.porta_cdo != null && (
+                <span style={{ color: 'rgba(255,255,255,0.2)' }}>P{entrada.porta_cdo}</span>
+              )}
+              {entrada.splitter_cto && (
+                <span style={{ color: 'rgba(249,115,22,0.6)', fontFamily: 'monospace' }}>{entrada.splitter_cto}</span>
+              )}
+            </div>
+          )}
+          {data.capacidade != null && (
+            <OccBar ocupacao={data.ocupacao ?? 0} capacidade={data.capacidade} />
+          )}
         </div>
-        {!data._mobile && data.ctoId && data.ctoId !== data.nome && (
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace', marginTop: 2 }}>
-            {data.ctoId}
-          </div>
-        )}
-        {/* FO de entrada */}
-        {!data._mobile && entrada?.cdo_id && (
-          <div style={{ fontSize: 7.5, color: 'rgba(100,220,140,0.5)', marginTop: 3, display: 'flex', gap: 3, alignItems: 'center' }}>
-            <span>↑</span>
-            <span style={{ fontFamily: 'monospace' }}>{entrada.cdo_id}</span>
-            {entrada.porta_cdo != null && (
-              <span style={{ color: 'rgba(255,255,255,0.2)' }}>P{entrada.porta_cdo}</span>
-            )}
-            {entrada.splitter_cto && (
-              <span style={{ color: 'rgba(249,115,22,0.6)', fontFamily: 'monospace' }}>{entrada.splitter_cto}</span>
-            )}
-          </div>
-        )}
-        {data.capacidade != null && (
-          <OccBar ocupacao={data.ocupacao ?? 0} capacidade={data.capacidade} />
-        )}
-      </div>
+      )}
 
       {/* Bandejas */}
-      {bandejas.length > 0 && (
+      {!collapsed && bandejas.length > 0 && (
         <div style={{ borderTop: '1px solid rgba(22,163,74,0.15)' }}>
           {bandejas.map((bdj, bi) => {
             const fusoes = bdj.fusoes ?? []
@@ -1550,6 +1597,51 @@ function FlowInner({ projetoId, userRole, altura }) {
   const [activeTool, setActiveTool]      = useState('select')
   const [isMobile, setIsMobile]          = useState(false)
   const SNAP = 25
+
+  // ── Collapse state ─────────────────────────────────────────────────────────
+  const COLLAPSE_KEY = projetoId ? `ftth-topo-collapsed-${projetoId}` : null
+
+  const [collapsedNodes, setCollapsedNodes] = useState(() => {
+    if (!COLLAPSE_KEY || typeof window === 'undefined') return new Set()
+    try {
+      const saved = JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? '[]')
+      return new Set(Array.isArray(saved) ? saved : [])
+    } catch { return new Set() }
+  })
+
+  // Persist collapse state to localStorage
+  useEffect(() => {
+    if (!COLLAPSE_KEY) return
+    try {
+      localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...collapsedNodes]))
+    } catch {}
+  }, [collapsedNodes, COLLAPSE_KEY])
+
+  // Stable callback passed into node data
+  const onToggleCollapse = useCallback((nodeId) => {
+    setCollapsedNodes(prev => {
+      const next = new Set(prev)
+      if (next.has(nodeId)) next.delete(nodeId)
+      else next.add(nodeId)
+      return next
+    })
+  }, [])
+
+  // Inject collapsed + onToggleCollapse into nodes whenever either changes
+  useEffect(() => {
+    setNodes(prev => prev.map(n => {
+      if (!['cdoNode', 'ceNode', 'ctoNode'].includes(n.type)) return n
+      const id = n.data._nodeId ?? n.id
+      return {
+        ...n,
+        data: {
+          ...n.data,
+          collapsed:        collapsedNodes.has(id),
+          onToggleCollapse,
+        },
+      }
+    }))
+  }, [collapsedNodes, onToggleCollapse, setNodes])
 
   useEffect(() => {
     function check() { setIsMobile(window.innerWidth < 480) }

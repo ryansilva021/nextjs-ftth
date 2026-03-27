@@ -1123,58 +1123,65 @@ export default function MapaFTTH({
       )}
 
       {/* Spread panel overlay — seletor de itens sobrepostos */}
-      {spreadPanel && (
-        <div
-          style={{
-            position: 'absolute',
-            left: spreadPanel.x,
-            top: spreadPanel.y,
-            zIndex: 200,
-            transform: 'translate(-50%, -110%)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-            pointerEvents: 'auto',
-          }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {spreadPanel.items.map((item, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  setSelectedElement({ type: item.type, data: item.data })
-                  setSpreadPanel(null)
-                }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '7px 12px',
-                  borderRadius: 8,
-                  border: `1.5px solid ${item.cor}66`,
-                  background: 'rgba(11,18,32,0.97)',
-                  color: item.cor,
-                  cursor: 'pointer',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.7)',
-                  backdropFilter: 'blur(4px)',
-                  textAlign: 'left',
-                }}
-              >
-                <span>{item.icone}</span>
-                <span style={{ color: '#e2e8f0' }}>{item.nome}</span>
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setSpreadPanel(null)}
-            style={{ alignSelf: 'center', background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 11, padding: '2px 8px' }}
+      {spreadPanel && (() => {
+        const isDark = theme === 'dark'
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              left: spreadPanel.x,
+              top: spreadPanel.y,
+              zIndex: 200,
+              transform: 'translate(-50%, -110%)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+              pointerEvents: 'auto',
+            }}
+            onClick={e => e.stopPropagation()}
           >
-            fechar
-          </button>
-        </div>
-      )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {spreadPanel.items.map((item, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setSelectedElement({ type: item.type, data: item.data })
+                    setSpreadPanel(null)
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '7px 12px',
+                    borderRadius: 8,
+                    border: `1.5px solid ${item.cor}66`,
+                    background: isDark ? 'rgba(11,18,32,0.97)' : 'rgba(255,255,255,0.97)',
+                    color: item.cor,
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    whiteSpace: 'nowrap',
+                    boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.7)' : '0 4px 20px rgba(0,0,0,0.15)',
+                    backdropFilter: 'blur(4px)',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span>{item.icone}</span>
+                  <span style={{ color: isDark ? '#e2e8f0' : '#1e293b' }}>{item.nome}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setSpreadPanel(null)}
+              style={{
+                alignSelf: 'center', background: 'none', border: 'none',
+                color: isDark ? '#475569' : '#64748b',
+                cursor: 'pointer', fontSize: 11, padding: '2px 8px',
+              }}
+            >
+              fechar
+            </button>
+          </div>
+        )
+      })()}
 
       {/* Bottom sheet de elemento selecionado */}
       {!addMode && !reposicionandoEl && (

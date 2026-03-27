@@ -238,14 +238,36 @@ function PosteContent({ data, isAdmin, onAction, onIrAte, isDark }) {
   )
 }
 
-function OLTContent({ data, isAdmin, onAction, onIrAte, isDark }) {
+function OLTContent({ data, isAdmin, isNoc, onAction, onIrAte, isDark }) {
+  const [stats,      setStats]      = useState(null)
+  const [statsLoad,  setStatsLoad]  = useState(false)
+
   const STATUS_OLT = {
     ativo:         { label: 'Ativo',      bg: 'rgba(34,197,94,0.15)',   border: 'rgba(34,197,94,0.4)',   color: '#86efac' },
     inativo:       { label: 'Inativo',    bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.4)',   color: '#fca5a5' },
     em_manutencao: { label: 'Manutenção', bg: 'rgba(234,179,8,0.15)',   border: 'rgba(234,179,8,0.4)',   color: '#fde047' },
   }
-  const st = STATUS_OLT[data.status] ?? STATUS_OLT.ativo
+  const st    = STATUS_OLT[data.status] ?? STATUS_OLT.ativo
   const oltId = data.id ?? data.olt_id
+
+  // Fetch live stats on mount
+  useEffect(() => {
+    if (!oltId) return
+    let cancelled = false
+    setStatsLoad(true)
+    import('@/actions/olts').then(m => m.getOltStats(oltId))
+      .then(s => { if (!cancelled) { setStats(s); setStatsLoad(false) } })
+      .catch(() => { if (!cancelled) setStatsLoad(false) })
+    return () => { cancelled = true }
+  }, [oltId])
+
+  function openNoc() {
+    window.location.href = `/admin/noc?olt_id=${encodeURIComponent(oltId)}`
+  }
+
+  const muted     = isDark ? 'rgba(255,255,255,0.4)' : '#64748b'
+  const cardBg    = isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc'
+  const cardBord  = isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'
 
   return (
     <div>
@@ -253,18 +275,130 @@ function OLTContent({ data, isAdmin, onAction, onIrAte, isDark }) {
         <Badge label={st.label} {...st} />
       </div>
 
+      {/* Equipment info */}
       <InfoSection title="Equipamento" isDark={isDark}>
-        <InfoRow label="ID"     value={oltId}      mono accent="#67e8f9" isDark={isDark} />
-        <InfoRow label="Nome"   value={data.nome} isDark={isDark} />
+        <InfoRow label="ID"     value={oltId}       mono accent="#67e8f9" isDark={isDark} />
+        <InfoRow label="Nome"   value={data.nome}   isDark={isDark} />
         <InfoRow label="Modelo" value={data.modelo} isDark={isDark} />
-        <InfoRow label="IP"     value={data.ip}    mono accent="#86efac" isDark={isDark} />
-      </InfoSection>
-
-      <InfoSection title="Capacidade" isDark={isDark}>
+        <InfoRow label="IP"     value={data.ip}     mono accent="#86efac" isDark={isDark} />
         <InfoRow label="Portas PON" value={data.capacidade ? `${data.capacidade} portas` : null} accent="#67e8f9" isDark={isDark} />
       </InfoSection>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+      {/* Live stats */}
+      <div style={{ marginBottom: 12 }}>
+        <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: muted, marginBottom: 6 }}>
+          Status da Rede
+        </p>
+
+        {statsLoad && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
+            backgroundColor: cardBg, border: `1px solid ${cardBord}`, borderRadius: 10, fontSize: 12, color: muted }}>
+            <span style={{ display: 'inline-block', width: 12, height: 12, border: `2px solid ${cardBord}`, borderTopColor: '#0891b2', borderRadius: '50%', animation: 'bs-spin 0.7s linear infinite' }} />
+            Carregando dados da OLT…
+          </div>
+        )}
+
+        {stats && !statsLoad && (
+          <>
+            {/* Stats grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
+              {[
+                { label: 'Total ONUs', value: stats.total,   color: '#67e8f9' },
+                { label: 'Online',     value: stats.online,  color: '#86efac' },
+                { label: 'Offline',    value: stats.offline, color: stats.offline > 0 ? '#f87171' : muted },
+              ].map((s, i) => (
+                <div key={i} style={{
+                  backgroundColor: cardBg, border: `1px solid ${cardBord}`, borderRadius: 8,
+                  padding: '8px 10px', textAlign: 'center',
+                }}>
+                  <p style={{ fontSize: 18, fontWeight: 800, color: s.color, margin: 0, lineHeight: 1 }}>{s.value}</p>
+                  <p style={{ fontSize: 9, color: muted, marginTop: 3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Network health */}
+            <div style={{
+              backgroundColor: cardBg, border: `1px solid ${cardBord}`,
+              borderRadius: 10, overflow: 'hidden', marginBottom: 10,
+            }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '8px 12px', borderBottom: `1px solid ${cardBord}`,
+              }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: muted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Saúde da Rede
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: `1px solid ${cardBord}` }}>
+                <span style={{ fontSize: 11, color: muted, fontWeight: 600 }}>Sinal médio (RX)</span>
+                <span style={{
+                  fontSize: 12, fontWeight: 700, fontFamily: 'monospace',
+                  color: stats.avgRx == null ? muted
+                    : stats.avgRx > -20 ? '#22c55e'
+                    : stats.avgRx >= -25 ? '#4ade80'
+                    : stats.avgRx >= -28 ? '#f59e0b' : '#ef4444',
+                }}>
+                  {stats.avgRx != null ? `${stats.avgRx} dBm` : '—'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px' }}>
+                <span style={{ fontSize: 11, color: muted, fontWeight: 600 }}>Alertas ativos</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: stats.alerts.length > 0 ? '#f87171' : '#86efac' }}>
+                  {stats.alerts.length}
+                </span>
+              </div>
+            </div>
+
+            {/* PON ports */}
+            {stats.ponPorts.length > 0 && (
+              <div style={{ backgroundColor: cardBg, border: `1px solid ${cardBord}`, borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
+                <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: muted, margin: 0, padding: '7px 12px', borderBottom: `1px solid ${cardBord}` }}>
+                  Portas PON
+                </p>
+                {stats.ponPorts.slice(0, 8).map((p, i) => (
+                  <div key={i} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '7px 12px', borderBottom: i < Math.min(stats.ponPorts.length, 8) - 1 ? `1px solid ${cardBord}` : 'none',
+                  }}>
+                    <span style={{ fontSize: 11, fontFamily: 'monospace', color: isDark ? '#67e8f9' : '#0891b2', fontWeight: 700 }}>{p.pon}</span>
+                    <span style={{ fontSize: 11, color: muted }}>{p.count} ONUs{p.offline > 0 ? ` · ` : ''}{p.offline > 0 && <span style={{ color: '#f87171' }}>{p.offline} offline</span>}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Alerts */}
+            {stats.alerts.length > 0 && (
+              <div style={{
+                backgroundColor: isDark ? 'rgba(239,68,68,0.08)' : '#fef2f2',
+                border: `1px solid ${isDark ? 'rgba(239,68,68,0.25)' : '#fecaca'}`,
+                borderRadius: 10, padding: '10px 12px', marginBottom: 10,
+              }}>
+                <p style={{ fontSize: 9, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>
+                  🚨 Alertas
+                </p>
+                {stats.alerts.map((a, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: i < stats.alerts.length - 1 ? 5 : 0 }}>
+                    <span style={{ fontSize: 10, flexShrink: 0 }}>{a.nivel === 'critico' ? '🔴' : '📴'}</span>
+                    <div>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: isDark ? '#e2e8f0' : '#1e293b' }}>{a.cto_id}</span>
+                      <span style={{ fontSize: 10, color: muted, marginLeft: 5 }}>— {a.problema}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {/* NOC — available to admin and noc role */}
+        {(isAdmin || isNoc) && (
+          <ActBtn onClick={openNoc} color="#38bdf8" bg="rgba(14,165,233,0.12)" border="rgba(14,165,233,0.35)" icon="📡" label="Abrir no NOC" full />
+        )}
         {onIrAte && (
           <ActBtn onClick={onIrAte} color="#38bdf8" bg="rgba(14,165,233,0.12)" border="rgba(14,165,233,0.35)" icon="🧭" label="Ir Até" />
         )}
@@ -275,6 +409,8 @@ function OLTContent({ data, isAdmin, onAction, onIrAte, isDark }) {
           <ActBtn onClick={() => onAction('editar')} color={isDark ? '#f1f5f9' : '#475569'} bg={isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9'} border={isDark ? 'rgba(255,255,255,0.15)' : '#e2e8f0'} icon="✏️" label="Editar OLT" />
         )}
       </div>
+
+      <style>{`@keyframes bs-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
@@ -408,7 +544,7 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
         {(type === 'cdo' || type === 'caixa') && <CaixaContent data={data} isAdmin={isAdmin} onAction={handleAction} onIrAte={temCoordenadas ? irAte : null} isDark={isDark} />}
         {type === 'rota'                       && <RotaContent  data={data} isAdmin={isAdmin} onAction={handleAction} isDark={isDark} />}
         {type === 'poste'                      && <PosteContent data={data} isAdmin={isAdmin} onAction={handleAction} onIrAte={temCoordenadas ? irAte : null} isDark={isDark} />}
-        {type === 'olt'                        && <OLTContent   data={data} isAdmin={isAdmin} onAction={handleAction} onIrAte={temCoordenadas ? irAte : null} isDark={isDark} />}
+        {type === 'olt'                        && <OLTContent   data={data} isAdmin={isAdmin} isNoc={role === 'noc'} onAction={handleAction} onIrAte={temCoordenadas ? irAte : null} isDark={isDark} />}
       </div>
     </div>
   )

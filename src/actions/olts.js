@@ -17,6 +17,7 @@ import { connectDB } from '@/lib/db'
 import { WRITE_ROLES, ALL_ROLES } from '@/lib/auth'
 import { requireActiveEmpresa } from '@/lib/tenant-guard'
 import { OLT } from '@/models/OLT'
+import { ONU } from '@/models/ONU'
 import { Topologia } from '@/models/Topologia'
 import { CaixaEmendaCDO } from '@/models/CaixaEmendaCDO'
 import { CTO } from '@/models/CTO'
@@ -315,3 +316,60 @@ export async function linkTopologia(data) {
 
   return { linked: true }
 }
+
+// ---------------------------------------------------------------------------
+// getOltStats — Painel profissional de OLT no mapa
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns live stats for an OLT: ONU counts by status, average RX,
+ * PON port list, and active diagnostic alerts.
+ *
+ * @param {string} olt_id
+ * @returns {Promise<{ total, online, offline, critico, avgRx, ponPorts, alerts }>}
+ */
+export async function getOltStats(olt_id) {
+  const session = await requireActiveEmpresa(ALL_ROLES)
+  const { projeto_id } = session.user
+
+  await connectDB()
+
+  const onus = await ONU.find(
+    { projeto_id, olt_id, status: { $ne: 'cancelled' } },
+    'status pon rx_power last_diagnostic cto_id'
+  ).limit(500).lean()
+
+  const total   = onus.length
+  const online  = onus.filter(o => o.status === 'active').length
+  const offline = onus.filter(o => o.status === 'offline').length
+  const critico = onus.filter(o => o.status === 'active' && o.rx_power != null && o.rx_power < -28).length
+
+  // Average RX of active ONUs with readings
+  const rxValues = onus.filter(o => o.status === 'active' && o.rx_power != null).map(o => o.rx_power)
+  const avgRx = rxValues.length > 0
+    ? parseFloat((rxValues.reduce((s, v) => s + v, 0) / rxValues.length).toFixed(2))
+    : null
+
+  // Group by PON port
+  const ponMap = {}
+  for (const o of onus) {
+    const pon = o.pon ?? 'N/A'
+    if (!ponMap[pon]) ponMap[pon] = { pon, count: 0, offline: 0 }
+    ponMap[pon].count++
+    if (o.status === 'offline') ponMap[pon].offline++
+  }
+  const ponPorts = Object.values(ponMap).sort((a, b) => a.pon.localeCompare(b.pon))
+
+  // Alerts: offline ONUs or critical signal
+  const alerts = onus
+    .filter(o => o.status === 'offline' || (o.rx_power != null && o.rx_power < -28))
+    .slice(0, 10)
+    .map(o => ({
+      cto_id:     o.cto_id ?? '—',
+      problema:   o.last_diagnostic ?? (o.status === 'offline' ? 'ONU offline' : 'Sinal crítico'),
+      nivel:      o.rx_power != null && o.rx_power < -28 ? 'critico' : 'offline',
+    }))
+
+  return { total, online, offline, critico, avgRx, ponPorts, alerts }
+}
+
