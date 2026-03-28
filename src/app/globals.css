@@ -84,3 +84,152 @@ input::placeholder, textarea::placeholder {
 [data-theme="light"] .bg-slate-800 { background-color: #f1f5f9 !important; }
 [data-theme="light"] .bg-slate-900 { background-color: #f0f4f8 !important; }
 [data-theme="light"] .bg-slate-800\/30 { background-color: rgba(0,0,0,0.03) !important; }
+
+/* ============================================================
+   NOC RESPONSIVE SYSTEM
+   Classes usadas pelos componentes NOCClient e ONUManagementView
+   ============================================================ */
+
+/* ── Page wrapper ─────────────────────────────────────────── */
+.noc-page { padding: 24px; }
+@media (max-width: 1024px) { .noc-page { padding: 16px; } }
+@media (max-width: 768px)  { .noc-page { padding: 10px 8px; } }
+
+.noc-page-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 4px; flex-wrap: wrap;
+}
+@media (max-width: 480px) {
+  .noc-page-header { flex-direction: column; align-items: flex-start; gap: 4px; }
+}
+
+/* ── NOC shell (sidebar + content) ───────────────────────── */
+.noc-shell { display: flex; min-height: 80vh; position: relative; }
+
+/* ── NOC inner sidebar ────────────────────────────────────── */
+.noc-sidebar-mobile-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 48;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(2px);
+}
+.noc-sidebar-mobile-overlay.active { display: block; }
+
+/* Desktop: wrapper transparent — Sidebar's own div é o flex item */
+.noc-sidebar { display: contents; }
+
+/* Mobile: wrapper vira um box posicionado para o slide funcionar */
+@media (max-width: 768px) {
+  .noc-sidebar {
+    display: block;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 49;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+  }
+  .noc-sidebar.open { transform: translateX(0); }
+}
+
+/* Mobile menu toggle in main content */
+.noc-mobile-menu-btn {
+  display: none;
+  background: none; border: 1px solid var(--border-color);
+  color: var(--text-muted); border-radius: 7px;
+  padding: 6px 10px; cursor: pointer; font-size: 16px;
+  align-items: center; gap: 6px; margin-bottom: 10px;
+}
+@media (max-width: 768px) { .noc-mobile-menu-btn { display: flex; } }
+
+/* ── Dashboard grids ──────────────────────────────────────── */
+.noc-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+@media (max-width: 480px) {
+  .noc-metric-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+}
+
+.noc-health-grid {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 14px;
+}
+@media (max-width: 900px) {
+  .noc-health-grid { grid-template-columns: 1fr; }
+}
+
+.noc-kpi-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.noc-chart-alerts-grid {
+  display: grid;
+  grid-template-columns: 1fr 290px;
+  gap: 14px;
+}
+@media (max-width: 1024px) {
+  .noc-chart-alerts-grid { grid-template-columns: 1fr; }
+}
+
+/* ── ONU Management grids ────────────────────────────────── */
+.noc-kpi-row {
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.noc-kpi-row > * { flex: 1 1 100px; min-width: 0; }
+
+.noc-dual-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 900px) {
+  .noc-dual-charts { grid-template-columns: 1fr; }
+}
+
+/* ── Status bar ───────────────────────────────────────────── */
+.noc-status-bar {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px; gap: 12px; flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  .noc-status-bar { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .noc-status-bar-right { flex-wrap: wrap; gap: 6px; }
+}
+
+/* ── Virtual table / mobile cards ────────────────────────── */
+.noc-table-wrap  { display: block; }
+.noc-cards-wrap  { display: none; }
+@media (max-width: 768px) {
+  .noc-table-wrap { display: none; }
+  .noc-cards-wrap { display: flex; flex-direction: column; gap: 8px; }
+}
+
+/* ── Content padding ─────────────────────────────────────── */
+.noc-content-pad { padding: 16px 20px; }
+@media (max-width: 768px) { .noc-content-pad { padding: 10px 8px; } }
+
+/* ── FAB ──────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .noc-fab { bottom: 10px !important; right: 10px !important; }
+  .noc-fab button { padding: 8px 14px !important; font-size: 12px !important; }
+}
+
+/* ── Overflow controls ────────────────────────────────────── */
+.noc-overflow-x { overflow-x: auto; width: 100%; max-width: 100%; }
+.noc-text-clamp {
+  overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; max-width: 100%;
+}
+
+/* ── Topology page ────────────────────────────────────────── */
+.topo-wrap { width: 100%; overflow: hidden; }
+@media (max-width: 768px) {
+  .topo-toolbar { flex-wrap: wrap; gap: 6px; }
+  .topo-toolbar > * { flex: 1 1 auto; min-width: 0; }
+}

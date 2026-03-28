@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import OltMgmtTab from './OltMgmtTab'
+import ONUManagementView from './ONUManagementView'
 
 // ─── Style constants ───────────────────────────────────────────────────────────
 
@@ -740,7 +741,7 @@ function QuickActionsFAB({ onNavigate }) {
     { label: 'Gerenciar OLTs',   view: 'olt-mgmt' },
   ]
   return (
-    <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
+    <div className="noc-fab" style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
       {open && (
         <div style={{ position: 'absolute', bottom: 52, right: 0, backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden', minWidth: 180, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
           {items.map(item => (
@@ -786,7 +787,7 @@ function DashboardView({ stats, ackedAlerts, onAck }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* Metric cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(196px, 1fr))', gap: 14 }}>
+      <div className="noc-metric-grid">
         <MetricCard label="ONUs Online"  value={onuStats?.active       ?? 0} accent="#00C853" sparkData={generateSparkData(onuStats?.active  ?? 0)} />
         <MetricCard label="ONUs Offline" value={onuStats?.offline      ?? 0} accent={(onuStats?.offline ?? 0) > 0 ? '#FF3D00' : '#6B7A8D'} sparkData={generateSparkData(onuStats?.offline ?? 0)} />
         <MetricCard label="Em Alerta"    value={activeAlerts.length}          accent={activeAlerts.length > 0 ? '#FFD600' : '#6B7A8D'} sparkData={generateSparkData(activeAlerts.length)} />
@@ -794,7 +795,7 @@ function DashboardView({ stats, ackedAlerts, onAck }) {
       </div>
 
       {/* Health + KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: '190px 1fr', gap: 14 }}>
+      <div className="noc-health-grid">
         <div style={{ ...card, borderLeft: `4px solid ${statusColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
           <p style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, margin: 0 }}>Saúde da Rede</p>
           <p style={{ fontSize: 52, fontWeight: 700, color: statusColor, lineHeight: 1, margin: 0, fontVariantNumeric: 'tabular-nums' }}>{score}</p>
@@ -802,7 +803,7 @@ function DashboardView({ stats, ackedAlerts, onAck }) {
             {score >= 90 ? 'OPERAÇÃO NORMAL' : score >= 70 ? 'DEGRADADO' : 'CRÍTICO'}
           </span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
+        <div className="noc-kpi-mini-grid">
           {[
             { label: 'Provisionando', value: onuStats?.provisioning ?? 0, color: '#2D8CFF' },
             { label: 'CTOs',          value: totalCTOs ?? 0,               color: 'var(--foreground)' },
@@ -821,7 +822,7 @@ function DashboardView({ stats, ackedAlerts, onAck }) {
       <OLTsPanel olts={olts} onus={onus} />
 
       {/* Chart + Signal + Alerts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 290px', gap: 14 }}>
+      <div className="noc-chart-alerts-grid">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={card}>
             <NetworkChart
@@ -1984,19 +1985,28 @@ function LogTerminal({ logs }) {
 export default function NOCClient({ stats, userRole }) {
   const [view,             setView]             = useState('dashboard')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
   const [logs,             setLogs]             = useState([])
   const [ackedAlerts,      setAckedAlerts]      = useState(new Set())
   const [lastUpdate]                            = useState(() => new Date())
   const [now,              setNow]              = useState(() => new Date())
+  const [isMobile,         setIsMobile]         = useState(false)
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(t)
   }, [])
 
-  // Collapse sidebar on small screens
+  // Detect and track mobile breakpoint
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarCollapsed(true)
+    function check() {
+      const mobile = window.innerWidth < 769
+      setIsMobile(mobile)
+      if (mobile) setSidebarCollapsed(true)
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
   }, [])
 
   const olts      = stats?.olts      ?? []
@@ -2048,27 +2058,57 @@ export default function NOCClient({ stats, userRole }) {
 
   function handleAck(key) { setAckedAlerts(prev => new Set([...prev, key])) }
 
+  const alertCount = alertas.filter(a => !ackedAlerts.has(`${a.tipo}-${a.serial ?? a.cto_id}`)).length
+  const activeAlertasFiltered = alertas.filter(a => !ackedAlerts.has(`${a.tipo}-${a.serial ?? a.cto_id}`))
+
   return (
-    <div style={{ display: 'flex', minHeight: '80vh' }}>
+    <div className="noc-shell">
       <style>{`
         @keyframes noc-spin  { to { transform: rotate(360deg); } }
         @keyframes noc-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
         @keyframes noc-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; } 50% { opacity: 0.85; box-shadow: 0 0 6px 2px currentColor; } }
+        @keyframes nocDrawerIn { from { transform: translateX(100%) } to { transform: translateX(0) } }
       `}</style>
 
-      <Sidebar
-        view={view}
-        onNavigate={setView}
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(c => !c)}
-        alertCount={alertas.filter(a => !ackedAlerts.has(`${a.tipo}-${a.serial ?? a.cto_id}`)).length}
-      />
+      {/* Mobile sidebar overlay backdrop */}
+      {isMobile && sidebarMobileOpen && (
+        <div
+          className="noc-sidebar-mobile-overlay active"
+          onClick={() => setSidebarMobileOpen(false)}
+        />
+      )}
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px', minWidth: 0 }}>
-        <StatusBar alertas={alertas.filter(a => !ackedAlerts.has(`${a.tipo}-${a.serial ?? a.cto_id}`))} now={now} lastUpdate={lastUpdate} userRole={userRole} />
+      <div className={`noc-sidebar${isMobile && sidebarMobileOpen ? ' open' : ''}`}>
+        <Sidebar
+          view={view}
+          onNavigate={v => { setView(v); if (isMobile) setSidebarMobileOpen(false) }}
+          collapsed={sidebarCollapsed && !isMobile}
+          onToggle={() => {
+            if (isMobile) setSidebarMobileOpen(false)
+            else setSidebarCollapsed(c => !c)
+          }}
+          alertCount={alertCount}
+        />
+      </div>
+
+      <div style={{ flex: 1, overflow: 'auto', minWidth: 0 }} className="noc-content-pad">
+        {/* Mobile menu button */}
+        <button
+          className="noc-mobile-menu-btn"
+          onClick={() => setSidebarMobileOpen(true)}
+        >
+          ≡ <span style={{ fontSize: 12, fontWeight: 600 }}>Menu NOC</span>
+          {alertCount > 0 && (
+            <span style={{ marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 99, backgroundColor: '#FF3D00', color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
+              {alertCount}
+            </span>
+          )}
+        </button>
+
+        <StatusBar alertas={activeAlertasFiltered} now={now} lastUpdate={lastUpdate} userRole={userRole} />
 
         {view === 'dashboard'   && <DashboardView stats={stats} ackedAlerts={ackedAlerts} onAck={handleAck} />}
-        {view === 'onus'        && <ClientesTab onus={onus} olts={olts} onLog={addLog} />}
+        {view === 'onus'        && <ONUManagementView onus={onus} olts={olts} onLog={addLog} userRole={userRole} />}
         {view === 'olts'        && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <OLTsPanel olts={olts} onus={onus} />
@@ -2091,7 +2131,7 @@ export default function NOCClient({ stats, userRole }) {
         {view !== 'logs' && <LogTerminal logs={logs} />}
       </div>
 
-      <QuickActionsFAB onNavigate={setView} />
+      <QuickActionsFAB onNavigate={v => { setView(v); if (isMobile) setSidebarMobileOpen(false) }} />
     </div>
   )
 }

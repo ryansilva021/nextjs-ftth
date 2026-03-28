@@ -61,23 +61,59 @@ export const authConfig = {
     },
 
     /**
-     * authorized — controla acesso nas rotas protegidas pelo proxy.
-     * Retorna true se pode prosseguir; false redireciona para signIn.
+     * authorized — controla acesso nas rotas protegidas pelo middleware.
+     * Retorna true para permitir, false para redirecionar ao login,
+     * ou Response para redirecionar a uma rota específica.
      */
     authorized({ auth: session, request: { nextUrl } }) {
-      const isLoggedIn  = !!session?.user
-      const pathname    = nextUrl.pathname
+      const isLoggedIn = !!session?.user
+      const pathname   = nextUrl.pathname
+      const role       = session?.user?.role ?? 'user'
 
       // Rotas públicas: sempre permitido
-      const publicRoutes = ['/login', '/cadastro']
-      const isPublic = publicRoutes.includes(pathname) ||
+      if (
+        pathname.startsWith('/login') ||
+        pathname.startsWith('/cadastro') ||
         pathname.startsWith('/api/auth') ||
-        pathname.startsWith('/api/registro')
-
-      if (isPublic) return true
+        pathname.startsWith('/api/registro') ||
+        pathname.startsWith('/empresa/bloqueada')
+      ) return true
 
       // Demais rotas: exige autenticação
-      return isLoggedIn
+      if (!isLoggedIn) return false
+
+      // Rotas superadmin
+      if (pathname.startsWith('/superadmin')) {
+        if (role !== 'superadmin') {
+          return Response.redirect(new URL('/acesso-negado', nextUrl))
+        }
+        return true
+      }
+
+      // Mapa de rotas → roles permitidos (sem depender de DB, só JWT)
+      const ROUTE_ROLES = {
+        '/admin/noc':       ['superadmin', 'admin', 'noc'],
+        '/admin/campo':     ['superadmin', 'admin'],
+        '/admin/diagramas': ['superadmin', 'admin', 'tecnico'],
+        '/admin/topologia': ['superadmin', 'admin', 'tecnico', 'noc'],
+        '/admin/calculos':  ['superadmin', 'admin', 'tecnico'],
+        '/admin/os':        ['superadmin', 'admin', 'tecnico', 'noc', 'recepcao'],
+        '/admin/usuarios':  ['superadmin', 'admin'],
+        '/admin/importar':  ['superadmin', 'admin'],
+        '/admin/logs':      ['superadmin', 'admin', 'tecnico', 'noc'],
+        '/admin/olts':      ['superadmin', 'admin', 'noc'],
+      }
+
+      for (const [route, roles] of Object.entries(ROUTE_ROLES)) {
+        if (pathname.startsWith(route)) {
+          if (!roles.includes(role)) {
+            return Response.redirect(new URL('/acesso-negado', nextUrl))
+          }
+          return true
+        }
+      }
+
+      return true
     },
   },
 

@@ -7,8 +7,18 @@ import {
   toggleUsuarioAtivo,
   setPassword,
 } from '@/actions/usuarios'
+import { ROLE_LABELS } from '@/lib/permissions'
 
-const ROLES = ['user', 'tecnico', 'admin']
+// Roles que um admin pode atribuir (superadmin só via painel superadmin)
+const ROLES = ['user', 'recepcao', 'tecnico', 'noc', 'admin']
+
+const ROLE_DESCRIPTIONS = {
+  user:     'Somente visualização do mapa',
+  recepcao: 'Criar OS, visualizar e editar clientes',
+  tecnico:  'Acessar Topologia, executar e concluir OS',
+  noc:      'Acessar NOC, monitorar OLTs e ONUs',
+  admin:    'Acesso completo ao projeto',
+}
 
 const inputStyle = {
   backgroundColor: 'var(--inp-bg)',
@@ -27,18 +37,20 @@ const modalBgStyle = {
 
 function RoleBadge({ role }) {
   const cores = {
-    superadmin: { bg: '#2e1065', color: '#c4b5fd' },
-    admin: { bg: '#0c2340', color: '#38bdf8' },
-    tecnico: { bg: '#052e16', color: '#4ade80' },
-    user: { bg: '#1c1917', color: '#a8a29e' },
+    superadmin: { bg: '#2e1065', color: '#c4b5fd', border: '#7c3aed44' },
+    admin:      { bg: '#0c2340', color: '#38bdf8',  border: '#0284c744' },
+    tecnico:    { bg: '#052e16', color: '#4ade80',  border: '#16a34a44' },
+    noc:        { bg: '#1a1a2e', color: '#818cf8',  border: '#6366f144' },
+    recepcao:   { bg: '#2d1a12', color: '#fb923c',  border: '#f9731644' },
+    user:       { bg: '#1c1917', color: '#a8a29e',  border: '#78716c44' },
   }
   const c = cores[role] ?? cores.user
   return (
     <span
-      style={{ backgroundColor: c.bg, color: c.color }}
-      className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
+      style={{ backgroundColor: c.bg, color: c.color, border: `1px solid ${c.border}` }}
+      className="text-xs px-2 py-0.5 rounded-full font-medium"
     >
-      {role}
+      {ROLE_LABELS[role] ?? role}
     </span>
   )
 }
@@ -341,9 +353,14 @@ export default function UsuariosClient({
                   className="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
                 >
                   {ROLES.map((r) => (
-                    <option key={r} value={r}>{r}</option>
+                    <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
                   ))}
                 </select>
+                {form.role && ROLE_DESCRIPTIONS[form.role] && (
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                    {ROLE_DESCRIPTIONS[form.role]}
+                  </p>
+                )}
               </div>
               {!editando && (
                 <div className="flex flex-col gap-1">

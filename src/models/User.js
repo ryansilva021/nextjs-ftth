@@ -54,7 +54,7 @@ const UserSchema = new Schema(
 
     role: {
       type:    String,
-      enum:    ["superadmin", "admin", "tecnico", "user"],
+      enum:    ["superadmin", "admin", "tecnico", "noc", "recepcao", "user"],
       default: "user",
     },
 
@@ -162,4 +162,10 @@ UserSchema.statics.getFull = async function (username) {
 // ---------------------------------------------------------------------------
 // Export
 // ---------------------------------------------------------------------------
+// Limpa cache do modelo em dev para garantir que mudanças de schema (enum)
+// sejam recarregadas pelo HMR sem precisar reiniciar o servidor.
+if (process.env.NODE_ENV !== 'production' && models.User) {
+  delete models.User
+}
+
 export const User = models.User || model("User", UserSchema);

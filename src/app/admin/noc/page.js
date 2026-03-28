@@ -21,9 +21,9 @@ export default async function NOCPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-1">
+    <div className="noc-page">
+      <div style={{ marginBottom: 16 }}>
+        <div className="noc-page-header">
           <h1 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>
             Centro de Operações de Rede
           </h1>

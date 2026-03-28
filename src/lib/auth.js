@@ -47,13 +47,17 @@ export const ROLES = {
   ADMIN:      'admin',
   TECNICO:    'tecnico',
   NOC:        'noc',
+  RECEPCAO:   'recepcao',
   USER:       'user',
 }
 
-export const WRITE_ROLES = [ROLES.SUPERADMIN, ROLES.ADMIN]
-export const FIELD_ROLES = [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.TECNICO]
-export const NOC_ROLES   = [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.NOC]
-export const ALL_ROLES   = [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.TECNICO, ROLES.USER]
+export const WRITE_ROLES  = [ROLES.SUPERADMIN, ROLES.ADMIN]
+export const FIELD_ROLES  = [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.TECNICO]
+export const NOC_ROLES    = [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.NOC]
+// ALL_ROLES inclui todos os roles ativos do sistema
+export const ALL_ROLES    = [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.TECNICO, ROLES.NOC, ROLES.RECEPCAO, ROLES.USER]
+// Roles que podem criar/executar Ordens de Serviço
+export const OS_ROLES     = [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.TECNICO, ROLES.NOC, ROLES.RECEPCAO]
 
 // ---------------------------------------------------------------------------
 // Hierarquia de roles para comparação numérica
@@ -64,6 +68,7 @@ const ROLE_RANK = {
   admin:      3,
   tecnico:    2,
   noc:        2,
+  recepcao:   1,
   user:       1,
 }
 
