@@ -1,6 +1,7 @@
 /**
- * middleware.js
- * Middleware de autenticação e controle de acesso por rota.
+ * proxy.js
+ * Proxy de autenticação e controle de acesso por rota.
+ * (anteriormente middleware.js — renomeado no Next.js 16)
  *
  * Usa NextAuth v5 (Edge Runtime) com authConfig.
  * A lógica de permissões por role está em authConfig.authorized.
