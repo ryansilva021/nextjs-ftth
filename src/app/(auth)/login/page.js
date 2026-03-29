@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useState } from 'react'
+import Image from 'next/image'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -49,10 +50,9 @@ function LoginForm() {
 
   return (
     <div className="w-full max-w-sm px-6">
-      {/* Logo / título */}
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-white tracking-tight">FiberOps</h1>
-        <p className="text-sm text-slate-400 mt-1">Gestão de rede FTTH</p>
+      {/* Logo */}
+      <div className="flex justify-center mb-8">
+        <Image src="/long-logo.svg" alt="FiberOps" width={160} height={40} priority />
       </div>
 
       {/* Card */}

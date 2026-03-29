@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { checkLoginDisponivel, criarRegistro } from '@/actions/registros'
 
@@ -150,14 +151,8 @@ export default function CadastroPage() {
     <div className="w-full max-w-lg px-4 py-8">
       {/* Logo */}
       <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 mb-2">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-lg font-black"
-            style={{ background: 'linear-gradient(135deg, #0284c7, #7c3aed)' }}
-          >
-            F
-          </div>
-          <span className="text-2xl font-black text-white tracking-tight">FiberOps</span>
+        <div className="flex justify-center mb-2">
+          <Image src="/long-logo.svg" alt="FiberOps" width={160} height={40} priority />
         </div>
         <p className="text-sm text-slate-400">
           Plataforma de gestão de redes FTTH para ISPs

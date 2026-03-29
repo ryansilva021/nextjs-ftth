@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -102,12 +103,7 @@ export default function SidebarLayout({ session, children }) {
           style={{ borderBottom: "1px solid var(--sidebar-border)" }}
           className="flex items-center gap-3 px-5 py-4"
         >
-          <div
-            style={{ backgroundColor: "#0284c7" }}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
-          >
-            F
-          </div>
+          <Image src="/short-logo.svg" alt="FiberOps" width={32} height={32} priority />
           <div className="flex-1 min-w-0">
             <p style={{ color: "var(--foreground)" }} className="text-sm font-bold">FiberOps</p>
             <p className="text-slate-500 text-xs truncate max-w-[120px]">
