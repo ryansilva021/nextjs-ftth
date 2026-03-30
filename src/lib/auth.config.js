@@ -100,7 +100,7 @@ export const authConfig = {
         '/admin/os':        ['superadmin', 'admin', 'tecnico', 'noc', 'recepcao'],
         '/admin/usuarios':  ['superadmin', 'admin'],
         '/admin/importar':  ['superadmin', 'admin'],
-        '/admin/logs':      ['superadmin', 'admin', 'tecnico', 'noc'],
+        '/admin/logs':      ['superadmin', 'admin'],
         '/admin/olts':      ['superadmin', 'admin', 'noc'],
       }
 

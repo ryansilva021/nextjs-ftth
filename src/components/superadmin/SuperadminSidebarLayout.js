@@ -9,7 +9,6 @@ import { signOut } from 'next-auth/react'
 const NAV_ITEMS = [
   { href: '/superadmin/projetos', label: 'Projetos', icon: '🏢' },
   { href: '/superadmin/registros', label: 'Registros Pendentes', icon: '📋' },
-  { href: '/', label: 'Voltar ao Mapa', icon: '🗺️' },
 ]
 
 export default function SuperadminSidebarLayout({ session, children }) {

@@ -122,6 +122,69 @@ const EmpresaSchema = new Schema(
       default: true,
       index:   true,
     },
+
+    // ── Asaas Billing ───────────────────────────────────────────────────────
+
+    // ID do cliente no Asaas (criado automaticamente na 1ª assinatura)
+    asaas_customer_id: {
+      type:    String,
+      default: null,
+      sparse:  true,
+    },
+
+    // ID da assinatura recorrente no Asaas
+    asaas_subscription_id: {
+      type:    String,
+      default: null,
+      sparse:  true,
+    },
+
+    // Forma de pagamento usada na assinatura
+    asaas_payment_method: {
+      type:    String,
+      enum:    ['PIX', 'BOLETO', 'CREDIT_CARD', null],
+      default: null,
+    },
+
+    // ── Controle de e-mails ─────────────────────────────────────────────────
+
+    // Última vez que o lembrete de trial expirando foi enviado (idempotência)
+    last_trial_reminder_sent: {
+      type:    Date,
+      default: null,
+    },
+
+    // Último tipo de evento de e-mail disparado
+    last_email_event: {
+      type:    String,
+      default: null,
+    },
+
+    // ── Onboarding ──────────────────────────────────────────────────────────
+
+    // Lista de etapas do onboarding com status de conclusão
+    onboarding_steps: {
+      type: [
+        {
+          step:         { type: String, required: true },
+          completed:    { type: Boolean, default: false },
+          completed_at: { type: Date, default: null },
+        },
+      ],
+      default: () => [
+        { step: 'empresa_criada',   completed: true,  completed_at: new Date() },
+        { step: 'primeira_olt',     completed: false, completed_at: null },
+        { step: 'primeira_cto',     completed: false, completed_at: null },
+        { step: 'primeiro_tecnico', completed: false, completed_at: null },
+        { step: 'integracao_sgp',   completed: false, completed_at: null },
+      ],
+    },
+
+    // true quando o usuário dispensou ou concluiu o onboarding
+    onboarding_completed: {
+      type:    Boolean,
+      default: false,
+    },
   },
   {
     timestamps: { createdAt: 'criado_em', updatedAt: 'updated_at' },

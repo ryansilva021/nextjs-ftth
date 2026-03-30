@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import Link from 'next/link'
 import { getProjetoConfig, updateProjetoConfig } from '@/actions/projetos'
@@ -25,7 +26,6 @@ function savePref(key, val) {
 // ---------------------------------------------------------------------------
 // Sub-componentes
 // ---------------------------------------------------------------------------
-
 function SectionTitle({ children }) {
   return (
     <p style={{
@@ -78,60 +78,33 @@ function Toggle({ value, onChange }) {
   )
 }
 
-function SelectInput({ value, onChange, options }) {
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      style={{
-        background: 'var(--inp-bg, var(--card-bg))',
-        border: '1px solid var(--border-color)',
-        borderRadius: 8, padding: '6px 10px',
-        fontSize: 13, color: 'var(--foreground)', cursor: 'pointer',
-      }}
-    >
-      {options.map(o => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
-  )
-}
-
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 export default function ConfiguracoesPage() {
+  const router = useRouter()
   const { theme, toggleTheme } = useTheme()
   const isDark = theme === 'dark'
 
-  // Preferências
   const [campoMode, setCampoMode] = useState(false)
 
-  // Mapa
-  const [animacoes, setAnimacoes]       = useState(true)
-  const [sombhasCTO, setSombrasCTO]     = useState(true)
-
-  // GPS
-  const [gpsAcc, setGpsAcc]           = useState('high')
-  const [gpsAutoFollow, setGpsAutoFollow] = useState(false)
-
   // Fibras Ópticas (salvo no servidor)
-  const [fiberStandard, setFiberStandard]     = useState('ABNT')
-  const [fiberSaving, setFiberSaving]         = useState(false)
-  const [fiberMsg, setFiberMsg]               = useState('')
-  const [fiberLoadError, setFiberLoadError]   = useState('')
+  const [fiberStandard, setFiberStandard]   = useState('ABNT')
+  const [fiberSaving, setFiberSaving]       = useState(false)
+  const [fiberMsg, setFiberMsg]             = useState('')
+  const [fiberLoadError, setFiberLoadError] = useState('')
 
-  // Carrega preferências salvas
+  // Sistema
+  const [cacheMsg, setCacheMsg] = useState('')
+  const [syncMsg, setSyncMsg]   = useState('')
+  const [syncing, setSyncing]   = useState(false)
+
   useEffect(() => {
     setCampoMode(loadPref('pref_campo_mode', false))
-    setAnimacoes(loadPref('pref_animacoes', true))
-    setSombrasCTO(loadPref('pref_sombras_cto', true))
-    setGpsAcc(loadPref('pref_gps_acc', 'high'))
-    setGpsAutoFollow(loadPref('pref_gps_follow', false))
 
-    // Carrega config de fibras — servidor tem prioridade, localStorage como fallback
     const localStandard = loadPref('pref_fiber_standard', null)
     if (localStandard) setFiberStandard(localStandard)
+
     getProjetoConfig()
       .then(cfg => {
         const std = cfg.fiberColorStandard ?? localStandard ?? 'ABNT'
@@ -145,15 +118,13 @@ export default function ConfiguracoesPage() {
 
   async function saveFiberStandard(standard) {
     setFiberStandard(standard)
-    // Persiste localmente de imediato (funciona para qualquer role)
     savePref('pref_fiber_standard', standard)
     setFiberSaving(true)
     setFiberMsg('')
     try {
       await updateProjetoConfig({ fiberColorStandard: standard })
       setFiberMsg('Salvo!')
-    } catch (e) {
-      // Config salva localmente mesmo se o servidor falhar
+    } catch {
       setFiberMsg('Salvo localmente.')
     } finally {
       setFiberSaving(false)
@@ -161,27 +132,31 @@ export default function ConfiguracoesPage() {
     }
   }
 
-  function set(setter, key, val) {
-    setter(val)
-    savePref(key, val)
-  }
-
-  const [cacheMsg, setCacheMsg] = useState('')
-  const [syncMsg, setSyncMsg]   = useState('')
-
   function limparCache() {
     try {
-      const keys = Object.keys(localStorage).filter(k => k.startsWith('ftth_cache_'))
+      const keys = Object.keys(localStorage).filter(k =>
+        k.startsWith('pref_') || k.startsWith('ftth_cache_')
+      )
       keys.forEach(k => localStorage.removeItem(k))
-      setCacheMsg(`${keys.length} entradas removidas.`)
-      setTimeout(() => setCacheMsg(''), 3000)
-    } catch { setCacheMsg('Erro ao limpar cache.') }
+      setCacheMsg(`${keys.length} preferências removidas. Recarregue para aplicar.`)
+      setTimeout(() => setCacheMsg(''), 5000)
+    } catch {
+      setCacheMsg('Erro ao limpar.')
+    }
   }
 
-  function forceSinc() {
-    setSyncMsg('Sincronizando...')
-    // Dispara revalidation recarregando a página atual no background
-    setTimeout(() => { setSyncMsg('Sincronizado!'); setTimeout(() => setSyncMsg(''), 3000) }, 1200)
+  async function forceSinc() {
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      router.refresh()
+      setSyncMsg('Dados recarregados!')
+    } catch {
+      setSyncMsg('Erro ao sincronizar.')
+    } finally {
+      setSyncing(false)
+      setTimeout(() => setSyncMsg(''), 3000)
+    }
   }
 
   const card = {
@@ -240,33 +215,10 @@ export default function ConfiguracoesPage() {
           >
             <Toggle
               value={campoMode}
-              onChange={v => set(setCampoMode, 'pref_campo_mode', v)}
-            />
-          </SettingRow>
-        </div>
-
-        {/* ── Mapa ── */}
-        <div style={card}>
-          <SectionTitle>Mapa</SectionTitle>
-
-          <SettingRow
-            label="Animações"
-            description="Ativar efeitos visuais e transições no mapa"
-          >
-            <Toggle
-              value={animacoes}
-              onChange={v => set(setAnimacoes, 'pref_animacoes', v)}
-            />
-          </SettingRow>
-
-          <SettingRow
-            label="Sombra de alerta CTO"
-            description="Glow vermelho pulsante em CTOs com 100% de ocupação"
-            last
-          >
-            <Toggle
-              value={sombhasCTO}
-              onChange={v => set(setSombrasCTO, 'pref_sombras_cto', v)}
+              onChange={v => {
+                setCampoMode(v)
+                savePref('pref_campo_mode', v)
+              }}
             />
           </SettingRow>
         </div>
@@ -281,7 +233,7 @@ export default function ConfiguracoesPage() {
 
           <SettingRow
             label="Padrão de cores"
-            description="Define a sequência de cores usada em bandejas, fusões e diagramas"
+            description="Sequência de cores usada em bandejas, fusões e diagramas"
             last
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -294,7 +246,6 @@ export default function ConfiguracoesPage() {
             </div>
           </SettingRow>
 
-          {/* Cards de seleção de padrão */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
             {[
               {
@@ -342,7 +293,6 @@ export default function ConfiguracoesPage() {
                     )}
                   </div>
                   <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 8px' }}>{opt.desc}</p>
-                  {/* Preview das 12 cores em ordem */}
                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                     {opt.colors.map((hex, i) => (
                       <span
@@ -368,44 +318,13 @@ export default function ConfiguracoesPage() {
           </div>
         </div>
 
-        {/* ── GPS ── */}
-        <div style={card}>
-          <SectionTitle>GPS</SectionTitle>
-
-          <SettingRow
-            label="Precisão"
-            description="Nível de precisão da geolocalização"
-          >
-            <SelectInput
-              value={gpsAcc}
-              onChange={v => set(setGpsAcc, 'pref_gps_acc', v)}
-              options={[
-                { value: 'high', label: 'Alta (mais bateria)' },
-                { value: 'medium', label: 'Média' },
-                { value: 'low', label: 'Baixa (menos bateria)' },
-              ]}
-            />
-          </SettingRow>
-
-          <SettingRow
-            label="Seguir automaticamente"
-            description="Centralizar mapa na posição GPS ao detectar movimento"
-            last
-          >
-            <Toggle
-              value={gpsAutoFollow}
-              onChange={v => set(setGpsAutoFollow, 'pref_gps_follow', v)}
-            />
-          </SettingRow>
-        </div>
-
         {/* ── Sistema ── */}
         <div style={card}>
           <SectionTitle>Sistema</SectionTitle>
 
           <SettingRow
-            label="Limpar cache local"
-            description={cacheMsg || 'Remove dados temporários armazenados no navegador'}
+            label="Limpar preferências"
+            description={cacheMsg || 'Remove todas as preferências salvas localmente no navegador'}
           >
             <button
               onClick={limparCache}
@@ -422,26 +341,24 @@ export default function ConfiguracoesPage() {
 
           <SettingRow
             label="Forçar sincronização"
-            description={syncMsg || 'Recarrega todos os dados do servidor'}
+            description={syncMsg || 'Recarrega todos os dados do servidor imediatamente'}
             last
           >
             <button
               onClick={forceSinc}
+              disabled={syncing}
               style={{
-                padding: '7px 14px', borderRadius: 8, cursor: 'pointer',
+                padding: '7px 14px', borderRadius: 8, cursor: syncing ? 'not-allowed' : 'pointer',
                 border: '1px solid #0284c740',
                 background: isDark ? 'rgba(2,132,199,0.1)' : '#e0f2fe',
                 fontSize: 13, fontWeight: 600, color: '#0284c7',
+                opacity: syncing ? 0.6 : 1,
               }}
             >
-              Sincronizar
+              {syncing ? 'Sincronizando…' : 'Sincronizar'}
             </button>
           </SettingRow>
         </div>
-
-        <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: 8 }}>
-          As configurações são salvas localmente no seu navegador.
-        </p>
 
       </div>
     </div>

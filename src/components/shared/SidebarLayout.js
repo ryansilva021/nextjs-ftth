@@ -12,20 +12,18 @@ import { hasPermission, PERM, ROLE_LABELS, ROLE_COLORS } from '@/lib/permissions
 const GROUPS = { public: 0, staff: 1, admin: 2, superadmin: 3 }
 
 // ── Definição de itens do menu ──────────────────────────────────────────────
-// perm: permissão necessária (PERM.*)
-// minRole: fallback para itens sem permissão específica (superadmin)
-// group: para separador visual
+// perm:  permissão necessária (PERM.*)
+// group: para separador visual e controle de acesso por role
 const NAV_ITEMS = [
   { href: '/',                     label: 'Mapa',              icon: '🗺️', group: GROUPS.public  },
 
   // NOC (apenas role noc/admin)
   { href: '/admin/noc',            label: 'NOC',               icon: '🖥️', perm: PERM.ACCESS_NOC,          group: GROUPS.staff },
 
-  // Visão de rede — tecnico vê topologia e fusões (somente leitura, restrito via página)
-  { href: '/admin/topologia',      label: 'Topologia',         icon: '🌐', perm: PERM.VIEW_TOPOLOGY,        group: GROUPS.staff },
-  { href: '/admin/campo',          label: 'Campo',             icon: '📡', perm: PERM.VIEW_FIELD,           group: GROUPS.staff },
-  { href: '/admin/diagramas',      label: 'Fusões ABNT',       icon: '🧩', perm: PERM.VIEW_FUSIONS,         group: GROUPS.staff },
-  { href: '/admin/calculos',       label: 'Cálc. Potência',    icon: '⚡', perm: PERM.VIEW_CALCULATIONS,    group: GROUPS.staff },
+  // Visão de rede
+  { href: '/admin/topologia', label: 'Topologia', icon: '🌐', perm: PERM.VIEW_TOPOLOGY, group: GROUPS.staff },
+  { href: '/admin/campo',     label: 'Campo',      icon: '📡', perm: PERM.VIEW_FIELD,   group: GROUPS.staff },
+  { href: '/admin/calculos',  label: 'Cálc. Potência', icon: '⚡', perm: PERM.VIEW_CALCULATIONS, group: GROUPS.staff },
 
   // Ordens de Serviço (tecnico, noc, recepcao)
   { href: '/admin/os',             label: 'Ordens de Serviço', icon: '📋', perm: PERM.VIEW_SERVICE_ORDERS,  group: GROUPS.staff },
@@ -36,22 +34,19 @@ const NAV_ITEMS = [
   { href: '/admin/logs',           label: 'Log de Eventos',    icon: '📜', perm: PERM.VIEW_LOGS,            group: GROUPS.admin },
 
   // Superadmin
-  { href: '/superadmin/projetos',  label: 'Projetos',          icon: '🏢', minRole: 'superadmin',           group: GROUPS.superadmin },
-  { href: '/superadmin/empresas',  label: 'Empresas',          icon: '🏬', minRole: 'superadmin',           group: GROUPS.superadmin },
-  { href: '/superadmin/registros', label: 'Registros',         icon: '📋', minRole: 'superadmin',           group: GROUPS.superadmin },
+  { href: '/superadmin/projetos',  label: 'Projetos',          icon: '🏢', group: GROUPS.superadmin },
+  { href: '/superadmin/empresas',  label: 'Empresas',          icon: '🏬', group: GROUPS.superadmin },
+  { href: '/superadmin/registros', label: 'Registros',         icon: '📋', group: GROUPS.superadmin },
 ]
 
-const ROLE_RANK = {
-  superadmin: 4, admin: 3, tecnico: 2, noc: 2, recepcao: 1, user: 1,
-}
-
-function hasMinRole(role, minimum) {
-  return (ROLE_RANK[role] ?? 0) >= (ROLE_RANK[minimum] ?? 99)
-}
-
 function isItemVisible(item, role) {
-  if (item.minRole) return hasMinRole(role, item.minRole)
-  if (item.perm)    return hasPermission(role, item.perm)
+  if (role === 'superadmin') {
+    // Superadmin vê APENAS o painel de gestão (Projetos, Empresas, Registros)
+    return item.group === GROUPS.superadmin
+  }
+  // Demais roles nunca veem itens do painel superadmin
+  if (item.group === GROUPS.superadmin) return false
+  if (item.perm) return hasPermission(role, item.perm)
   return true // sem restrição (Mapa)
 }
 

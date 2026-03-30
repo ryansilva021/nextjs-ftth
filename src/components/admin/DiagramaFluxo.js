@@ -6,7 +6,7 @@
  * Suporta tema light/dark via ThemeContext.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   ReactFlow, Controls, Background, BackgroundVariant,
   Panel, Handle, Position, useReactFlow, ReactFlowProvider,
@@ -111,8 +111,24 @@ function calcSplitterHeight(saidas) {
 
 // ─── OLT Node ────────────────────────────────────────────────────────────────
 
+function CollapseBtn({ collapsed, onToggle, color }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onToggle() }}
+      title={collapsed ? 'Expandir' : 'Minimizar'}
+      style={{
+        background: 'none', border: 'none', cursor: 'pointer',
+        color, fontSize: 10, lineHeight: 1, padding: '0 2px',
+        flexShrink: 0, display: 'flex', alignItems: 'center',
+      }}
+    >
+      {collapsed ? '▸' : '▾'}
+    </button>
+  )
+}
+
 function OLTNode({ data }) {
-  const { T, nome, modelo, ip, capacidade, status, ponCount } = data
+  const { T, nome, modelo, ip, capacidade, status, ponCount, collapsed, onToggleCollapse, nodeId } = data
   const online = status === 'ativo' || status === 'online'
 
   return (
@@ -125,7 +141,7 @@ function OLTNode({ data }) {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '8px 12px', fontWeight: 700, fontSize: 13,
-        borderRadius: '8px 8px 0 0', background: T.oltHdrBg, color: T.oltHdr,
+        borderRadius: collapsed ? 8 : '8px 8px 0 0', background: T.oltHdrBg, color: T.oltHdr,
       }}>
         <span style={{ fontSize: 15 }}>⚡</span>
         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
@@ -134,30 +150,35 @@ function OLTNode({ data }) {
           background: online ? '#22c55e' : '#ef4444',
           boxShadow: online ? '0 0 6px #22c55e88' : 'none',
         }} />
+        {onToggleCollapse && (
+          <CollapseBtn collapsed={collapsed} onToggle={() => onToggleCollapse(nodeId)} color={T.oltHdr} />
+        )}
       </div>
       {/* Body */}
-      <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {modelo && <div style={{ color: T.muted, fontSize: 11 }}>{modelo}</div>}
-        {ip     && <div style={{ color: T.muted, fontSize: 11, fontFamily: 'monospace' }}>{ip}</div>}
-        <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-          {capacidade != null && (
-            <span style={{
-              fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 700,
-              background: T.oltBdr + '22', border: `1px solid ${T.oltBdr}55`, color: T.oltHdr,
-            }}>
-              {capacidade} PONs
-            </span>
-          )}
-          {ponCount > 0 && (
-            <span style={{
-              fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 700,
-              background: '#22c55e22', border: '1px solid #22c55e44', color: '#22c55e',
-            }}>
-              {ponCount} CDO{ponCount !== 1 ? 's' : ''}
-            </span>
-          )}
+      {!collapsed && (
+        <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {modelo && <div style={{ color: T.muted, fontSize: 11 }}>{modelo}</div>}
+          {ip     && <div style={{ color: T.muted, fontSize: 11, fontFamily: 'monospace' }}>{ip}</div>}
+          <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+            {capacidade != null && (
+              <span style={{
+                fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 700,
+                background: T.oltBdr + '22', border: `1px solid ${T.oltBdr}55`, color: T.oltHdr,
+              }}>
+                {capacidade} PONs
+              </span>
+            )}
+            {ponCount > 0 && (
+              <span style={{
+                fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 700,
+                background: '#22c55e22', border: '1px solid #22c55e44', color: '#22c55e',
+              }}>
+                {ponCount} CDO{ponCount !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+      )}
       <Handle type="source" position={Position.Right} id="out"
         style={{ ...HANDLE_BASE, background: T.oltBdr, right: -6 }} />
     </div>
@@ -167,7 +188,7 @@ function OLTNode({ data }) {
 // ─── CDO Node ─────────────────────────────────────────────────────────────────
 
 function CDONode({ data }) {
-  const { T, nome, tipo, entrada, bandejas = [], ponFusoes = [] } = data
+  const { T, nome, tipo, entrada, bandejas = [], ponFusoes = [], collapsed, onToggleCollapse, nodeId } = data
 
   return (
     <div style={{
@@ -183,7 +204,7 @@ function CDONode({ data }) {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '8px 12px', fontWeight: 700, fontSize: 13,
-        borderRadius: '8px 8px 0 0', background: T.cdoHdrBg, color: T.cdoHdr,
+        borderRadius: collapsed ? 8 : '8px 8px 0 0', background: T.cdoHdrBg, color: T.cdoHdr,
         justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -206,11 +227,14 @@ function CDONode({ data }) {
               PON {entrada.pon}
             </span>
           )}
+          {onToggleCollapse && (
+            <CollapseBtn collapsed={collapsed} onToggle={() => onToggleCollapse(nodeId)} color={T.cdoHdr} />
+          )}
         </div>
       </div>
 
       {/* Bandejas com fusões */}
-      {bandejas.length > 0 && (
+      {!collapsed && bandejas.length > 0 && (
         <div style={{ padding: '5px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {bandejas.map(bdj => {
             const ponRows = (bdj.fusoes ?? []).filter(f => f.tipo === 'pon')
@@ -294,7 +318,7 @@ function CDONode({ data }) {
       )}
 
       {/* Sem bandejas: handle genérico */}
-      {bandejas.length === 0 && (
+      {!collapsed && bandejas.length === 0 && (
         <div style={{ padding: '8px 12px', color: T.muted, fontSize: 11 }}>
           Sem bandejas configuradas
         </div>
@@ -313,7 +337,7 @@ function CDONode({ data }) {
 // ─── Splitter Node ───────────────────────────────────────────────────────────
 
 function SplitterNode({ data }) {
-  const { T, nome, tipo, entrada, saidas = [] } = data
+  const { T, nome, tipo, entrada, saidas = [], collapsed, onToggleCollapse, nodeId } = data
   const ligadas = saidas.filter(s => s.cto_id?.trim()).length
 
   return (
@@ -329,7 +353,7 @@ function SplitterNode({ data }) {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '8px 12px', fontWeight: 700, fontSize: 13, height: SPL_HEADER_H,
-        borderRadius: '8px 8px 0 0', background: T.splHdrBg, color: T.splHdr,
+        borderRadius: collapsed ? 8 : '8px 8px 0 0', background: T.splHdrBg, color: T.splHdr,
         boxSizing: 'border-box',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
@@ -338,15 +362,23 @@ function SplitterNode({ data }) {
             {nome}
           </span>
         </div>
-        {tipo && (
-          <span style={{
-            fontSize: 10, padding: '1px 7px', borderRadius: 4, fontWeight: 700, flexShrink: 0,
-            background: T.splBdr + '33', border: `1px solid ${T.splBdr}55`, color: T.splHdr,
-          }}>
-            {tipo}
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          {tipo && (
+            <span style={{
+              fontSize: 10, padding: '1px 7px', borderRadius: 4, fontWeight: 700,
+              background: T.splBdr + '33', border: `1px solid ${T.splBdr}55`, color: T.splHdr,
+            }}>
+              {tipo}
+            </span>
+          )}
+          {onToggleCollapse && (
+            <CollapseBtn collapsed={collapsed} onToggle={() => onToggleCollapse(nodeId)} color={T.splHdr} />
+          )}
+        </div>
       </div>
+
+      {/* Body (hidden when collapsed) */}
+      {!collapsed && <>
 
       {/* Fiber entrance row — height = SPL_ENTRY_H (32px) */}
       <div style={{
@@ -427,6 +459,8 @@ function SplitterNode({ data }) {
           </div>
         )
       })}
+
+      </>}
     </div>
   )
 }
@@ -463,7 +497,7 @@ function PassagemNode({ data }) {
 
 function CTONode({ data }) {
   const { T, nome, cto_id, capacidade = 16, ocupacao = 0, fibraEntrada,
-          bandejas = [], splitters = [] } = data
+          bandejas = [], splitters = [], collapsed, onToggleCollapse, nodeId } = data
   const pct     = Math.min(1, ocupacao / Math.max(1, capacidade))
   const livres  = capacidade - ocupacao
   const cheio   = livres <= 0
@@ -490,7 +524,7 @@ function CTONode({ data }) {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '8px 12px', fontWeight: 700, fontSize: 12,
-        borderRadius: '8px 8px 0 0', background: T.ctoHdrBg, color: alertC,
+        borderRadius: collapsed ? 8 : '8px 8px 0 0', background: T.ctoHdrBg, color: alertC,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ fontSize: 13 }}>📡</span>
@@ -498,15 +532,20 @@ function CTONode({ data }) {
             {nome}
           </span>
         </div>
-        {cto_id && (
-          <span style={{ fontSize: 9, color: T.muted, fontFamily: 'monospace', flexShrink: 0 }}>
-            {cto_id}
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          {cto_id && (
+            <span style={{ fontSize: 9, color: T.muted, fontFamily: 'monospace' }}>
+              {cto_id}
+            </span>
+          )}
+          {onToggleCollapse && (
+            <CollapseBtn collapsed={collapsed} onToggle={() => onToggleCollapse(nodeId)} color={alertC} />
+          )}
+        </div>
       </div>
 
       {/* Body */}
-      <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {!collapsed && <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
         {/* Badge fibra de entrada (identidade da FO) */}
         {fibraEntrada != null && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
@@ -536,10 +575,10 @@ function CTONode({ data }) {
             {cheio ? '🔴 CHEIO' : `${livres} livre${livres !== 1 ? 's' : ''}`}
           </span>
         </div>
-      </div>
+      </div>}
 
       {/* ── Bandejas + Splitters internos ── */}
-      {(bandejas.length > 0 || splitters.length > 0) && (
+      {!collapsed && (bandejas.length > 0 || splitters.length > 0) && (
         <div style={{ borderTop: `1px solid ${T.border}`, padding: '4px 10px 8px' }}>
 
           {bandejas.map(b => {
@@ -1262,7 +1301,10 @@ function calcCTOHeight(bandejas = [], splitters = []) {
   return Math.max(NODE_H.cto, h)
 }
 
+const COLLAPSED_H = 40
+
 function calcH(node) {
+  if (node.data?.collapsed) return COLLAPSED_H
   if (node.type === 'cdo')      return calcCDOHeight(node.data?.bandejas ?? [])
   if (node.type === 'splitter') return calcSplitterHeight(node.data?.saidas ?? [])
   if (node.type === 'cto')      return calcCTOHeight(node.data?.bandejas ?? [], node.data?.splitters ?? [])
@@ -1802,14 +1844,64 @@ function DiagramaFluxoInner({ projetoId }) {
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
   const [stats,   setStats]   = useState(null)
+  const [collapsedNodes, setCollapsedNodes] = useState(() => new Set())
+
+  // Full graph stored in refs — source of truth for collapse filtering
+  const allNodesRef = useRef([])
+  const allEdgesRef = useRef([])
 
   const { fitView } = useReactFlow()
 
-  const runLayout = useCallback((ns, es) => {
-    const laid = dagreLayout(ns, es)
+  // Stable toggle
+  const toggleCollapse = useCallback((nodeId) => {
+    setCollapsedNodes(prev => {
+      const next = new Set(prev)
+      if (next.has(nodeId)) next.delete(nodeId)
+      else next.add(nodeId)
+      return next
+    })
+  }, [])
+
+  // Inject callback + nodeId into node data
+  const injectMeta = useCallback((ns) =>
+    ns.map(n => ({ ...n, data: { ...n.data, nodeId: n.id, onToggleCollapse: toggleCollapse } }))
+  , [toggleCollapse])
+
+  // Given collapsed set, compute visible nodes/edges (hide descendants of collapsed nodes)
+  const applyCollapse = useCallback((collapsedSet) => {
+    const allNs = allNodesRef.current
+    const allEs = allEdgesRef.current
+    if (allNs.length === 0) return
+
+    // Build child map from full edge list
+    const childMap = new Map()
+    for (const e of allEs) {
+      if (!childMap.has(e.source)) childMap.set(e.source, [])
+      childMap.get(e.source).push(e.target)
+    }
+
+    // Collect all descendants of every collapsed node
+    const hidden = new Set()
+    function hideDesc(id) {
+      for (const child of (childMap.get(id) ?? [])) {
+        if (!hidden.has(child)) {
+          hidden.add(child)
+          hideDesc(child)
+        }
+      }
+    }
+    for (const id of collapsedSet) hideDesc(id)
+
+    // Build visible subset with collapsed flag
+    const visibleNs = allNs
+      .filter(n => !hidden.has(n.id))
+      .map(n => ({ ...n, data: { ...n.data, collapsed: collapsedSet.has(n.id) } }))
+    const visibleEs = allEs.filter(e => !hidden.has(e.source) && !hidden.has(e.target))
+
+    const laid = dagreLayout(visibleNs, visibleEs)
     setNodes(laid)
-    setEdges(es)
-    setTimeout(() => fitView({ padding: 0.12, duration: 500 }), 80)
+    setEdges(visibleEs)
+    setTimeout(() => fitView({ padding: 0.12, duration: 400 }), 60)
   }, [fitView])
 
   const load = useCallback(() => {
@@ -1825,11 +1917,20 @@ function DiagramaFluxoInner({ projetoId }) {
           splitters: ns.filter(n => n.type === 'splitter').length,
           ctos:      ns.filter(n => n.type === 'cto').length,
         })
-        runLayout(ns, es)
+        // Store full graph and reset collapse
+        allNodesRef.current = injectMeta(ns)
+        allEdgesRef.current = es
+        const emptySet = new Set()
+        setCollapsedNodes(emptySet)
+        // Apply with empty set (show everything)
+        const laid = dagreLayout(allNodesRef.current, es)
+        setNodes(laid)
+        setEdges(es)
+        setTimeout(() => fitView({ padding: 0.12, duration: 500 }), 80)
       })
       .catch(e => setError(e?.message ?? 'Erro ao carregar topologia'))
       .finally(() => setLoading(false))
-  }, [projetoId, T, runLayout])
+  }, [projetoId, T, injectMeta, fitView])
 
   useEffect(() => { load() }, [load])
 
@@ -1842,12 +1943,23 @@ function DiagramaFluxoInner({ projetoId }) {
 
   // Re-theme all nodes when theme changes (without reload)
   useEffect(() => {
-    if (nodes.length === 0) return
-    setNodes(prev => prev.map(n => ({ ...n, data: { ...n.data, T } })))
+    if (allNodesRef.current.length === 0) return
+    allNodesRef.current = allNodesRef.current.map(n => ({ ...n, data: { ...n.data, T } }))
+    applyCollapse(collapsedNodes)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [T])
 
-  const handleOrganize = useCallback(() => runLayout(nodes, edges), [nodes, edges, runLayout])
+  // Re-compute visible graph when collapse state changes
+  useEffect(() => {
+    applyCollapse(collapsedNodes)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapsedNodes])
+
+  const handleOrganize = useCallback(() => {
+    const laid = dagreLayout(nodes, edges)
+    setNodes(laid)
+    setTimeout(() => fitView({ padding: 0.12, duration: 500 }), 80)
+  }, [nodes, edges, fitView])
   const handleFitView  = useCallback(() => fitView({ padding: 0.12, duration: 500 }), [fitView])
 
   const btnStyle = {

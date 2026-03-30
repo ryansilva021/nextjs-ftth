@@ -2,15 +2,14 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getEventos } from '@/actions/eventos'
 import LogEventosClient from '@/components/admin/LogEventosClient'
+import { hasPermission, PERM } from '@/lib/permissions'
 
 export const metadata = { title: 'Log de Eventos | FiberOps' }
-
-const ROLE_RANK = { superadmin: 4, admin: 3, tecnico: 2, user: 1 }
 
 export default async function LogsPage() {
   const session = await auth()
   const userRole = session?.user?.role ?? 'user'
-  if ((ROLE_RANK[userRole] ?? 0) < ROLE_RANK.tecnico) redirect('/')
+  if (!hasPermission(userRole, PERM.VIEW_LOGS)) redirect('/')
 
   const projetoId = session?.user?.projeto_id
   const eventos = await getEventos({ projeto_id: projetoId, limite: 100 })
