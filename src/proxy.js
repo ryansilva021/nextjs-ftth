@@ -117,8 +117,10 @@ export default auth(function proxy(request) {
   // ── Rotas públicas ─────────────────────────────────────────────────────────
   const publicRoutes = ['/login', '/cadastro']
   const isPublic = publicRoutes.includes(pathname) ||
+    pathname.startsWith('/planos') ||
     pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/api/registro')
+    pathname.startsWith('/api/registro') ||
+    pathname.startsWith('/api/checkout')
 
   if (isPublic) {
     if (isAuthenticated && publicRoutes.includes(pathname)) {
@@ -152,8 +154,8 @@ export default auth(function proxy(request) {
     empresaStatus &&
     ['bloqueado', 'vencido', 'trial_expirado'].includes(empresaStatus)
   ) {
-    // Permite apenas rotas de auth e página de bloqueio
-    const allowedPaths = ['/empresa/bloqueada', '/api/auth', '/login']
+    // Permite apenas rotas de auth, página de bloqueio e assinatura (para o admin pagar)
+    const allowedPaths = ['/empresa/bloqueada', '/api/auth', '/login', '/admin/assinatura']
     const isAllowed = allowedPaths.some((p) => pathname.startsWith(p))
     if (!isAllowed) {
       return NextResponse.redirect(new URL('/empresa/bloqueada', request.url))

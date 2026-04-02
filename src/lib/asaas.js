@@ -10,14 +10,16 @@
  *                    — https://api.asaas.com/api/v3       (produção)
  */
 
-const BASE_URL  = process.env.ASAAS_BASE_URL  || 'https://sandbox.asaas.com/api/v3'
-const API_KEY   = process.env.ASAAS_API_KEY   || ''
-
 // ---------------------------------------------------------------------------
 // HTTP helper
 // ---------------------------------------------------------------------------
 
 async function request(method, path, body = null) {
+  // Lido a cada chamada para garantir que o valor do .env.local seja sempre o correto
+  const BASE_URL = process.env.ASAAS_BASE_URL || 'https://sandbox.asaas.com/api/v3'
+  const API_KEY  = process.env.ASAAS_API_KEY  || ''
+
+
   const url = `${BASE_URL}${path}`
   const headers = {
     'Content-Type':  'application/json',
@@ -159,6 +161,36 @@ export async function updateSubscriptionPlan(subscriptionId, newPlan) {
  */
 export async function listSubscriptionPayments(subscriptionId, limit = 10) {
   return request('GET', `/subscriptions/${subscriptionId}/payments?limit=${limit}`)
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+/**
+ * Busca um pagamento pelo ID.
+ * @param {string} paymentId
+ */
+export async function getPayment(paymentId) {
+  return request('GET', `/payments/${paymentId}`)
+}
+
+/**
+ * Retorna o QR Code PIX de um pagamento.
+ * @param {string} paymentId
+ * @returns {Promise<{ encodedImage: string, payload: string, expirationDate: string }>}
+ */
+export async function getPixQrCode(paymentId) {
+  return request('GET', `/payments/${paymentId}/pixQrCode`)
+}
+
+/**
+ * Retorna o código de barras (linha digitável) de um boleto.
+ * @param {string} paymentId
+ * @returns {Promise<{ identificationField: string, nossoNumero: string }>}
+ */
+export async function getBoletoBarcode(paymentId) {
+  return request('GET', `/payments/${paymentId}/identificationField`)
 }
 
 // ---------------------------------------------------------------------------

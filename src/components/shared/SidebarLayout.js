@@ -32,6 +32,7 @@ const NAV_ITEMS = [
   { href: '/admin/usuarios',       label: 'Usuários',          icon: '👥', perm: PERM.MANAGE_USERS,         group: GROUPS.admin },
   { href: '/admin/importar',       label: 'Imp/Exportar',      icon: '📦', perm: PERM.VIEW_IMPORT,          group: GROUPS.admin },
   { href: '/admin/logs',           label: 'Log de Eventos',    icon: '📜', perm: PERM.VIEW_LOGS,            group: GROUPS.admin },
+  { href: '/admin/assinatura',     label: 'Assinatura',        icon: '💳', perm: PERM.MANAGE_USERS,         group: GROUPS.admin },
 
   // Superadmin
   { href: '/superadmin/projetos',  label: 'Projetos',          icon: '🏢', group: GROUPS.superadmin },

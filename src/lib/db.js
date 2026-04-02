@@ -39,6 +39,9 @@ export async function connectDB() {
       .connect(MONGODB_URI, {
         bufferCommands: false,
         maxPoolSize: 10,
+        serverSelectionTimeoutMS: 8000,
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 30000,
       })
       .then((m) => m.connection)
       .catch((err) => {

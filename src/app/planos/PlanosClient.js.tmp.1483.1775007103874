@@ -1,0 +1,284 @@
+'use client'
+
+import Link from 'next/link'
+import {
+  PLAN_LABELS, PLAN_PRICES, PLAN_LIMITS, PLAN_DESCRIPTIONS, formatPlanPrice,
+} from '@/lib/plan-config'
+
+// ─── Dados dos planos ─────────────────────────────────────────────────────────
+
+const PLANS = [
+  {
+    key:     'basico',
+    accent:  '#16a34a',
+    icon:    '🌱',
+    features: [
+      'Até 4 OLTs',
+      'Até 500 ONUs',
+      'Até 5 usuários',
+      'Mapa interativo',
+      'Topologia FTTH',
+      'NOC em tempo real',
+      'Ordens de serviço',
+    ],
+  },
+  {
+    key:      'pro',
+    accent:   '#0891b2',
+    icon:     '🚀',
+    popular:  true,
+    features: [
+      'OLTs ilimitadas',
+      'Até 2.000 ONUs',
+      'Até 15 usuários',
+      'Tudo do Básico',
+      'Cálculo de potência',
+      'Importação em massa',
+      'Log de eventos',
+    ],
+  },
+  {
+    key:     'enterprise',
+    accent:  '#7c3aed',
+    icon:    '🏢',
+    features: [
+      'OLTs ilimitadas',
+      'ONUs ilimitadas',
+      'Usuários ilimitados',
+      'Tudo do Pro',
+      'Suporte prioritário',
+      'Onboarding dedicado',
+      'SLA garantido',
+    ],
+  },
+]
+
+// ─── Feature Row ──────────────────────────────────────────────────────────────
+
+function FeatureRow({ text }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
+      <span style={{ color: '#22c55e', fontSize: 13, flexShrink: 0 }}>✓</span>
+      <span style={{ fontSize: 13, color: '#94a3b8' }}>{text}</span>
+    </div>
+  )
+}
+
+// ─── Plan Card ────────────────────────────────────────────────────────────────
+
+function PlanCard({ plan, logado }) {
+  const { key, accent, icon, popular, features } = plan
+  const price = PLAN_PRICES[key]
+
+  const ctaHref  = logado ? '/admin/assinatura' : '/login?callbackUrl=/admin/assinatura'
+  const ctaLabel = logado ? 'Assinar agora' : 'Entrar para assinar'
+
+  return (
+    <div style={{
+      position:   'relative',
+      border:     `2px solid ${popular ? accent : '#1e293b'}`,
+      borderRadius: 16,
+      padding:    '32px 28px',
+      background: popular ? `${accent}0d` : '#0f172a',
+      display:    'flex',
+      flexDirection: 'column',
+      transition: 'transform .15s, border-color .15s',
+    }}
+    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+    >
+      {popular && (
+        <div style={{
+          position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)',
+          background: accent, color: '#fff',
+          fontSize: 11, fontWeight: 800, padding: '4px 16px', borderRadius: 20,
+          letterSpacing: '.06em', whiteSpace: 'nowrap',
+        }}>
+          MAIS POPULAR
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: '#f1f5f9', marginBottom: 4 }}>
+          {PLAN_LABELS[key]}
+        </div>
+        <div style={{ fontSize: 12, color: '#64748b' }}>{PLAN_DESCRIPTIONS[key]}</div>
+      </div>
+
+      {/* Preço */}
+      <div style={{ marginBottom: 24 }}>
+        <span style={{ fontSize: 38, fontWeight: 900, color: accent, lineHeight: 1 }}>
+          {formatPlanPrice(key)}
+        </span>
+        {price > 0 && (
+          <span style={{ fontSize: 13, color: '#64748b', marginLeft: 4 }}>/mês</span>
+        )}
+      </div>
+
+      {/* Features */}
+      <div style={{ marginBottom: 28, flex: 1 }}>
+        {features.map(f => <FeatureRow key={f} text={f} />)}
+      </div>
+
+      {/* Limites */}
+      <div style={{
+        borderTop: `1px solid ${accent}33`, paddingTop: 16, marginBottom: 24,
+        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4,
+      }}>
+        {[
+          { l: 'OLTs',  v: PLAN_LIMITS[key].olts },
+          { l: 'ONUs',  v: PLAN_LIMITS[key].onus },
+          { l: 'Users', v: PLAN_LIMITS[key].users },
+        ].map(({ l, v }) => (
+          <div key={l} style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: v === null ? '#22c55e' : accent }}>
+              {v === null ? '∞' : v}
+            </div>
+            <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: '.04em' }}>{l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA */}
+      <Link
+        href={ctaHref}
+        style={{
+          display: 'block', textAlign: 'center',
+          padding: '13px', borderRadius: 10,
+          background: popular ? accent : 'transparent',
+          border: `2px solid ${accent}`,
+          color: popular ? '#fff' : accent,
+          fontWeight: 700, fontSize: 14,
+          textDecoration: 'none',
+          transition: 'background .15s, color .15s',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = accent
+          e.currentTarget.style.color = '#fff'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = popular ? accent : 'transparent'
+          e.currentTarget.style.color = popular ? '#fff' : accent
+        }}
+      >
+        {ctaLabel} →
+      </Link>
+    </div>
+  )
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+export default function PlanosClient({ logado, isAdmin }) {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: '#020817',
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+      color: '#f1f5f9',
+    }}>
+      {/* Nav */}
+      <nav style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px 32px', borderBottom: '1px solid #1e293b',
+        position: 'sticky', top: 0, background: '#020817cc',
+        backdropFilter: 'blur(10px)', zIndex: 100,
+      }}>
+        <Link href="/" style={{ textDecoration: 'none' }}>
+          <span style={{ fontWeight: 900, fontSize: 18, color: '#38bdf8', letterSpacing: '-.02em' }}>
+            Fiber<span style={{ color: '#f1f5f9' }}>Ops</span>
+          </span>
+        </Link>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <Link href={logado ? '/admin/assinatura' : '/login'} style={{
+            padding: '8px 18px', borderRadius: 8, fontSize: 13,
+            background: '#38bdf8', color: '#020817', fontWeight: 700,
+            textDecoration: 'none',
+          }}>
+            {logado ? 'Minha assinatura' : 'Entrar'}
+          </Link>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <div style={{ textAlign: 'center', padding: '72px 24px 56px' }}>
+        <div style={{
+          display: 'inline-block', padding: '4px 16px', borderRadius: 20,
+          background: '#38bdf818', border: '1px solid #38bdf833',
+          fontSize: 12, fontWeight: 700, color: '#38bdf8',
+          letterSpacing: '.06em', marginBottom: 20,
+        }}>
+          PLANOS E PREÇOS
+        </div>
+        <h1 style={{ fontSize: 'clamp(28px, 5vw, 48px)', fontWeight: 900, margin: '0 0 16px', lineHeight: 1.15 }}>
+          O plano certo para o<br />
+          <span style={{ color: '#38bdf8' }}>seu provedor</span>
+        </h1>
+        <p style={{ fontSize: 16, color: '#64748b', maxWidth: 480, margin: '0 auto 12px' }}>
+          Gerencie sua rede FTTH com mapa interativo, topologia, NOC em tempo real e ordens de serviço.
+          Sem contrato de fidelidade.
+        </p>
+        <div style={{ fontSize: 13, color: '#475569' }}>
+          ✓ Cobrança via Asaas &nbsp;·&nbsp; ✓ PIX, Boleto ou Cartão &nbsp;·&nbsp; ✓ Cancele quando quiser
+        </div>
+      </div>
+
+      {/* Cards */}
+      <div style={{
+        maxWidth: 1000, margin: '0 auto', padding: '0 24px 80px',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: 20,
+      }}>
+        {PLANS.map(plan => (
+          <PlanCard key={plan.key} plan={plan} logado={logado} isAdmin={isAdmin} />
+        ))}
+      </div>
+
+      {/* CTA para não logados */}
+      {!logado && (
+        <div style={{ maxWidth: 640, margin: '0 auto 80px', padding: '0 24px', textAlign: 'center' }}>
+          <div style={{ border: '1px solid #1e293b', borderRadius: 16, padding: '32px 28px', background: '#0f172a' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🔑</div>
+            <h3 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 8px' }}>Já tem uma conta?</h3>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>
+              Faça login para acessar o painel de assinatura e escolher ou atualizar seu plano.
+            </p>
+            <Link href="/login" style={{
+              display: 'inline-block', padding: '12px 28px', borderRadius: 10,
+              background: '#38bdf8', color: '#020817', fontWeight: 800,
+              fontSize: 14, textDecoration: 'none',
+            }}>
+              Entrar no painel →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* FAQ */}
+      <div style={{ maxWidth: 640, margin: '0 auto 80px', padding: '0 24px' }}>
+        <h2 style={{ textAlign: 'center', fontSize: 22, fontWeight: 800, marginBottom: 28, color: '#f1f5f9' }}>
+          Perguntas frequentes
+        </h2>
+        {[
+          { q: 'Posso trocar de plano a qualquer momento?', r: 'Sim. Você pode fazer upgrade ou downgrade do plano a qualquer momento pelo painel de assinatura.' },
+          { q: 'Quais formas de pagamento são aceitas?', r: 'Aceitamos PIX, boleto bancário e cartão de crédito, todos processados pelo Asaas de forma segura.' },
+          { q: 'O que acontece quando o trial expira?', r: 'Você recebe um aviso por e-mail e precisa assinar um plano para continuar. Seus dados ficam preservados.' },
+          { q: 'Preciso de contrato?', r: 'Não. A assinatura é mensal e pode ser cancelada a qualquer momento sem multa.' },
+        ].map(({ q, r }) => (
+          <div key={q} style={{ marginBottom: 16, border: '1px solid #1e293b', borderRadius: 10, padding: '16px 20px', background: '#0f172a' }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#f1f5f9', marginBottom: 6 }}>{q}</div>
+            <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>{r}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div style={{ textAlign: 'center', padding: '24px', borderTop: '1px solid #1e293b', color: '#475569', fontSize: 12 }}>
+        © {new Date().getFullYear()} FiberOps · Todos os direitos reservados
+      </div>
+    </div>
+  )
+}
