@@ -338,7 +338,7 @@ function CDONode({ data }) {
 
 function SplitterNode({ data }) {
   const { T, nome, tipo, entrada, saidas = [], collapsed, onToggleCollapse, nodeId } = data
-  const ligadas = saidas.filter(s => s.cto_id?.trim()).length
+  const ligadas = saidas.filter(s => s._ligada ?? !!s.cto_id?.trim()).length
 
   return (
     <div style={{
@@ -411,9 +411,9 @@ function SplitterNode({ data }) {
       {/* Output rows — each SPL_ROW_H (24px), handle inline per row */}
       {saidas.map((s, idx) => {
         const porta   = s.porta ?? s.num ?? (idx + 1)
-        const hasLink = !!s.cto_id?.trim()
+        const hasLink = s._ligada ?? !!s.cto_id?.trim()
         const hex     = abntHex(porta)
-        const label   = s.cto_id?.trim() || (s.obs?.trim() || 'livre')
+        const label   = s._nome ?? (s.cto_id?.trim() || (s.obs?.trim() || 'livre'))
         return (
           <div
             key={porta}
@@ -509,11 +509,11 @@ function CTONode({ data }) {
     <div style={{
       background: T.ctoBg, borderRadius: 10,
       border: `2px solid ${alertC}`,
-      minWidth: NODE_W.cto, boxShadow: cheio
-        ? `0 0 16px #ef444455, ${T.shadow}`
-        : T.shadow,
+      minWidth: NODE_W.cto,
+      boxShadow: T.shadow,
       overflow: 'visible', position: 'relative',
       fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+      animation: cheio ? 'cto-glow 1.6s ease-in-out infinite' : undefined,
     }}>
       <Handle type="target" position={Position.Left} id="in"
         style={{ ...HANDLE_BASE, background: alertC, left: -6 }} />
@@ -765,7 +765,7 @@ function buildGraph(topologia, T) {
 
   let ei = 0
   function edge(src, tgt, style, opts = {}) {
-    edges.push({ id: `e${ei++}`, source: src, target: tgt, style, type: 'smoothstep', ...opts })
+    edges.push({ id: `e${ei++}`, source: src, target: tgt, style, type: 'default', ...opts })
   }
 
   function lookupCTO(id) {
@@ -1023,9 +1023,30 @@ function buildGraph(topologia, T) {
       const splFibra  = ponFusao?.saida?.fibra ?? ponFusao?.entrada?.fibra ?? spl.entrada?.fibra
       const splHex    = abntHex(splFibra)
 
+      // Enrich saidas with resolved display names
+      const enrichedSaidas = saidas.map(s => {
+        const tipo = s.tipo ?? 'cto'
+        if (tipo === 'pon') {
+          const ponLabel = s.obs?.trim()
+            || (s.pon_placa != null && s.pon_porta != null
+                ? `Pl${s.pon_placa}/PON${s.pon_porta}`
+                : s.pon_porta != null ? `PON${s.pon_porta}` : null)
+            || 'PON'
+          return { ...s, _nome: ponLabel, _ligada: true }
+        }
+        const rawId = String(s.cto_id ?? '').trim()
+        if (!rawId) return { ...s, _nome: s.obs?.trim() || 'livre', _ligada: false }
+        if (tipo === 'cdo' || tipo === 'ce') {
+          const cdo = lookupCDO(rawId)
+          return { ...s, _nome: cdo ? (cdo.nome ?? rawId.slice(-8)) : (s.obs?.trim() || rawId.slice(-8)), _ligada: true }
+        }
+        // cto (default)
+        const cto = lookupCTO(rawId)
+        return { ...s, _nome: cto ? (cto.nome ?? s.cto_id) : (s.obs?.trim() || rawId.slice(-8)), _ligada: !!rawId }
+      })
       nodes.push({
         id: splNodeId, type: 'splitter', position: { x: 0, y: 0 },
-        data: { T, nome: spl.nome, tipo: spl.tipo, entrada: spl.entrada, saidas },
+        data: { T, nome: spl.nome, tipo: spl.tipo, entrada: spl.entrada, saidas: enrichedSaidas },
       })
 
       // Edge CDO → Splitter (usa handle inline da bandeja se há fusão PON vinculada)
@@ -1397,7 +1418,7 @@ function dagreLayout(nodes, edges) {
   g.setDefaultEdgeLabel(() => ({}))
   // ranksep calculado para garantir gap real de ≥ 30px entre colunas mais largas
   // (splitter=195, cto=240 → ranksep mínimo = 30 + 97 + 120 = 247 → usamos 300)
-  g.setGraph({ rankdir: 'LR', nodesep: 80, ranksep: 300, edgesep: 30 })
+  g.setGraph({ rankdir: 'LR', nodesep: 120, ranksep: 380, edgesep: 50 })
 
   for (const n of nodes) {
     g.setNode(n.id, { width: NODE_W[n.type] ?? 220, height: calcH(n) })
@@ -2016,10 +2037,17 @@ function DiagramaFluxoInner({ projetoId }) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <style>{`
+      @keyframes cto-glow {
+        0%,100% { filter: drop-shadow(0 0 3px #ef444432); }
+        50%      { filter: drop-shadow(0 0 10px #ef4444aa); }
+      }
+    `}</style>
     <ReactFlow
       nodes={nodes}
       edges={edges}
       nodeTypes={NODE_TYPES}
+      defaultEdgeOptions={{ type: 'default' }}
       fitView
       minZoom={0.08}
       maxZoom={2.5}
