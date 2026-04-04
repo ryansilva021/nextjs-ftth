@@ -30,7 +30,7 @@ import Point        from 'ol/geom/Point'
 import LineString   from 'ol/geom/LineString'
 import GeoJSON      from 'ol/format/GeoJSON'
 import Overlay      from 'ol/Overlay'
-import { Style, Circle as CircleStyle, Fill, Stroke, Text as TextStyle, Icon } from 'ol/style'
+import { Style, Circle as CircleStyle, Fill, Stroke, Text as TextStyle, Icon, RegularShape } from 'ol/style'
 import { Zoom, ScaleLine }  from 'ol/control'
 import { defaults as defaultControls } from 'ol/control/defaults'
 import { fromLonLat } from 'ol/proj'
@@ -107,19 +107,35 @@ function _nodeStyleFn(feature, resolution) {
     const pct    = feature.get('pct') ?? 0
     const isFull = pct >= 1.0
     const color  = _ctoColor(pct)
-    const opacity = isFull ? (_animBright ? 1 : 0.15) : 1
 
-    // Ícone (zIndex alto) + label (zIndex baixo) separados para que o ícone
-    // fique sempre por cima das labels de features vizinhas
-    return [
-      new Style({
-        image: new CircleStyle({
-          radius:  9,
-          fill:    new Fill({ color: _hexWithAlpha(color, opacity) }),
-          stroke:  new Stroke({ color: '#000000', width: 2 }),
+    // X shape: 4-pointed star rotated 45° = X
+    const icon = new RegularShape({
+      points:  4,
+      radius:  10,
+      radius2: 3,
+      angle:   Math.PI / 4,
+      fill:    new Fill({ color: isFull ? '#f43f5e' : color }),
+      stroke:  new Stroke({ color: '#000000', width: 2 }),
+    })
+
+    const styles = [new Style({ image: icon, zIndex: 10 })]
+
+    if (isFull) {
+      styles.unshift(new Style({
+        image: new RegularShape({
+          points:  4,
+          radius:  18,
+          radius2: 6,
+          angle:   Math.PI / 4,
+          fill:   new Fill({ color: _hexWithAlpha('#f43f5e', _animBright ? 0.5 : 0.0) }),
+          stroke: new Stroke({ color: _hexWithAlpha('#f43f5e', _animBright ? 0.35 : 0.0), width: 1 }),
         }),
-        zIndex: 10,
-      }),
+        zIndex: 9,
+      }))
+    }
+
+    return [
+      ...styles,
       new Style({
         text: new TextStyle({
           text:     feature.get('cto_id') ?? '',

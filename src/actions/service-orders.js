@@ -102,6 +102,21 @@ export async function createOS(data) {
     descricao:        data.descricao?.trim() ?? null,
     data_agendamento: data.data_agendamento ? new Date(data.data_agendamento) : null,
     criado_por:       name ?? session.user.email ?? null,
+    conexao: {
+      login:     data.conexao_login?.trim()    ?? null,
+      senha:     data.conexao_senha?.trim()    ?? null,
+      ip:        data.conexao_ip?.trim()       ?? null,
+      mac:       data.conexao_mac?.trim()      ?? null,
+      onu_id:    data.conexao_onu_id?.trim()   ?? null,
+      slot:      null,
+      pon_porta: null,
+      status:    null,
+    },
+    plano: {
+      nome:     data.plano_nome?.trim()     ?? null,
+      download: data.plano_download?.trim() ?? null,
+      upload:   data.plano_upload?.trim()   ?? null,
+    },
   })
 
   revalidatePath('/admin/os')
@@ -271,4 +286,332 @@ export async function getOSStats() {
   ])
 
   return { total, abertas, agendadas, em_andamento, concluidas, canceladas, byTipo }
+}
+
+// ---------------------------------------------------------------------------
+// addMaterial
+// ---------------------------------------------------------------------------
+
+export async function addMaterial(osId, { nome, quantidade = 1, tipo = 'OS', valor = null, produto_id = null }) {
+  const session = await requireActiveEmpresa(TECNICO_UP)
+  const { projeto_id, name, id } = session.user
+
+  if (!nome?.trim()) throw new Error('nome do material é obrigatório')
+
+  await connectDB()
+
+  const material = {
+    produto_id: produto_id ?? null,
+    nome:       nome.trim(),
+    quantidade: Number(quantidade) || 1,
+    tipo:       ['OS', 'COMODATO'].includes(tipo) ? tipo : 'OS',
+    valor:      valor != null ? Number(valor) : null,
+  }
+
+  const os = await ServiceOrder.findOneAndUpdate(
+    { projeto_id, os_id: osId },
+    {
+      $push: {
+        materiais: material,
+        historico: {
+          usuario_id:   id ?? null,
+          usuario_nome: name ?? null,
+          acao:         `Material adicionado: ${material.nome} (${material.quantidade}x)`,
+          timestamp:    new Date(),
+        },
+      },
+    },
+    { new: true }
+  ).lean()
+
+  if (!os) throw new Error('OS não encontrada')
+
+  revalidatePath('/admin/os')
+  return { ...os, _id: os._id.toString() }
+}
+
+// ---------------------------------------------------------------------------
+// removeMaterial
+// ---------------------------------------------------------------------------
+
+export async function removeMaterial(osId, materialId) {
+  const session = await requireActiveEmpresa(WRITE_ROLES)
+  const { projeto_id, name, id } = session.user
+
+  await connectDB()
+
+  const os = await ServiceOrder.findOneAndUpdate(
+    { projeto_id, os_id: osId },
+    {
+      $pull: { materiais: { _id: materialId } },
+      $push: {
+        historico: {
+          usuario_id:   id ?? null,
+          usuario_nome: name ?? null,
+          acao:         'Material removido da OS',
+          timestamp:    new Date(),
+        },
+      },
+    },
+    { new: true }
+  ).lean()
+
+  if (!os) throw new Error('OS não encontrada')
+
+  revalidatePath('/admin/os')
+  return { ...os, _id: os._id.toString() }
+}
+
+// ---------------------------------------------------------------------------
+// addHistorico — helper interno e exportado
+// ---------------------------------------------------------------------------
+
+export async function addHistorico(osId, acao) {
+  const session = await requireActiveEmpresa(OS_VIEW)
+  const { projeto_id, name, id } = session.user
+
+  if (!acao?.trim()) throw new Error('ação é obrigatória')
+
+  await connectDB()
+
+  const os = await ServiceOrder.findOneAndUpdate(
+    { projeto_id, os_id: osId },
+    {
+      $push: {
+        historico: {
+          usuario_id:   id ?? null,
+          usuario_nome: name ?? null,
+          acao:         acao.trim(),
+          timestamp:    new Date(),
+        },
+      },
+    },
+    { new: true }
+  ).lean()
+
+  if (!os) throw new Error('OS não encontrada')
+
+  revalidatePath('/admin/os')
+  return { ...os, _id: os._id.toString() }
+}
+
+// ---------------------------------------------------------------------------
+// updateConexao
+// ---------------------------------------------------------------------------
+
+export async function updateConexao(osId, conexaoFields) {
+  const session = await requireActiveEmpresa(TECNICO_UP)
+  const { projeto_id, name, id } = session.user
+
+  const allowed = ['login', 'senha', 'ip', 'mac', 'onu_id', 'slot', 'pon_porta', 'status']
+  const safe = {}
+
+  for (const k of allowed) {
+    if (k in conexaoFields) {
+      safe[`conexao.${k}`] = conexaoFields[k]
+    }
+  }
+
+  if (Object.keys(safe).length === 0) throw new Error('Nenhum campo de conexão válido')
+
+  await connectDB()
+
+  const os = await ServiceOrder.findOneAndUpdate(
+    { projeto_id, os_id: osId },
+    {
+      $set: safe,
+      $push: {
+        historico: {
+          usuario_id:   id ?? null,
+          usuario_nome: name ?? null,
+          acao:         'Dados de conexão atualizados',
+          timestamp:    new Date(),
+        },
+      },
+    },
+    { new: true }
+  ).lean()
+
+  if (!os) throw new Error('OS não encontrada')
+
+  revalidatePath('/admin/os')
+  return { ...os, _id: os._id.toString() }
+}
+
+// ---------------------------------------------------------------------------
+// updatePlano
+// ---------------------------------------------------------------------------
+
+export async function updatePlano(osId, planoFields) {
+  const session = await requireActiveEmpresa(TECNICO_UP)
+  const { projeto_id, name, id } = session.user
+
+  const allowed = ['nome', 'download', 'upload']
+  const safe = {}
+
+  for (const k of allowed) {
+    if (k in planoFields) {
+      safe[`plano.${k}`] = planoFields[k]
+    }
+  }
+
+  if (Object.keys(safe).length === 0) throw new Error('Nenhum campo de plano válido')
+
+  await connectDB()
+
+  const os = await ServiceOrder.findOneAndUpdate(
+    { projeto_id, os_id: osId },
+    {
+      $set: safe,
+      $push: {
+        historico: {
+          usuario_id:   id ?? null,
+          usuario_nome: name ?? null,
+          acao:         'Dados do plano atualizados',
+          timestamp:    new Date(),
+        },
+      },
+    },
+    { new: true }
+  ).lean()
+
+  if (!os) throw new Error('OS não encontrada')
+
+  revalidatePath('/admin/os')
+  return { ...os, _id: os._id.toString() }
+}
+
+// ---------------------------------------------------------------------------
+// updateLocalizacao
+// ---------------------------------------------------------------------------
+
+export async function updateLocalizacao(osId, { lat, lng }) {
+  const session = await requireActiveEmpresa(TECNICO_UP)
+  const { projeto_id, name, id } = session.user
+
+  if (lat == null || lng == null) throw new Error('lat e lng são obrigatórios')
+
+  await connectDB()
+
+  const os = await ServiceOrder.findOneAndUpdate(
+    { projeto_id, os_id: osId },
+    {
+      $set: {
+        'localizacao.lat': Number(lat),
+        'localizacao.lng': Number(lng),
+      },
+      $push: {
+        historico: {
+          usuario_id:   id ?? null,
+          usuario_nome: name ?? null,
+          acao:         `Localização atualizada: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`,
+          timestamp:    new Date(),
+        },
+      },
+    },
+    { new: true }
+  ).lean()
+
+  if (!os) throw new Error('OS não encontrada')
+
+  revalidatePath('/admin/os')
+  return { ...os, _id: os._id.toString() }
+}
+
+// ---------------------------------------------------------------------------
+// addFoto
+// ---------------------------------------------------------------------------
+
+export async function addFoto(osId, { nome, url, tamanho = null }) {
+  const session = await requireActiveEmpresa(TECNICO_UP)
+  const { projeto_id, name, id } = session.user
+
+  if (!url) throw new Error('url da foto é obrigatória')
+
+  await connectDB()
+
+  const foto = {
+    nome:      nome ?? 'foto',
+    url,
+    tamanho:   tamanho != null ? Number(tamanho) : null,
+    criado_em: new Date(),
+  }
+
+  const os = await ServiceOrder.findOneAndUpdate(
+    { projeto_id, os_id: osId },
+    {
+      $push: {
+        fotos: foto,
+        historico: {
+          usuario_id:   id ?? null,
+          usuario_nome: name ?? null,
+          acao:         `Foto adicionada: ${foto.nome}`,
+          timestamp:    new Date(),
+        },
+      },
+    },
+    { new: true }
+  ).lean()
+
+  if (!os) throw new Error('OS não encontrada')
+
+  revalidatePath('/admin/os')
+  return { ...os, _id: os._id.toString() }
+}
+
+// ---------------------------------------------------------------------------
+// removeFoto
+// ---------------------------------------------------------------------------
+
+export async function removeFoto(osId, fotoId) {
+  const session = await requireActiveEmpresa(TECNICO_UP)
+  const { projeto_id, name, id } = session.user
+
+  await connectDB()
+
+  const os = await ServiceOrder.findOneAndUpdate(
+    { projeto_id, os_id: osId },
+    {
+      $pull: { fotos: { _id: fotoId } },
+      $push: {
+        historico: {
+          usuario_id:   id ?? null,
+          usuario_nome: name ?? null,
+          acao:         'Foto removida da OS',
+          timestamp:    new Date(),
+        },
+      },
+    },
+    { new: true }
+  ).lean()
+
+  if (!os) throw new Error('OS não encontrada')
+
+  revalidatePath('/admin/os')
+  return { ...os, _id: os._id.toString() }
+}
+
+// ---------------------------------------------------------------------------
+// simularStatusConexao — alterna conexao.status ONLINE/OFFLINE (demo)
+// ---------------------------------------------------------------------------
+
+export async function simularStatusConexao(osId) {
+  const session = await requireActiveEmpresa(OS_VIEW)
+  const { projeto_id } = session.user
+
+  await connectDB()
+
+  const current = await ServiceOrder.findOne({ projeto_id, os_id: osId }, 'conexao.status').lean()
+  if (!current) throw new Error('OS não encontrada')
+
+  const novoStatus = current.conexao?.status === 'ONLINE' ? 'OFFLINE' : 'ONLINE'
+
+  const os = await ServiceOrder.findOneAndUpdate(
+    { projeto_id, os_id: osId },
+    { $set: { 'conexao.status': novoStatus } },
+    { new: true }
+  ).lean()
+
+  revalidatePath('/admin/os')
+  return { ...os, _id: os._id.toString() }
 }

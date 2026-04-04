@@ -77,6 +77,62 @@ const ServiceOrderSchema = new Schema(
 
     // Audit
     criado_por: { type: String, trim: true, default: null },
+
+    // ── Dados de conexão do cliente ─────────────────────────────────────
+    conexao: {
+      login:     { type: String, default: null },
+      senha:     { type: String, default: null },
+      ip:        { type: String, default: null },
+      mac:       { type: String, default: null },
+      onu_id:    { type: String, default: null },
+      slot:      { type: String, default: null },
+      pon_porta: { type: String, default: null },
+      status:    { type: String, enum: ['ONLINE', 'OFFLINE', null], default: null },
+    },
+
+    // ── Plano contratado ─────────────────────────────────────────────────
+    plano: {
+      nome:     { type: String, default: null },
+      download: { type: String, default: null },
+      upload:   { type: String, default: null },
+    },
+
+    // ── Materiais utilizados / em comodato ────────────────────────────────
+    materiais: [
+      {
+        produto_id: { type: String, default: null },
+        nome:       { type: String, required: true },
+        quantidade: { type: Number, default: 1 },
+        tipo:       { type: String, enum: ['OS', 'COMODATO'], default: 'OS' },
+        valor:      { type: Number, default: null },
+      },
+    ],
+
+    // ── Geolocalização do endereço de instalação ──────────────────────────
+    localizacao: {
+      lat: { type: Number, default: null },
+      lng: { type: Number, default: null },
+    },
+
+    // ── Fotos da execução ─────────────────────────────────────────────────
+    fotos: [
+      {
+        nome:      { type: String },
+        url:       { type: String },
+        tamanho:   { type: Number, default: null },
+        criado_em: { type: Date, default: () => new Date() },
+      },
+    ],
+
+    // ── Histórico de ações / auditoria ────────────────────────────────────
+    historico: [
+      {
+        usuario_id:   { type: String },
+        usuario_nome: { type: String },
+        acao:         { type: String },
+        timestamp:    { type: Date, default: () => new Date() },
+      },
+    ],
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
