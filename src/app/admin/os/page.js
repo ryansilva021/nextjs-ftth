@@ -6,7 +6,7 @@ import ServiceOrdersClient from '@/components/admin/ServiceOrdersClient'
 
 export const metadata = { title: 'Ordens de Serviço | FiberOps' }
 
-const ALLOWED = ['superadmin', 'admin', 'noc', 'tecnico', 'comercial']
+const ALLOWED = ['superadmin', 'admin', 'noc', 'recepcao']
 
 export default async function OSPage() {
   const session = await auth()

@@ -112,6 +112,7 @@ export function useOLLayers(map, mapLoaded, data, layerToggles, callbacks = {}) 
       if (type === 'ce' || type === 'cdo') callbacksRef.current?.onClickCaixa?.(properties)
       if (type === 'poste') callbacksRef.current?.onClickPoste?.(properties)
       if (type === 'olt')   callbacksRef.current?.onClickOLT?.(properties)
+      if (type === 'rota')  callbacksRef.current?.onClickRota?.(properties)
     }
 
     window.addEventListener('olmap:feature-click', handleFeatureClick)

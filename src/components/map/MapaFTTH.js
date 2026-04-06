@@ -107,7 +107,12 @@ export default function MapaFTTH({
 
   // ---- Estado de UI ----
   const [selectedElement, setSelectedElement] = useState(null)
-  const [layerToggles, setLayerToggles]       = useState(DEFAULT_LAYER_TOGGLES)
+  const [layerToggles, setLayerToggles]       = useState(() => {
+    try {
+      const saved = typeof window !== 'undefined' && localStorage.getItem('fiberops_layers')
+      return saved ? { ...DEFAULT_LAYER_TOGGLES, ...JSON.parse(saved) } : DEFAULT_LAYER_TOGGLES
+    } catch { return DEFAULT_LAYER_TOGGLES }
+  })
 
   // ---- Modo de adição de elementos no mapa ----
   const [addMode, setAddMode]           = useState(null) // null | 'cto' | 'caixa' | 'poste' | 'rota'
@@ -195,6 +200,7 @@ export default function MapaFTTH({
     onClickCaixa: (caixa) => handleElementClick({ type: 'caixa', data: caixa }),
     onClickPoste: (poste) => handleElementClick({ type: 'poste', data: poste }),
     onClickOLT:   (olt)   => handleElementClick({ type: 'olt',   data: olt }),
+    onClickRota:  (rota)  => handleElementClick({ type: 'rota',  data: rota }),
     onClusterClick: (items, pixel) => setSpreadPanel({ x: pixel.x, y: pixel.y, items }),
   })
 
@@ -497,6 +503,11 @@ export default function MapaFTTH({
       setEditRotaSaving(false)
     }
   }
+
+  // ---- Persistir toggles no localStorage ----
+  useEffect(() => {
+    try { localStorage.setItem('fiberops_layers', JSON.stringify(layerToggles)) } catch {}
+  }, [layerToggles])
 
   // ---- Toggles de camada ----
   const handleLayerToggle = useCallback((key, value) => {
@@ -1017,9 +1028,10 @@ export default function MapaFTTH({
             transition: 'right 0.22s ease',
             pointerEvents: 'auto',
             background: isDark ? 'rgba(6,10,22,0.95)' : '#ffffff',
-            border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
-            borderRight: mapPainel ? undefined : 'none',
-            borderLeft: mapPainel ? 'none' : undefined,
+            borderTop:    isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
+            borderBottom: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
+            borderRight:  mapPainel ? (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0') : 'none',
+            borderLeft:   mapPainel ? 'none' : (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0'),
             borderRadius: mapPainel ? '0 8px 8px 0' : '8px 0 0 8px',
             width: 22,
             height: 64,

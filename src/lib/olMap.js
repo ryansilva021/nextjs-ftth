@@ -426,10 +426,11 @@ export function initMap(container, opts = {}) {
   let _hoveredFeature = null
   _map.on('pointermove', (e) => {
     if (e.dragging) return
-    const pixel = _map.getEventPixel(e.originalEvent)
-    const hit   = _map.hasFeatureAtPixel(pixel, { layerFilter: (l) => l === _nodeLayer })
+    const pixel   = _map.getEventPixel(e.originalEvent)
+    const hitNode = _map.hasFeatureAtPixel(pixel, { layerFilter: (l) => l === _nodeLayer })
+    const hitLink = !hitNode && _map.hasFeatureAtPixel(pixel, { layerFilter: (l) => l === _linkLayer, hitTolerance: 6 })
 
-    _map.getViewport().style.cursor = hit ? 'pointer' : ''
+    _map.getViewport().style.cursor = (hitNode || hitLink) ? 'pointer' : ''
 
     _map.forEachFeatureAtPixel(
       pixel,
@@ -446,7 +447,7 @@ export function initMap(container, opts = {}) {
     )
 
     // Mouse saiu de cima de qualquer feature
-    if (!hit && _hoveredFeature) {
+    if (!hitNode && _hoveredFeature) {
       _hoveredFeature.setStyle(null)
       _hoveredFeature = null
     }
@@ -454,7 +455,7 @@ export function initMap(container, opts = {}) {
 
   // ── Click: popup ou seletor de itens sobrepostos ────────────────────────
   _map.on('click', (e) => {
-    // Coleta TODAS as features sob o pixel clicado
+    // Coleta TODAS as features de nó sob o pixel clicado
     const hitFeatures = []
     _map.forEachFeatureAtPixel(
       e.pixel,
@@ -462,7 +463,27 @@ export function initMap(container, opts = {}) {
       { layerFilter: (l) => l === _nodeLayer }
     )
 
+    // Se não acertou nenhum nó, verifica se acertou uma rota (linha)
     if (hitFeatures.length === 0) {
+      let rotaFeature = null
+      _map.forEachFeatureAtPixel(
+        e.pixel,
+        (feature) => { rotaFeature = feature; return true },
+        { layerFilter: (l) => l === _linkLayer, hitTolerance: 6 }
+      )
+      if (rotaFeature) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('olmap:feature-click', {
+            detail: {
+              feature:    rotaFeature,
+              properties: { ...rotaFeature.getProperties(), _type: 'rota' },
+              coordinate: e.coordinate,
+            },
+          }))
+        }
+        return
+      }
+
       // Click em área vazia: fecha popup e emite evento de mapa
       _popupOverlay.setPosition(undefined)
       const lonLat = _toLonLat(e.coordinate)

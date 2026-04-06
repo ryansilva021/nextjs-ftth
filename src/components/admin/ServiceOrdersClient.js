@@ -54,8 +54,9 @@ const STATUS_FLOW = {
 }
 
 // Role-based access control
-const CAN_WRITE   = ['superadmin', 'admin', 'tecnico', 'comercial']
-const CAN_EXECUTE = ['superadmin', 'admin', 'tecnico']
+const CAN_CREATE  = ['superadmin', 'admin', 'recepcao']
+const CAN_WRITE   = ['superadmin', 'admin', 'recepcao']
+const CAN_EXECUTE = ['superadmin', 'admin']
 const CAN_DELETE  = ['superadmin', 'admin']
 
 // Status stepper order (linear flow, cancelada is a side-exit)
@@ -1055,6 +1056,25 @@ function OSDrawer({ os, olts, userRole, onClose, onUpdated, onDeleted }) {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
+// SGP-style status tab definitions (order matters for tab row)
+const STATUS_TABS = [
+  { key: '', label: 'Todos', color: '#64748b' },
+  { key: 'aberta',       label: 'Aberta',       color: '#3b82f6' },
+  { key: 'agendada',     label: 'Agendada',     color: '#a78bfa' },
+  { key: 'em_andamento', label: 'Em andamento', color: '#f59e0b' },
+  { key: 'concluida',    label: 'Concluida',    color: '#22c55e' },
+  { key: 'cancelada',    label: 'Cancelada',    color: '#ef4444' },
+]
+
+// Strip counts for the stats bar (keyed from stats object)
+const STATS_STRIP = [
+  { key: 'abertas',      status: 'aberta',       label: 'Abertas',      color: '#3b82f6' },
+  { key: 'agendadas',    status: 'agendada',     label: 'Agendadas',    color: '#a78bfa' },
+  { key: 'em_andamento', status: 'em_andamento', label: 'Em andamento', color: '#f59e0b' },
+  { key: 'concluidas',   status: 'concluida',    label: 'Concluidas',   color: '#22c55e' },
+  { key: 'canceladas',   status: 'cancelada',    label: 'Canceladas',   color: '#ef4444' },
+]
+
 export default function ServiceOrdersClient({ initialItems, initialTotal, stats, olts, userRole, userName }) {
   const [items, setItems]               = useState(initialItems ?? [])
   const [total, setTotal]               = useState(initialTotal ?? 0)
@@ -1066,7 +1086,7 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
   const [view, setView]                 = useState('list')   // 'list' | 'kanban'
   const [loading, startTransition]      = useTransition()
 
-  const canCreate = CAN_WRITE.includes(userRole)
+  const canCreate = CAN_CREATE.includes(userRole)
 
   // ── Derived filtered list ──
   const filtered = useMemo(() => {
@@ -1131,45 +1151,96 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
   function toggleStatus(s) { setFilterStatus(p => p === s ? '' : s) }
   function toggleTipo(k)   { setFilterTipo(p => p === k ? '' : k) }
 
+  const hasFilters = !!(filterStatus || filterTipo || search)
+
   return (
     <div>
       {/* Inject global animations */}
       <style>{GLOBAL_STYLES}</style>
 
-      {/* ── KPI Dashboard Row ── */}
+      {/* ── SGP Stats Strip ── */}
       {stats && (
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
-          <KPICard label="Total"        value={stats.total}        color="#64748b" total={stats.total} onClick={() => setFilterStatus('')}             active={!filterStatus} />
-          <KPICard label="Abertas"      value={stats.abertas}      color="#3b82f6" total={stats.total} onClick={() => toggleStatus('aberta')}          active={filterStatus === 'aberta'} />
-          <KPICard label="Agendadas"    value={stats.agendadas}    color="#a78bfa" total={stats.total} onClick={() => toggleStatus('agendada')}        active={filterStatus === 'agendada'} />
-          <KPICard label="Em andamento" value={stats.em_andamento} color="#f59e0b" total={stats.total} onClick={() => toggleStatus('em_andamento')}    active={filterStatus === 'em_andamento'} />
-          <KPICard label="Concluidas"   value={stats.concluidas}   color="#22c55e" total={stats.total} onClick={() => toggleStatus('concluida')}       active={filterStatus === 'concluida'} />
-          <KPICard label="Canceladas"   value={stats.canceladas}   color="#ef4444" total={stats.total} onClick={() => toggleStatus('cancelada')}       active={filterStatus === 'cancelada'} />
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+          {STATS_STRIP.map(({ key, status, label, color }) => (
+            <button
+              key={key}
+              onClick={() => toggleStatus(status)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '7px 14px', borderRadius: 7, cursor: 'pointer',
+                border: `1px solid ${filterStatus === status ? color : 'var(--border-color)'}`,
+                background: filterStatus === status ? `${color}22` : 'var(--card-bg)',
+                transition: 'all 0.12s',
+                outline: 'none',
+              }}
+            >
+              <span style={{
+                fontSize: 18, fontWeight: 800, color,
+                lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+              }}>
+                {stats[key] ?? 0}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>
+                {label}
+              </span>
+            </button>
+          ))}
         </div>
       )}
 
+      {/* ── SGP Status Tabs ── */}
+      <div style={{
+        display: 'flex', gap: 4, flexWrap: 'wrap',
+        marginBottom: 16,
+        borderBottom: '1px solid var(--border-color)',
+        paddingBottom: 0,
+      }}>
+        {STATUS_TABS.map(({ key, label, color }) => {
+          const isActive = filterStatus === key
+          return (
+            <button
+              key={key}
+              onClick={() => setFilterStatus(key)}
+              style={{
+                padding: '7px 16px', borderRadius: '6px 6px 0 0',
+                fontSize: 12, fontWeight: isActive ? 700 : 500,
+                cursor: 'pointer', outline: 'none',
+                border: `1px solid ${isActive ? color : 'var(--border-color)'}`,
+                borderBottom: isActive ? `2px solid ${color}` : '1px solid var(--border-color)',
+                background: isActive ? `${color}22` : 'transparent',
+                color: isActive ? color : 'var(--text-muted)',
+                marginBottom: -1,
+                transition: 'all 0.12s',
+              }}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
+
       {/* ── Toolbar ── */}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
         {/* Search */}
         <input
-          placeholder="Buscar OS, cliente, técnico, serial..."
+          placeholder="Buscar OS, cliente, tecnico, serial..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{
             flex: '1 1 220px', minWidth: 0,
             background: 'var(--inp-bg)', border: '1px solid var(--border-color)',
-            borderRadius: 8, padding: '8px 13px', color: 'var(--foreground)', fontSize: 13,
+            borderRadius: 7, padding: '7px 12px', color: 'var(--foreground)', fontSize: 13,
           }}
         />
 
-        {/* Tipo filters */}
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+        {/* Tipo chip filters */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {Object.entries(TIPO_META).map(([k, v]) => (
             <button
               key={k}
               onClick={() => toggleTipo(k)}
               style={{
-                padding: '6px 12px', borderRadius: 7, fontSize: 11, cursor: 'pointer',
+                padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
                 border: `1px solid ${filterTipo === k ? v.color : 'var(--border-color)'}`,
                 background: filterTipo === k ? `${v.color}22` : 'transparent',
                 color: filterTipo === k ? v.color : 'var(--text-muted)',
@@ -1183,7 +1254,7 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
         {/* View toggle */}
         <div style={{
           display: 'flex', border: '1px solid var(--border-color)',
-          borderRadius: 7, overflow: 'hidden',
+          borderRadius: 7, overflow: 'hidden', flexShrink: 0,
         }}>
           {[['list', '≡ Lista'], ['kanban', '⬛ Kanban']].map(([v, label]) => (
             <button
@@ -1202,14 +1273,18 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
 
         {/* Reload */}
         <button
-          onClick={reload} disabled={loading}
+          onClick={reload}
+          disabled={loading}
           title="Recarregar"
           style={{
-            padding: '7px 12px', borderRadius: 7, border: '1px solid var(--border-color)',
-            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14,
+            padding: '6px 11px', borderRadius: 7, border: '1px solid var(--border-color)',
+            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 15,
+            flexShrink: 0,
           }}
         >
-          <span style={{ display: 'inline-block', animation: loading ? 'spin 0.8s linear infinite' : 'none' }}>↻</span>
+          <span style={{ display: 'inline-block', animation: loading ? 'spin 0.8s linear infinite' : 'none' }}>
+            ↻
+          </span>
         </button>
 
         {/* New OS */}
@@ -1217,21 +1292,27 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
           <button
             onClick={() => setShowCreate(true)}
             style={{
-              padding: '7px 20px', borderRadius: 8, border: 'none',
+              padding: '7px 18px', borderRadius: 7, border: 'none',
               background: '#3b82f6', color: '#fff', cursor: 'pointer',
-              fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
+              fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
             }}
           >+ Nova OS</button>
         )}
       </div>
 
-      {/* Count label */}
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
-        {filtered.length} OS{filtered.length !== total ? ` (de ${total} carregadas)` : ''}
-        {(filterStatus || filterTipo || search) && (
+      {/* ── Result count ── */}
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span>
+          {filtered.length} {filtered.length === 1 ? 'ordem de servico' : 'ordens de servico'}
+          {filtered.length !== total && ` (de ${total} carregadas)`}
+        </span>
+        {hasFilters && (
           <button
             onClick={() => { setFilterStatus(''); setFilterTipo(''); setSearch('') }}
-            style={{ marginLeft: 10, fontSize: 11, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+            style={{
+              fontSize: 11, color: '#3b82f6', background: 'none',
+              border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0,
+            }}
           >Limpar filtros</button>
         )}
       </div>
@@ -1252,70 +1333,155 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
           <div className="os-table-wrap" style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border-color)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
-                <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border-color)' }}>
-                  {/* Priority strip column */}
+                <tr style={{ background: 'var(--background)', borderBottom: '2px solid var(--border-color)' }}>
+                  {/* Priority strip column header (no text) */}
                   <th style={{ width: 4, padding: 0 }} />
-                  {['OS ID', 'Tipo', 'Cliente', 'Tecnico', 'Agendamento', 'Status', 'Prioridade', ''].map(h => (
-                    <th key={h} style={{
-                      padding: '10px 12px', textAlign: 'left',
-                      color: 'var(--text-muted)', fontSize: 11, fontWeight: 700,
-                      whiteSpace: 'nowrap', letterSpacing: 0.5,
-                    }}>{h}</th>
+                  {[
+                    { label: 'No OS',        style: { minWidth: 80 } },
+                    { label: 'Data',         style: { minWidth: 80 } },
+                    { label: 'Tipo',         style: { minWidth: 100 } },
+                    { label: 'Cliente',      style: { minWidth: 160 } },
+                    { label: 'Tecnico',      style: { minWidth: 110 } },
+                    { label: 'Agendamento',  style: { minWidth: 100 } },
+                    { label: 'Status',       style: { minWidth: 110 } },
+                    { label: 'Acoes',        style: { width: 56, textAlign: 'center' } },
+                  ].map(({ label, style }) => (
+                    <th key={label} style={{
+                      padding: '9px 12px', textAlign: 'left',
+                      color: 'var(--text-muted)', fontSize: 10, fontWeight: 700,
+                      whiteSpace: 'nowrap', letterSpacing: 0.8,
+                      textTransform: 'uppercase',
+                      ...style,
+                    }}>{label}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={9} style={{ padding: '48px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      <div style={{ fontSize: 32, marginBottom: 10 }}>📋</div>
-                      <div style={{ fontSize: 13 }}>Nenhuma OS encontrada</div>
+                    <td colSpan={9} style={{ padding: '60px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Nenhuma OS encontrada</div>
+                      {hasFilters && (
+                        <button
+                          onClick={() => { setFilterStatus(''); setFilterTipo(''); setSearch('') }}
+                          style={{
+                            fontSize: 12, color: '#3b82f6', background: 'none',
+                            border: 'none', cursor: 'pointer', textDecoration: 'underline',
+                          }}
+                        >Limpar filtros</button>
+                      )}
                     </td>
                   </tr>
                 )}
                 {filtered.map(os => {
-                  const pm = PRIO_META[os.prioridade]
+                  const pm    = PRIO_META[os.prioridade]
                   const strip = pm?.strip && pm.strip !== 'transparent' ? pm.strip : null
                   const sched = relTime(os.data_agendamento)
+                  const smColor = STATUS_META[os.status]?.color ?? '#60a5fa'
                   return (
                     <tr
                       key={os._id ?? os.os_id}
                       onClick={() => setSelectedOS(os)}
-                      style={{ borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'background 0.1s' }}
+                      style={{
+                        borderBottom: '1px solid var(--border-color)',
+                        cursor: 'pointer',
+                        transition: 'background 0.1s',
+                      }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--card-bg)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
-                      {/* Priority color strip */}
+                      {/* Priority color strip — 4px left accent */}
                       <td style={{ padding: 0, width: 4 }}>
-                        <div style={{ width: 4, height: '100%', minHeight: 40, background: strip ?? 'transparent', borderRadius: '2px 0 0 2px' }} />
+                        <div style={{
+                          width: 4, height: '100%', minHeight: 48,
+                          background: strip ?? 'transparent',
+                          borderRadius: '2px 0 0 2px',
+                        }} />
                       </td>
-                      <td style={{ padding: '11px 12px', color: STATUS_META[os.status]?.color ?? '#60a5fa', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                        {os.os_id}
+
+                      {/* No OS — colored, bold, monospace feel */}
+                      <td style={{ padding: '11px 12px', whiteSpace: 'nowrap' }}>
+                        <span style={{
+                          color: smColor, fontWeight: 800,
+                          fontSize: 12, fontFamily: 'monospace',
+                        }}>
+                          {os.os_id}
+                        </span>
                       </td>
+
+                      {/* Data abertura */}
+                      <td style={{ padding: '11px 12px', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {fmtDate(os.data_abertura)}
+                        </span>
+                      </td>
+
+                      {/* Tipo */}
                       <td style={{ padding: '11px 12px', whiteSpace: 'nowrap' }}>
                         <TipoBadge tipo={os.tipo} />
                       </td>
-                      <td style={{ padding: '11px 12px', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--foreground)', fontWeight: 500 }}>
-                        {os.cliente_nome ?? '—'}
+
+                      {/* Cliente — two lines: bold name + muted address */}
+                      <td style={{ padding: '10px 12px', maxWidth: 200 }}>
+                        <div style={{
+                          fontSize: 12, color: 'var(--foreground)', fontWeight: 600,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {os.cliente_nome ?? '—'}
+                        </div>
+                        {os.cliente_endereco && (
+                          <div style={{
+                            fontSize: 10, color: 'var(--text-muted)', marginTop: 1,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {os.cliente_endereco}
+                          </div>
+                        )}
                       </td>
-                      <td style={{ padding: '11px 12px', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>
-                        {os.tecnico_nome ?? '—'}
-                        {os.auxiliar_nome && <span style={{ fontSize: 11, marginLeft: 4 }}>+{os.auxiliar_nome}</span>}
+
+                      {/* Tecnico */}
+                      <td style={{ padding: '11px 12px', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                          {os.tecnico_nome ?? '—'}
+                        </span>
+                        {os.auxiliar_nome && (
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginTop: 1 }}>
+                            + {os.auxiliar_nome}
+                          </span>
+                        )}
                       </td>
-                      {/* Relative agendamento */}
+
+                      {/* Agendamento — relative time */}
                       <td style={{ padding: '11px 12px', whiteSpace: 'nowrap' }}>
                         {sched
                           ? <span style={{ color: sched.color, fontWeight: 600, fontSize: 11 }}>{sched.label}</span>
-                          : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                          : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
+                        }
                       </td>
+
+                      {/* Status badge */}
                       <td style={{ padding: '11px 12px', whiteSpace: 'nowrap' }}>
                         <StatusBadge status={os.status} />
                       </td>
-                      <td style={{ padding: '11px 12px', whiteSpace: 'nowrap' }}>
-                        <PrioBadge prioridade={os.prioridade} />
+
+                      {/* Acoes — eye icon opens drawer */}
+                      <td style={{ padding: '11px 12px', textAlign: 'center' }}>
+                        <button
+                          title="Ver detalhes"
+                          onClick={e => { e.stopPropagation(); setSelectedOS(os) }}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: 'var(--text-muted)', fontSize: 16, lineHeight: 1,
+                            padding: '3px 6px', borderRadius: 5,
+                            transition: 'color 0.12s, background 0.12s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = smColor; e.currentTarget.style.background = `${smColor}18` }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent' }}
+                        >
+                          &#128065;
+                        </button>
                       </td>
-                      {/* Chevron */}
-                      <td style={{ padding: '11px 12px', color: 'var(--text-muted)', fontSize: 14 }}>›</td>
                     </tr>
                   )
                 })}
@@ -1328,7 +1494,16 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
             {filtered.length === 0 && (
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
                 <div style={{ fontSize: 32, marginBottom: 10 }}>📋</div>
-                <div style={{ fontSize: 13 }}>Nenhuma OS encontrada</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Nenhuma OS encontrada</div>
+                {hasFilters && (
+                  <button
+                    onClick={() => { setFilterStatus(''); setFilterTipo(''); setSearch('') }}
+                    style={{
+                      fontSize: 12, color: '#3b82f6', background: 'none',
+                      border: 'none', cursor: 'pointer', textDecoration: 'underline',
+                    }}
+                  >Limpar filtros</button>
+                )}
               </div>
             )}
             {filtered.map(os => (

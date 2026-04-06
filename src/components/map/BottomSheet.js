@@ -21,6 +21,29 @@ const TYPE_CONFIG = {
   rota:  { label: 'Rota',     emoji: '〰️', accent: '#6366f1' },
   poste: { label: 'Poste',    emoji: '🏗️', accent: '#d97706' },
   olt:   { label: 'OLT',      emoji: '🖥️', accent: '#0891b2' },
+  os:    { label: 'Ordem de Serviço', emoji: '📋', accent: '#e11d48' },
+}
+
+const OS_STATUS_CONFIG = {
+  aberta:        { label: 'Aberta',        bg: 'rgba(99,102,241,0.15)',  border: 'rgba(99,102,241,0.4)',  color: '#a5b4fc' },
+  agendada:      { label: 'Agendada',      bg: 'rgba(14,165,233,0.15)',  border: 'rgba(14,165,233,0.4)',  color: '#38bdf8' },
+  em_andamento:  { label: 'Em andamento',  bg: 'rgba(234,179,8,0.15)',   border: 'rgba(234,179,8,0.4)',   color: '#fde047' },
+  concluida:     { label: 'Concluída',     bg: 'rgba(34,197,94,0.15)',   border: 'rgba(34,197,94,0.4)',   color: '#86efac' },
+  cancelada:     { label: 'Cancelada',     bg: 'rgba(100,116,139,0.2)',  border: 'rgba(100,116,139,0.4)', color: '#94a3b8' },
+}
+
+const OS_TIPO_CONFIG = {
+  instalacao:    { label: 'Instalação',    bg: 'rgba(34,197,94,0.15)',   border: 'rgba(34,197,94,0.4)',   color: '#86efac' },
+  manutencao:    { label: 'Manutenção',    bg: 'rgba(234,179,8,0.15)',   border: 'rgba(234,179,8,0.4)',   color: '#fde047' },
+  suporte:       { label: 'Suporte',       bg: 'rgba(14,165,233,0.15)',  border: 'rgba(14,165,233,0.4)',  color: '#38bdf8' },
+  cancelamento:  { label: 'Cancelamento',  bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.4)',   color: '#fca5a5' },
+}
+
+const OS_PRIORIDADE_CONFIG = {
+  baixa:   { label: 'Baixa',   bg: 'rgba(100,116,139,0.15)',  border: 'rgba(100,116,139,0.35)', color: '#94a3b8' },
+  normal:  { label: 'Normal',  bg: 'rgba(14,165,233,0.15)',   border: 'rgba(14,165,233,0.35)',  color: '#38bdf8' },
+  alta:    { label: 'Alta',    bg: 'rgba(234,179,8,0.15)',    border: 'rgba(234,179,8,0.35)',   color: '#fde047' },
+  urgente: { label: 'Urgente', bg: 'rgba(239,68,68,0.15)',    border: 'rgba(239,68,68,0.35)',   color: '#fca5a5' },
 }
 
 // ─── Componentes internos ─────────────────────────────────────────────────────
@@ -36,7 +59,7 @@ function Badge({ label, bg, border, color }) {
 function InfoSection({ title, children, isDark }) {
   return (
     <div style={{ marginBottom: 12 }}>
-      <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: isDark ? 'rgba(255,255,255,0.25)' : '#64748b', marginBottom: 6 }}>{title}</p>
+      <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: isDark ? 'rgba(255,255,255,0.25)' : '#1e293b', marginBottom: 6 }}>{title}</p>
       <div style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc', border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`, borderRadius: 10, overflow: 'hidden' }}>
         {children}
       </div>
@@ -48,7 +71,7 @@ function InfoRow({ label, value, mono, accent, isDark }) {
   if (value == null || value === '' || value === '—' || value === 'null' || value === 'undefined') return null
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : '#f1f5f9'}` }}>
-      <span style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.4)' : '#64748b', fontWeight: 600 }}>{label}</span>
+      <span style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.4)' : '#334155', fontWeight: 600 }}>{label}</span>
       <span style={{ fontSize: 12, color: accent ?? (isDark ? '#e2e8f0' : '#1e293b'), fontWeight: 700, fontFamily: mono ? 'monospace' : 'inherit', maxWidth: '60%', textAlign: 'right', wordBreak: 'break-word' }}>
         {String(value)}
       </span>
@@ -63,15 +86,15 @@ function OcupacaoBar({ ocupadas = 0, capacidade = 0, accent, isDark }) {
   return (
     <div style={{ padding: '12px 16px', backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc', border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : '#e2e8f0'}`, borderRadius: 10, marginBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isDark ? 'rgba(255,255,255,0.35)' : '#64748b' }}>Ocupação de Portas</span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isDark ? 'rgba(255,255,255,0.35)' : '#1e293b' }}>Ocupação de Portas</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: barColor }}>{ocupadas}/{capacidade} <span style={{ fontSize: 11, fontWeight: 600 }}>({pct}%)</span></span>
       </div>
       <div style={{ height: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: `linear-gradient(90deg, ${barColor}, ${barColor}cc)`, borderRadius: 4, transition: 'width .5s ease' }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-        <span style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.25)' : '#94a3b8' }}>0</span>
-        <span style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.25)' : '#94a3b8' }}>{capacidade}</span>
+        <span style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.25)' : '#475569' }}>0</span>
+        <span style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.25)' : '#475569' }}>{capacidade}</span>
       </div>
     </div>
   )
@@ -265,7 +288,7 @@ function OLTContent({ data, isAdmin, isNoc, onAction, onIrAte, isDark }) {
     window.location.href = `/admin/noc?olt_id=${encodeURIComponent(oltId)}`
   }
 
-  const muted     = isDark ? 'rgba(255,255,255,0.4)' : '#64748b'
+  const muted     = isDark ? 'rgba(255,255,255,0.4)' : '#1e293b'
   const cardBg    = isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc'
   const cardBord  = isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'
 
@@ -415,6 +438,142 @@ function OLTContent({ data, isAdmin, isNoc, onAction, onIrAte, isDark }) {
   )
 }
 
+function CopyBtn({ text, isDark }) {
+  const [copied, setCopied] = useState(false)
+  function copy() {
+    navigator.clipboard?.writeText(String(text ?? '')).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    })
+  }
+  return (
+    <button
+      onClick={copy}
+      style={{
+        marginLeft: 8, padding: '2px 8px', fontSize: 10, fontWeight: 700, borderRadius: 6,
+        backgroundColor: copied ? 'rgba(34,197,94,0.18)' : (isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9'),
+        border: `1px solid ${copied ? 'rgba(34,197,94,0.4)' : (isDark ? 'rgba(255,255,255,0.13)' : '#e2e8f0')}`,
+        color: copied ? '#86efac' : (isDark ? 'rgba(255,255,255,0.5)' : '#475569'),
+        cursor: 'pointer', transition: 'all .2s', flexShrink: 0,
+      }}
+    >
+      {copied ? '✓' : 'Copiar'}
+    </button>
+  )
+}
+
+function InfoRowCopy({ label, value, mono, accent, isDark }) {
+  if (value == null || value === '' || value === '—') return null
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : '#f1f5f9'}` }}>
+      <span style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.4)' : '#334155', fontWeight: 600, flexShrink: 0 }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', maxWidth: '65%', justifyContent: 'flex-end' }}>
+        <span style={{ fontSize: 12, color: accent ?? (isDark ? '#e2e8f0' : '#1e293b'), fontWeight: 700, fontFamily: mono ? 'monospace' : 'inherit', textAlign: 'right', wordBreak: 'break-word' }}>
+          {String(value)}
+        </span>
+        <CopyBtn text={value} isDark={isDark} />
+      </div>
+    </div>
+  )
+}
+
+function OSContent({ data, isAdmin, isTecnico, onAction, onIrAte, isDark }) {
+  const statusCfg    = OS_STATUS_CONFIG[data.status]     ?? OS_STATUS_CONFIG.aberta
+  const tipoCfg      = OS_TIPO_CONFIG[data.tipo]         ?? OS_TIPO_CONFIG.suporte
+  const priorCfg     = OS_PRIORIDADE_CONFIG[data.prioridade] ?? OS_PRIORIDADE_CONFIG.normal
+
+  const agendamento  = data.data_agendamento
+    ? new Date(data.data_agendamento).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+    : null
+
+  const abertura = data.data_abertura
+    ? new Date(data.data_abertura).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+    : null
+
+  const coordStr = (data.localizacao?.lat != null && data.localizacao?.lng != null)
+    ? `${Number(data.localizacao.lat).toFixed(6)}, ${Number(data.localizacao.lng).toFixed(6)}`
+    : null
+
+  return (
+    <div>
+      {/* Badges de status/tipo/prioridade */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+        <Badge label={tipoCfg.label}    {...tipoCfg} />
+        <Badge label={statusCfg.label}  {...statusCfg} />
+        <Badge label={priorCfg.label}   {...priorCfg} />
+      </div>
+
+      {/* Identificação */}
+      <InfoSection title="Identificação" isDark={isDark}>
+        <InfoRow label="Nº OS"    value={data.os_id}       mono accent="#f472b6" isDark={isDark} />
+        <InfoRow label="Motivo"   value={data.descricao}   isDark={isDark} />
+        <InfoRow label="Abertura" value={abertura}          isDark={isDark} />
+        {agendamento && <InfoRow label="Agendado para" value={agendamento} accent="#fde047" isDark={isDark} />}
+      </InfoSection>
+
+      {/* Cliente */}
+      <InfoSection title="Cliente" isDark={isDark}>
+        <InfoRow     label="Nome"       value={data.cliente_nome}    isDark={isDark} />
+        <InfoRowCopy label="Endereço"   value={data.cliente_endereco} isDark={isDark} />
+        <InfoRowCopy label="Contato"    value={data.cliente_contato}  mono isDark={isDark} />
+        {coordStr && <InfoRowCopy label="Lat / Lng" value={coordStr} mono isDark={isDark} />}
+      </InfoSection>
+
+      {/* Problema / Observações */}
+      {(data.obs_tecnico || data.resultado) && (
+        <InfoSection title="Informações Técnicas" isDark={isDark}>
+          <InfoRow label="Problema"    value={data.obs_tecnico} isDark={isDark} />
+          <InfoRow label="Resultado"   value={data.resultado}   isDark={isDark} />
+        </InfoSection>
+      )}
+
+      {/* Rede */}
+      {(data.olt_id || data.cto_id || data.pon) && (
+        <InfoSection title="Rede Óptica" isDark={isDark}>
+          <InfoRow label="OLT"      value={data.olt_id}     mono accent="#67e8f9" isDark={isDark} />
+          <InfoRow label="CTO"      value={data.cto_id}     mono accent="#86efac" isDark={isDark} />
+          <InfoRow label="PON"      value={data.pon}         mono isDark={isDark} />
+          <InfoRow label="Porta CTO" value={data.porta_cto != null ? String(data.porta_cto) : null} isDark={isDark} />
+          <InfoRow label="ONU"      value={data.onu_serial}  mono isDark={isDark} />
+        </InfoSection>
+      )}
+
+      {/* Equipe */}
+      {(data.tecnico_nome || data.auxiliar_nome) && (
+        <InfoSection title="Equipe" isDark={isDark}>
+          <InfoRow label="Técnico"   value={data.tecnico_nome}   isDark={isDark} />
+          <InfoRow label="Auxiliar"  value={data.auxiliar_nome}  isDark={isDark} />
+        </InfoSection>
+      )}
+
+      {/* Sinal */}
+      {(data.rx_power != null || data.tx_power != null) && (
+        <InfoSection title="Leitura de Sinal" isDark={isDark}>
+          <InfoRow label="RX Power" value={data.rx_power != null ? `${data.rx_power} dBm` : null}
+            accent={data.rx_power != null ? (data.rx_power >= -25 ? '#86efac' : data.rx_power >= -28 ? '#fde047' : '#f87171') : undefined}
+            mono isDark={isDark} />
+          <InfoRow label="TX Power" value={data.tx_power != null ? `${data.tx_power} dBm` : null} mono isDark={isDark} />
+        </InfoSection>
+      )}
+
+      {/* Ações */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+        <ActBtn
+          onClick={() => onAction('abrir_os')}
+          color="#f472b6" bg="rgba(225,29,72,0.12)" border="rgba(225,29,72,0.35)"
+          icon="📋" label="Ver OS completa" full
+        />
+        {onIrAte && (
+          <ActBtn onClick={onIrAte} color="#93c5fd" bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.3)" icon="🧭" label="Ir Até" />
+        )}
+        {(isAdmin || isTecnico) && (
+          <ActBtn onClick={() => onAction('editar')} color={isDark ? '#f1f5f9' : '#475569'} bg={isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9'} border={isDark ? 'rgba(255,255,255,0.15)' : '#e2e8f0'} icon="✏️" label="Editar OS" />
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── BottomSheet principal ─────────────────────────────────────────────────────
 
 export default function BottomSheet({ element, onClose, session, userRole, onAction }) {
@@ -455,19 +614,19 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
 
   const { type, data }  = element
   const cfg             = TYPE_CONFIG[type] ?? { label: type, emoji: '📍', accent: '#6366f1' }
-  const name            = data?.nome || data?.cto_id || data?.rota_id || data?.poste_id || data?.id || data?.ce_id || '—'
+  const name            = data?.nome || data?.os_id || data?.cto_id || data?.rota_id || data?.poste_id || data?.id || data?.ce_id || '—'
   const handleAction    = (action) => onAction?.({ type, data, action })
 
   // "Ir Até" — abre navegação nativa para a posição do elemento
   function irAte() {
-    const lat = data?.lat
-    const lng = data?.lng
+    const lat = data?.lat ?? data?.localizacao?.lat
+    const lng = data?.lng ?? data?.localizacao?.lng
     if (lat == null || lng == null) return
     const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  const temCoordenadas = data?.lat != null && data?.lng != null
+  const temCoordenadas = (data?.lat != null && data?.lng != null) || (data?.localizacao?.lat != null && data?.localizacao?.lng != null)
 
   return (
     <div
@@ -510,7 +669,7 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
               {cfg.emoji}
             </div>
             <div>
-              <p style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.35)' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 2 }}>{cfg.label}</p>
+              <p style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.35)' : '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 2 }}>{cfg.label}</p>
               <p style={{ fontSize: 17, fontWeight: 800, color: isDark ? '#f1f5f9' : '#1e293b', lineHeight: 1.2, margin: 0 }}>{name}</p>
             </div>
           </div>
@@ -521,7 +680,7 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
               width: 32, height: 32, borderRadius: 8,
               backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9',
               border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`,
-              color: isDark ? 'rgba(255,255,255,0.4)' : '#64748b', fontSize: 16, lineHeight: 1,
+              color: isDark ? 'rgba(255,255,255,0.4)' : '#334155', fontSize: 16, lineHeight: 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', flexShrink: 0,
             }}
@@ -545,6 +704,7 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
         {type === 'rota'                       && <RotaContent  data={data} isAdmin={isAdmin} onAction={handleAction} isDark={isDark} />}
         {type === 'poste'                      && <PosteContent data={data} isAdmin={isAdmin} onAction={handleAction} onIrAte={temCoordenadas ? irAte : null} isDark={isDark} />}
         {type === 'olt'                        && <OLTContent   data={data} isAdmin={isAdmin} isNoc={role === 'noc'} onAction={handleAction} onIrAte={temCoordenadas ? irAte : null} isDark={isDark} />}
+        {type === 'os'                         && <OSContent    data={data} isAdmin={isAdmin} isTecnico={isTecnico} onAction={handleAction} onIrAte={temCoordenadas ? irAte : null} isDark={isDark} />}
       </div>
     </div>
   )
