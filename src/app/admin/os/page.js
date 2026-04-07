@@ -2,11 +2,12 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { listOS, getOSStats } from '@/actions/service-orders'
 import { getOLTs } from '@/actions/olts'
+import { getUsuarios } from '@/actions/usuarios'
 import ServiceOrdersClient from '@/components/admin/ServiceOrdersClient'
 
 export const metadata = { title: 'Ordens de Serviço | FiberOps' }
 
-const ALLOWED = ['superadmin', 'admin', 'noc', 'recepcao']
+const ALLOWED = ['superadmin', 'admin', 'noc', 'recepcao', 'tecnico']
 
 export default async function OSPage() {
   const session = await auth()
@@ -16,17 +17,23 @@ export default async function OSPage() {
   let initialData = { items: [], total: 0 }
   let stats = null
   let olts = []
+  let usuarios = []
   let erro = null
 
+  const isTecnico = role === 'tecnico'
+
   try {
-    const [data, s, o] = await Promise.all([
-      listOS({ limit: 50 }),
+    const promises = [
+      listOS({ limit: 100 }),
       getOSStats(),
       getOLTs(session?.user?.projeto_id),
-    ])
+      isTecnico ? Promise.resolve([]) : getUsuarios(session?.user?.projeto_id),
+    ]
+    const [data, s, o, u] = await Promise.all(promises)
     initialData = data
     stats = s
     olts = o
+    usuarios = u.filter(u => u.is_active !== false)
   } catch (e) {
     erro = e.message
   }
@@ -65,7 +72,9 @@ export default async function OSPage() {
         initialTotal={initialData.total}
         stats={stats}
         olts={olts}
+        usuarios={usuarios}
         userRole={role}
+        userId={session?.user?.username ?? ''}
         userName={session?.user?.name ?? session?.user?.email ?? ''}
       />
     </div>

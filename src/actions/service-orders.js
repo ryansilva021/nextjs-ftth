@@ -30,14 +30,19 @@ const OS_VIEW      = ['superadmin', 'admin', 'tecnico', 'noc', 'recepcao']
 
 export async function listOS({ status, tipo, tecnico_id, limit = 100, skip = 0 } = {}) {
   const session = await requireActiveEmpresa(OS_VIEW)
-  const { role, projeto_id: userProjeto } = session.user
+  const { role, projeto_id: userProjeto, username } = session.user
 
   await connectDB()
 
   const filter = { projeto_id: userProjeto }
   if (status) filter.status = status
   if (tipo)   filter.tipo = tipo
-  if (tecnico_id) filter.tecnico_id = tecnico_id
+  // Técnico de campo vê apenas suas próprias OS
+  if (role === 'tecnico') {
+    filter.tecnico_id = username
+  } else if (tecnico_id) {
+    filter.tecnico_id = tecnico_id
+  }
 
   const [items, total] = await Promise.all([
     ServiceOrder.find(filter)
