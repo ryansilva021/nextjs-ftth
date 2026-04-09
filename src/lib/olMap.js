@@ -71,7 +71,7 @@ function _ctoColor(pct = 0) {
 
 /** Cor de rota por tipo */
 const _rotaColor = { BACKBONE: '#6366f1', RAMAL: '#1e293b', DROP: '#22c55e' }
-const _rotaWidth = { BACKBONE: 6, RAMAL: 3, DROP: 2 }
+const _rotaWidth = { BACKBONE: 10, RAMAL: 6, DROP: 4 }
 
 /**
  * Estilo de nó (CTO) — chamado como função para suportar animação.
@@ -154,8 +154,10 @@ function _nodeStyleFn(feature, resolution) {
   if (type === 'ce') {
     return [
       new Style({
-        image: new CircleStyle({
-          radius:  7,
+        image: new RegularShape({
+          points:  4,
+          radius:  9,
+          angle:   Math.PI / 4,
           fill:    new Fill({ color: '#3b82f6' }),
           stroke:  new Stroke({ color: '#000', width: 1.5 }),
         }),
@@ -179,8 +181,10 @@ function _nodeStyleFn(feature, resolution) {
   if (type === 'cdo') {
     return [
       new Style({
-        image: new CircleStyle({
-          radius:  7,
+        image: new RegularShape({
+          points:  4,
+          radius:  9,
+          angle:   Math.PI / 4,
           fill:    new Fill({ color: '#a855f7' }),
           stroke:  new Stroke({ color: '#000', width: 1.5 }),
         }),

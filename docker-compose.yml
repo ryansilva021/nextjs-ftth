@@ -1,19 +1,22 @@
 version: '3.9'
+
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    env_file:
+      - .env.local
     environment:
-      - MONGODB_URI=mongodb://mongo:27017/fiberops
-      - AUTH_SECRET=change_me_in_production_min_32_chars_here
+      - NODE_ENV=production
       - NEXTAUTH_URL=http://localhost:3000
+      - MONGODB_URI=mongodb://mongo:27017/fiberops
     depends_on:
-      - mongo
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
 
   mongo:
     image: mongo:7
@@ -23,6 +26,12 @@ services:
       - mongo_data:/data/db
     environment:
       MONGO_INITDB_DATABASE: fiberops
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
 volumes:
   mongo_data:
