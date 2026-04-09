@@ -73,6 +73,7 @@ export const authConfig = {
       // Rotas públicas: sempre permitido
       if (
         pathname.startsWith('/login') ||
+        pathname.startsWith('/cadastro') ||
         pathname.startsWith('/planos') ||
         pathname.startsWith('/api/auth') ||
         pathname.startsWith('/api/registro') ||
