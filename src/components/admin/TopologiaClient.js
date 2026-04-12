@@ -41,8 +41,8 @@ const TIPOS_DESTINO = {
 function BadgeTipo({ tipo }) {
   const cor =
     tipo === 'CDO'
-      ? { backgroundColor: '#172554', color: '#93c5fd' }
-      : { backgroundColor: '#14532d', color: '#86efac' }
+      ? { backgroundColor: 'rgba(99,102,241,0.20)', color: '#4338ca', border: '1px solid rgba(99,102,241,0.45)' }
+      : { backgroundColor: 'rgba(22,163,74,0.18)',  color: '#15803d', border: '1px solid rgba(22,163,74,0.45)' }
   return (
     <span
       style={cor}
@@ -232,18 +232,18 @@ export default function TopologiaClient({ arvoreInicial, projetoId, userRole }) 
               {/* OLT Header */}
               <div className="flex items-center gap-3 mb-4">
                 <div
-                  style={{ backgroundColor: '#1e1b4b', border: '1px solid #3730a3' }}
+                  style={{ backgroundColor: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.45)' }}
                   className="rounded-lg px-3 py-1.5 flex items-center gap-2"
                 >
-                  <span className="text-xs text-indigo-300 font-semibold uppercase tracking-wider">
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#4338ca' }}>
                     OLT
                   </span>
-                  <span className="text-sm font-mono text-indigo-200">
+                  <span className="text-sm font-mono" style={{ color: '#3730a3' }}>
                     {olt.olt_id ?? olt.id}
                   </span>
                 </div>
                 {olt.nome && (
-                  <span className="text-sm text-white font-medium">{olt.nome}</span>
+                  <span className="text-sm text-slate-100 font-medium">{olt.nome}</span>
                 )}
                 {olt.ip && (
                   <span className="text-xs font-mono text-slate-400">
@@ -284,7 +284,7 @@ export default function TopologiaClient({ arvoreInicial, projetoId, userRole }) 
           style={modalBgStyle}
         >
           <div style={cardStyle} className="rounded-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-white mb-5">
+            <h2 className="text-lg font-bold text-slate-100 mb-5">
               Vincular Elementos da Topologia
             </h2>
 

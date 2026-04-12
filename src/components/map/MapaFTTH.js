@@ -453,7 +453,7 @@ export default function MapaFTTH({
     const sigColor =
       simResult.signal_quality === 'EXCELENTE' ? '#22c55e' :
       simResult.signal_quality === 'BOM'        ? '#4ade80' :
-      simResult.signal_quality === 'LIMITE'     ? '#f59e0b' : '#ef4444'
+      simResult.signal_quality === 'LIMITE'     ? '#ff8000' : '#ef4444'
 
     const src = new VectorSource()
     const lineF = new Feature({ geometry: new LineString([clientCoord, ctoCoord]) })
@@ -463,7 +463,7 @@ export default function MapaFTTH({
     dotF.setStyle(new Style({
       image: new OLCircle({
         radius: 10,
-        fill:   new Fill({ color: '#f59e0b' }),
+        fill:   new Fill({ color: '#ff8000' }),
         stroke: new Stroke({ color: '#ffffff', width: 2.5 }),
       }),
     }))
@@ -845,16 +845,16 @@ export default function MapaFTTH({
         >
           <div style={{
             width: 220, height: '100%',
-            background: isDark ? 'rgba(6,10,22,0.97)' : '#ffffff',
-            borderLeft: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
-            boxShadow: isDark ? '-4px 0 24px rgba(0,0,0,0.6)' : '-4px 0 24px rgba(0,0,0,0.12)',
+            background: '#d4c5b2',
+            borderLeft: '1px solid #b8a080',
+            boxShadow: '-4px 0 24px rgba(0,0,0,0.18)',
             display: 'flex', flexDirection: 'column',
             padding: '16px 12px',
             gap: 8,
             overflowY: 'auto',
           }}>
             {/* Título */}
-            <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: isDark ? '#475569' : '#94a3b8', marginBottom: 4 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#271204', marginBottom: 4 }}>
               Controles
             </div>
 
@@ -864,9 +864,9 @@ export default function MapaFTTH({
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '10px 12px', borderRadius: 10,
-                background: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
-                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
-                color: isDark ? '#94a3b8' : '#475569',
+                background: '#c8b89e',
+                border: '1px solid #b8a080',
+                color: '#0f0701',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
               }}
             >
@@ -875,16 +875,16 @@ export default function MapaFTTH({
             </button>
 
             {/* Divisor */}
-            <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0', margin: '4px 0' }} />
+            <div style={{ height: 1, background: '#b8a080', margin: '4px 0' }} />
 
             {/* Camadas */}
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isDark ? '#475569' : '#94a3b8', marginBottom: 2 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#271204', marginBottom: 2 }}>
               Camadas
             </div>
             {[
               { key: 'ctos',   label: 'CTOs',    icon: '📡', color: '#10b981' },
               { key: 'caixas', label: 'CE/CDOs', icon: '🔷', color: '#6366f1' },
-              { key: 'rotas',  label: 'Rotas',   icon: '〰️', color: '#f59e0b' },
+              { key: 'rotas',  label: 'Rotas',   icon: '〰️', color: '#ff8000' },
               { key: 'postes', label: 'Postes',  icon: '🪝', color: '#eab308' },
               { key: 'olts',   label: 'OLTs',    icon: '🖥️', color: '#0891b2' },
             ].map(({ key, label, icon, color }) => {
@@ -895,9 +895,9 @@ export default function MapaFTTH({
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
                     padding: '8px 12px', borderRadius: 8,
-                    background: ativo ? `${color}18` : (isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc'),
-                    border: `1px solid ${ativo ? color + '44' : (isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0')}`,
-                    color: ativo ? color : (isDark ? '#64748b' : '#94a3b8'),
+                    background: ativo ? `${color}28` : '#c8b89e',
+                    border: `1px solid ${ativo ? color + '66' : '#b8a080'}`,
+                    color: '#0f0701',
                     fontSize: 12, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
                     transition: 'all 0.15s',
                   }}
@@ -910,7 +910,7 @@ export default function MapaFTTH({
             })}
 
             {/* Divisor */}
-            <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0', margin: '4px 0' }} />
+            <div style={{ height: 1, background: '#b8a080', margin: '4px 0' }} />
 
             {/* Satélite */}
             <button
@@ -919,9 +919,9 @@ export default function MapaFTTH({
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '10px 12px', borderRadius: 10,
-                background: layerToggles.satellite ? 'rgba(14,165,233,0.18)' : (isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9'),
-                border: `1px solid ${layerToggles.satellite ? '#0ea5e9' : (isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0')}`,
-                color: layerToggles.satellite ? '#38bdf8' : (isDark ? '#94a3b8' : '#475569'),
+                background: layerToggles.satellite ? 'rgba(14,165,233,0.25)' : '#c8b89e',
+                border: `1px solid ${layerToggles.satellite ? '#0ea5e9' : '#b8a080'}`,
+                color: '#0f0701',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
               }}
             >
@@ -936,9 +936,9 @@ export default function MapaFTTH({
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '10px 12px', borderRadius: 10,
-                background: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
-                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
-                color: isDark ? '#94a3b8' : '#475569',
+                background: '#c8b89e',
+                border: '1px solid #b8a080',
+                color: '#0f0701',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
                 opacity: loadingData ? 0.5 : 1,
               }}
@@ -948,7 +948,7 @@ export default function MapaFTTH({
             </button>
 
             {/* Divisor */}
-            <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0', margin: '4px 0' }} />
+            <div style={{ height: 1, background: '#b8a080', margin: '4px 0' }} />
 
             {/* Simular Instalação */}
             <button
@@ -956,13 +956,9 @@ export default function MapaFTTH({
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '10px 12px', borderRadius: 10,
-                background: simMode
-                  ? (isDark ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.12)')
-                  : (isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9'),
-                border: simMode
-                  ? '1.5px solid #f59e0b'
-                  : (isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0'),
-                color: simMode ? '#f59e0b' : (isDark ? '#94a3b8' : '#475569'),
+                background: simMode ? 'rgba(255,128,0,0.28)' : '#c8b89e',
+                border: simMode ? '1.5px solid #ff8000' : '1px solid #b8a080',
+                color: '#0f0701',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
                 transition: 'all 0.18s',
               }}
@@ -972,7 +968,7 @@ export default function MapaFTTH({
               {simMode && (
                 <span style={{
                   marginLeft: 'auto', fontSize: 9, fontWeight: 800,
-                  background: 'rgba(245,158,11,0.2)', color: '#f59e0b',
+                  background: 'rgba(255,128,0,0.2)', color: '#ff8000',
                   padding: '2px 5px', borderRadius: 4,
                 }}>ATIVO</span>
               )}
@@ -981,25 +977,25 @@ export default function MapaFTTH({
             {/* ── Adicionar elementos — visível apenas para admin e superadmin ── */}
             {(userRole === 'admin' || userRole === 'superadmin') && (
               <>
-                <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.06)' : '#e2e8f0', margin: '4px 0' }} />
+                <div style={{ height: 1, background: '#b8a080', margin: '4px 0' }} />
                 {/* Permissão: somente admin e superadmin podem ver esta seção */}
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isDark ? '#475569' : '#94a3b8', marginBottom: 2 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#271204', marginBottom: 2 }}>
                   Adicionar
                 </div>
                 {[
                   { type: 'cto',   label: 'CTO',    color: '#10b981', icon: '📡' },
                   { type: 'caixa', label: 'CE/CDO', color: '#6366f1', icon: '🔷' },
                   { type: 'poste', label: 'Poste',  color: '#d97706', icon: '🪝' },
-                  { type: 'rota',  label: 'Rota',   color: '#f59e0b', icon: '〰️' },
+                  { type: 'rota',  label: 'Rota',   color: '#ff8000', icon: '〰️' },
                 ].map(({ type, label, color, icon }) => (
                   <button key={type}
                     onClick={() => { enterAddMode(type); setMapPainel(false) }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 8,
                       padding: '8px 12px', borderRadius: 8,
-                      background: `${color}18`,
-                      border: `1px solid ${color}44`,
-                      color: color,
+                      background: `${color}28`,
+                      border: `1px solid ${color}66`,
+                      color: '#0f0701',
                       fontSize: 12, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left',
                       transition: 'all 0.15s',
                     }}
@@ -1024,11 +1020,11 @@ export default function MapaFTTH({
             transform: 'translateY(-50%)',
             transition: 'right 0.22s ease',
             pointerEvents: 'auto',
-            background: isDark ? 'rgba(6,10,22,0.95)' : '#ffffff',
-            borderTop:    isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
-            borderBottom: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
-            borderRight:  mapPainel ? (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0') : 'none',
-            borderLeft:   mapPainel ? 'none' : (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0'),
+            background: '#d4c5b2',
+            borderTop:    '1px solid #b8a080',
+            borderBottom: '1px solid #b8a080',
+            borderRight:  mapPainel ? '1px solid #b8a080' : 'none',
+            borderLeft:   mapPainel ? 'none' : '1px solid #b8a080',
             borderRadius: mapPainel ? '0 8px 8px 0' : '8px 0 0 8px',
             width: 22,
             height: 64,
@@ -1037,8 +1033,8 @@ export default function MapaFTTH({
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: 12,
-            color: isDark ? '#64748b' : '#94a3b8',
-            boxShadow: isDark ? '-2px 0 8px rgba(0,0,0,0.4)' : '-2px 0 8px rgba(0,0,0,0.1)',
+            color: '#3d1f04',
+            boxShadow: '-2px 0 8px rgba(0,0,0,0.15)',
           }}
         >
           {mapPainel ? '▶' : '◀'}
@@ -1136,19 +1132,19 @@ export default function MapaFTTH({
                     padding: '7px 12px',
                     borderRadius: 8,
                     border: `1.5px solid ${item.cor}66`,
-                    background: isDark ? 'rgba(11,18,32,0.97)' : 'rgba(255,255,255,0.97)',
+                    background: 'rgba(212,197,178,0.97)',
                     color: item.cor,
                     cursor: 'pointer',
                     fontSize: 12,
                     fontWeight: 700,
                     whiteSpace: 'nowrap',
-                    boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.7)' : '0 4px 20px rgba(0,0,0,0.15)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.20)',
                     backdropFilter: 'blur(4px)',
                     textAlign: 'left',
                   }}
                 >
                   <span>{item.icone}</span>
-                  <span style={{ color: isDark ? '#e2e8f0' : '#1e293b' }}>{item.nome}</span>
+                  <span style={{ color: '#0f0701' }}>{item.nome}</span>
                 </button>
               ))}
             </div>
@@ -1156,7 +1152,7 @@ export default function MapaFTTH({
               onClick={() => setSpreadPanel(null)}
               style={{
                 alignSelf: 'center', background: 'none', border: 'none',
-                color: isDark ? '#475569' : '#64748b',
+                color: '#271204',
                 cursor: 'pointer', fontSize: 11, padding: '2px 8px',
               }}
             >
@@ -1217,18 +1213,14 @@ export default function MapaFTTH({
               position: 'relative',
               width: 44, height: 44,
               borderRadius: 12,
-              background: gpsExpanded
-                ? (isDark ? 'rgba(37,99,235,0.35)' : 'rgba(37,99,235,0.12)')
-                : (isDark ? 'rgba(6,10,22,0.90)' : 'rgba(255,255,255,0.96)'),
-              border: gpsExpanded
-                ? '1.5px solid #3b82f6'
-                : (isDark ? '1px solid rgba(255,255,255,0.10)' : '1px solid #e2e8f0'),
+              background: gpsExpanded ? 'rgba(37,99,235,0.18)' : 'rgba(212,197,178,0.96)',
+              border: gpsExpanded ? '1.5px solid #3b82f6' : '1px solid #b8a080',
               backdropFilter: 'blur(14px)',
               WebkitBackdropFilter: 'blur(14px)',
-              boxShadow: isDark ? '0 2px 12px rgba(0,0,0,0.5)' : '0 2px 12px rgba(0,0,0,0.10)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
               cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: gpsExpanded ? '#3b82f6' : (isDark ? '#93c5fd' : '#2563eb'),
+              color: '#0f0701',
               transition: 'all 0.18s',
             }}
           >
@@ -1247,8 +1239,8 @@ export default function MapaFTTH({
           {/* Painel expandido */}
           {gpsExpanded && (
             <div style={{
-              background: isDark ? 'rgba(6,10,22,0.92)' : 'rgba(255,255,255,0.97)',
-              border: isDark ? '1px solid rgba(255,255,255,0.10)' : '1px solid #e2e8f0',
+              background: 'rgba(212,197,178,0.97)',
+              border: '1px solid #b8a080',
               borderRadius: 14,
               backdropFilter: 'blur(14px)',
               WebkitBackdropFilter: 'blur(14px)',
@@ -1262,14 +1254,14 @@ export default function MapaFTTH({
               <div style={{
                 padding: '7px 12px 6px',
                 display: 'flex', alignItems: 'center', gap: 6,
-                borderBottom: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #f1f5f9',
+                borderBottom: '1px solid #b8a080',
               }}>
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                  background: tracking ? '#3b82f6' : (isDark ? '#334155' : '#cbd5e1'),
+                  background: tracking ? '#3b82f6' : '#b8a080',
                   ...(tracking ? { animation: 'gps-pulse 1.5s ease-in-out infinite' } : {}),
                 }} />
-                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: isDark ? '#475569' : '#94a3b8' }}>
+                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#271204' }}>
                   GPS
                 </span>
                 {tracking && followMode && (
@@ -1293,7 +1285,7 @@ export default function MapaFTTH({
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '8px 12px', border: 'none', background: 'none',
                   cursor: 'pointer', textAlign: 'left', width: '100%',
-                  color: isDark ? '#93c5fd' : '#2563eb', fontSize: 12, fontWeight: 600,
+                  color: '#0f0701', fontSize: 12, fontWeight: 600,
                   transition: 'background 0.15s',
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.06)'}
@@ -1303,7 +1295,7 @@ export default function MapaFTTH({
                 Localizar
               </button>
 
-              <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9', margin: '0 10px' }} />
+              <div style={{ height: 1, background: '#b8a080', margin: '0 10px' }} />
 
               {/* Seguir / Parar */}
               <button
@@ -1315,9 +1307,9 @@ export default function MapaFTTH({
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '8px 12px', border: 'none',
-                  background: tracking && followMode ? (isDark ? 'rgba(37,99,235,0.2)' : 'rgba(37,99,235,0.08)') : 'none',
+                  background: tracking && followMode ? 'rgba(37,99,235,0.15)' : 'none',
                   cursor: 'pointer', textAlign: 'left', width: '100%',
-                  color: tracking && followMode ? '#3b82f6' : (isDark ? '#93c5fd' : '#2563eb'),
+                  color: '#0f0701',
                   fontSize: 12, fontWeight: 600, transition: 'background 0.15s',
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(59,130,246,0.14)' : 'rgba(59,130,246,0.08)'}
@@ -1330,14 +1322,14 @@ export default function MapaFTTH({
               {/* Centralizar — só quando há posição mas não está seguindo */}
               {gpsPosition && !followMode && (
                 <>
-                  <div style={{ height: 1, background: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9', margin: '0 10px' }} />
+                  <div style={{ height: 1, background: '#b8a080', margin: '0 10px' }} />
                   <button
                     onClick={() => map?.flyTo({ center: [gpsPosition.lng, gpsPosition.lat], zoom: 16, duration: 800 })}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '8px 12px', border: 'none', background: 'none',
                       cursor: 'pointer', textAlign: 'left', width: '100%',
-                      color: isDark ? '#64748b' : '#94a3b8', fontSize: 12, fontWeight: 600,
+                      color: '#0f0701', fontSize: 12, fontWeight: 600,
                       transition: 'background 0.15s',
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'}
@@ -1550,19 +1542,19 @@ export default function MapaFTTH({
           className="absolute top-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-semibold shadow-lg flex items-center gap-3 whitespace-nowrap"
           style={{
             backgroundColor: isDark ? 'rgba(8,13,28,0.95)' : 'rgba(255,255,255,0.97)',
-            border: '1.5px solid rgba(245,158,11,0.6)',
-            color: '#f59e0b',
-            boxShadow: '0 4px 20px rgba(245,158,11,0.2)',
+            border: '1.5px solid rgba(255,128,0,0.6)',
+            color: '#ff8000',
+            boxShadow: '0 4px 20px rgba(255,128,0,0.2)',
           }}
         >
           <span style={{
-            width: 8, height: 8, borderRadius: '50%', background: '#f59e0b',
+            width: 8, height: 8, borderRadius: '50%', background: '#ff8000',
             display: 'inline-block', animation: 'gps-pulse 1.2s ease-in-out infinite',
           }} />
           {simLoading
             ? <><span style={{ color: isDark ? '#f1f5f9' : '#0f172a' }}>Analisando localização...</span></>
             : <><span style={{ color: isDark ? '#f1f5f9' : '#0f172a' }}>Clique no mapa para simular uma instalação</span></>}
-          <button onClick={cancelSimMode} style={{ color: 'rgba(245,158,11,0.6)', marginLeft: 4 }}>✕</button>
+          <button onClick={cancelSimMode} style={{ color: 'rgba(255,128,0,0.6)', marginLeft: 4 }}>✕</button>
         </div>
       )}
 
@@ -1664,7 +1656,7 @@ function SimResultCard({
   const SIG_COLOR = {
     EXCELENTE: '#22c55e',
     BOM:       '#4ade80',
-    LIMITE:    '#f59e0b',
+    LIMITE:    '#ff8000',
     CRÍTICO:   '#ef4444',
   }
 
@@ -1754,11 +1746,11 @@ function SimResultCard({
             {/* Diagnostics */}
             {result.diags?.length > 0 && (
               <div style={{
-                background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
+                background: 'rgba(255,128,0,0.08)', border: '1px solid rgba(255,128,0,0.3)',
                 borderRadius: 8, padding: '8px 12px', marginBottom: 12,
               }}>
                 {result.diags.map((d, i) => (
-                  <p key={i} style={{ fontSize: 11, color: '#f59e0b', margin: 0 }}>⚠ {d}</p>
+                  <p key={i} style={{ fontSize: 11, color: '#ff8000', margin: 0 }}>⚠ {d}</p>
                 ))}
               </div>
             )}

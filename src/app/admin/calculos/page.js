@@ -24,7 +24,7 @@ export default async function CalculosPage() {
     <div className="p-4 sm:p-6 w-full">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-white">Cálculo de Potência FTTH</h1>
+          <h1 className="text-xl font-bold text-slate-100">Cálculo de Potência FTTH</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             {topologia.ctos.length} CTOs · {topologia.olts.length} OLTs detectados
           </p>

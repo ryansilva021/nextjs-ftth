@@ -9,11 +9,11 @@ import OLTsClient   from '@/components/admin/OLTsClient'
 import { limparDadosProjeto } from '@/actions/imports'
 
 const TABS = [
-  { id: 'ctos',   label: 'CTOs',    icon: '📦', color: '#0284c7' },
+  { id: 'olts',   label: 'OLTs',    icon: '🖥️', color: '#0891b2' },
   { id: 'caixas', label: 'CE / CDO', icon: '🔌', color: '#7c3aed' },
   { id: 'rotas',  label: 'Rotas',   icon: '〰️', color: '#059669' },
   { id: 'postes', label: 'Postes',  icon: '🏗️', color: '#d97706' },
-  { id: 'olts',   label: 'OLTs',    icon: '🖥️', color: '#0891b2' },
+  { id: 'ctos',   label: 'CTOs',    icon: '📦', color: '#ff8000' },
 ]
 
 export default function CampoClient({

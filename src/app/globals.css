@@ -2,20 +2,20 @@
 @import "@xyflow/react/dist/style.css";
 
 :root {
-  --background: #fdf7f2;
-  --foreground: #1c1208;
-  --sidebar-bg: #fff9f5;
-  --sidebar-border: #eed5be;
-  --card-bg: #ffffff;
-  --card-bg-active: #fff4ea;
-  --border-color: #eed5be;
-  --border-color-strong: #f4b07a;
-  --text-muted: #a07040;
-  --text-secondary: #704520;
-  --inp-bg: #fffaf7;
-  --accent: #f97316;
-  --accent-dark: #ea580c;
-  --accent-light: #ffedd5;
+  --background: #ddd0c0;
+  --foreground: #0f0701;
+  --sidebar-bg: #d4c5b2;
+  --sidebar-border: #b8a080;
+  --card-bg: #e8dccf;
+  --card-bg-active: #dfd0bc;
+  --border-color: #b8a080;
+  --border-color-strong: #c47a28;
+  --text-muted: #3d1f04;
+  --text-secondary: #271204;
+  --inp-bg: #ddd0c0;
+  --accent: #ff8000;
+  --accent-dark: #d97706;
+  --accent-light: #fef3c7;
 }
 
 @theme inline {
@@ -52,8 +52,8 @@ body,
 }
 .ol-zoom-ftth .ol-zoom-in,
 .ol-zoom-ftth .ol-zoom-out {
-  background: rgba(255, 249, 245, 0.95);
-  color: #1c1208;
+  background: rgba(212, 197, 178, 0.95);
+  color: #0f0701;
   border: 1px solid #eed5be;
   border-radius: 6px;
   font-size: 18px;
@@ -64,33 +64,33 @@ body,
 }
 .ol-zoom-ftth .ol-zoom-in:hover,
 .ol-zoom-ftth .ol-zoom-out:hover {
-  background: rgba(249, 115, 22, 0.18);
-  border-color: #f97316;
+  background: rgba(255, 128, 0, 0.18);
+  border-color: #ff8000;
 }
 /* Scale line */
 .ol-scale-line {
-  background: rgba(255,249,245,0.88);
+  background: rgba(212,197,178,0.88);
   border-radius: 4px;
   padding: 2px 4px;
   bottom: 8px;
   left:   8px;
-  border: 1px solid #eed5be;
+  border: 1px solid #cdb89c;
 }
 .ol-scale-line-inner {
-  color: #a07040;
-  border-color: #a07040;
+  color: #7a5530;
+  border-color: #7a5530;
   font-size: 10px;
 }
 /* Attribution */
 .ol-attribution {
   bottom: 8px;
   right:  8px;
-  background: rgba(255,249,245,0.88);
-  border: 1px solid #eed5be;
+  background: rgba(212,197,178,0.88);
+  border: 1px solid #cdb89c;
   border-radius: 4px;
   font-size: 10px;
 }
-.ol-attribution a { color: #ea580c; }
+.ol-attribution a { color: #d97706; }
 /* ─────────────────────────────────────────────────────────────────────────── */
 
 /* Inputs e selects seguem a cor do tema */
@@ -109,6 +109,8 @@ input::placeholder, textarea::placeholder {
 .text-slate-200 { color: var(--text-secondary) !important; }
 .text-slate-300 { color: var(--text-muted) !important; }
 .text-slate-400 { color: var(--text-muted) !important; }
+.text-slate-500 { color: var(--text-muted) !important; }
+.text-slate-700 { color: var(--text-secondary) !important; }
 .text-zinc-400  { color: var(--text-muted) !important; }
 .text-zinc-300  { color: var(--text-secondary) !important; }
 .text-gray-400  { color: var(--text-muted) !important; }
@@ -262,6 +264,30 @@ input::placeholder, textarea::placeholder {
 .noc-text-clamp {
   overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; max-width: 100%;
+}
+
+/* ── ReactFlow controls (botões de zoom/fit na topologia) ─── */
+.react-flow__controls {
+  background: #3a2e22 !important;
+  border: 1px solid #5a4830 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+}
+.react-flow__controls-button {
+  background: #3a2e22 !important;
+  border-color: #5a4830 !important;
+  color: #f0e4d0 !important;
+  fill: #f0e4d0 !important;
+}
+.react-flow__controls-button:hover {
+  background: #4a3c2a !important;
+}
+.react-flow__minimap {
+  background: #2a2218 !important;
+  border: 1px solid #5a4830 !important;
+}
+.react-flow__panel.bottom.left {
+  background: transparent !important;
 }
 
 /* ── Topology page ────────────────────────────────────────── */

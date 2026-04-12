@@ -22,7 +22,7 @@ export default async function CaixasPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-white">Caixas CE / CDO</h1>
+          <h1 className="text-xl font-bold text-slate-100">Caixas CE / CDO</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             Caixas de Emenda e Distribuição Óptica — {caixas.length} registros
           </p>

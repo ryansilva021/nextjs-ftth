@@ -34,28 +34,28 @@ function useMobile() {
 
 function mkTheme() {
   return {
-    canvas:     '#fdf7f2',
-    bg:         '#ffffff',
-    bg2:        '#fff9f5',
-    border:     '#eed5be',
-    text:       '#1c1208',
-    muted:      '#a07040',
-    shadow:     '0 2px 16px rgba(160,112,64,0.14)',
+    canvas:     '#2a2218',
+    bg:         '#3a2e22',
+    bg2:        '#2e2418',
+    border:     '#5a4830',
+    text:       '#f0e4d0',
+    muted:      '#c8a878',
+    shadow:     '0 2px 16px rgba(0,0,0,0.5)',
     // OLT — azul
-    oltBg:  '#eff6ff', oltBdr: '#0369a1', oltHdr: '#0369a1', oltHdrBg: '#dbeafe',
+    oltBg:  '#1a2840', oltBdr: '#3b82f6', oltHdr: '#93c5fd', oltHdrBg: '#1e3a5a',
     // CDO — roxo
-    cdoBg:  '#faf5ff', cdoBdr: '#7c3aed', cdoHdr: '#6d28d9', cdoHdrBg: '#ede9fe',
-    // Splitter — laranja (identidade do projeto)
-    splBg:  '#fff7ed', splBdr: '#ea580c', splHdr: '#c2410c', splHdrBg: '#ffedd5',
+    cdoBg:  '#221830', cdoBdr: '#a855f7', cdoHdr: '#d8b4fe', cdoHdrBg: '#2e1a48',
+    // Splitter — amber (identidade do projeto)
+    splBg:  '#2e2010', splBdr: '#ff8000', splHdr: '#fcd34d', splHdrBg: '#3a280e',
     // CTO — verde
-    ctoBg:  '#f0fdf4', ctoBdr: '#16a34a', ctoHdr: '#166534', ctoHdrBg: '#bbf7d0',
+    ctoBg:  '#102210', ctoBdr: '#22c55e', ctoHdr: '#86efac', ctoHdrBg: '#143214',
     // Panels
-    panelBg: 'rgba(253,247,242,0.96)', panelBorder: '#eed5be',
-    mmBg: '#fff9f5', mmMask: '#eed5be88',
+    panelBg: 'rgba(42,34,24,0.97)', panelBorder: '#5a4830',
+    mmBg: '#3a2e22', mmMask: '#5a483088',
     // Edges
-    feeder:  { stroke: '#1d4ed8', strokeWidth: 3 },
-    distrib: { stroke: '#7c3aed', strokeWidth: 2 },
-    drop:    { stroke: '#15803d', strokeWidth: 1.5 },
+    feeder:  { stroke: '#60a5fa', strokeWidth: 3 },
+    distrib: { stroke: '#c084fc', strokeWidth: 2 },
+    drop:    { stroke: '#4ade80', strokeWidth: 1.5 },
   }
 }
 
@@ -376,7 +376,7 @@ function SplitterNode({ data }) {
         {entrada?.fibra != null && (
           <span style={{
             marginLeft: 'auto', fontSize: 10, fontWeight: 700,
-            color: ligadas === saidas.length ? T.ctoBdr : ligadas > 0 ? '#f59e0b' : T.muted,
+            color: ligadas === saidas.length ? T.ctoBdr : ligadas > 0 ? '#ff8000' : T.muted,
           }}>
             {ligadas}/{saidas.length}
           </span>
@@ -476,7 +476,7 @@ function CTONode({ data }) {
   const pct     = Math.min(1, ocupacao / Math.max(1, capacidade))
   const livres  = capacidade - ocupacao
   const cheio   = livres <= 0
-  const alertC  = cheio ? '#ef4444' : pct > 0.8 ? '#f59e0b' : T.ctoBdr
+  const alertC  = cheio ? '#ef4444' : pct > 0.8 ? '#ff8000' : T.ctoBdr
   const segs    = Math.min(capacidade, 16)
   const filled  = Math.round(pct * segs)
 
@@ -492,8 +492,12 @@ function CTONode({ data }) {
     }}>
       <Handle type="target" position={Position.Left} id="in"
         style={{ ...HANDLE_BASE, background: alertC, left: -6 }} />
+      {/* Generic out handle — hidden when bandeja-specific handles exist */}
       <Handle type="source" position={Position.Right} id="out"
-        style={{ ...HANDLE_BASE, background: alertC, right: -6 }} />
+        style={{
+          ...HANDLE_BASE, background: alertC, right: -6,
+          opacity: bandejas.some(b => (b.fusoes ?? []).some(f => f.tipo !== 'livre')) ? 0 : 1,
+        }} />
 
       {/* Header */}
       <div style={{
@@ -559,25 +563,27 @@ function CTONode({ data }) {
           {bandejas.map(b => {
             const fusoes = b.fusoes ?? []
             const ativas = fusoes.filter(f => f.tipo !== 'livre').length
-            // Handle de saída alinhado ao header da bandeja
-            const bdjHex = ativas > 0 ? T.ctoBdr : T.border
+            // Bandeja handle only shown when there's a cascata connection going out
+            const hasCascataOut = fusoes.some(f => f.tipo === 'cascata')
+            const bdjHex = T.ctoBdr
             return (
               <div key={b.id} style={{ marginBottom: 5, position: 'relative', overflow: 'visible' }}>
-                {/* Handle de saída da bandeja — posicionado no header */}
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id={`bdj-${b.id}`}
-                  style={{
-                    ...HANDLE_BASE,
-                    width: 10, height: 10,
-                    position: 'absolute', right: -16, top: 9,
-                    background: bdjHex,
-                    boxShadow: ativas > 0 ? `0 0 5px ${bdjHex}99` : 'none',
-                    opacity: ativas > 0 ? 1 : 0.4,
-                    zIndex: 10,
-                  }}
-                />
+                {/* Handle de saída da bandeja — só renderiza se há fusão cascata */}
+                {hasCascataOut && (
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={`bdj-${b.id}`}
+                    style={{
+                      ...HANDLE_BASE,
+                      width: 10, height: 10,
+                      position: 'absolute', right: -16, top: 9,
+                      background: bdjHex,
+                      boxShadow: `0 0 5px ${bdjHex}99`,
+                      zIndex: 10,
+                    }}
+                  />
+                )}
                 {/* Bandeja header */}
                 <div style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -698,7 +704,7 @@ function CTONode({ data }) {
                 const ocup  = (spl.saidas ?? []).filter(sd => sd.cliente?.trim()).length
                 const total = (spl.saidas ?? []).length
                 const p     = total > 0 ? ocup / total : 0
-                const barC  = p >= 0.9 ? '#ef4444' : p >= 0.7 ? '#f59e0b' : '#16a34a'
+                const barC  = p >= 0.9 ? '#ef4444' : p >= 0.7 ? '#ff8000' : '#16a34a'
                 return (
                   <div key={spl.id} style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: si < splitters.length - 1 ? 3 : 0 }}>
                     <span style={{ fontSize: 9, color: T.muted, minWidth: 46, whiteSpace: 'nowrap' }}>🔀 {spl.tipo}</span>

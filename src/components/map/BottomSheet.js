@@ -58,8 +58,8 @@ function Badge({ label, bg, border, color }) {
 function InfoSection({ title, children, isDark: _d }) {
   return (
     <div style={{ marginBottom: 12 }}>
-      <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#704520', marginBottom: 6 }}>{title}</p>
-      <div style={{ backgroundColor: '#fffaf7', border: '1px solid #eed5be', borderRadius: 10, overflow: 'hidden' }}>
+      <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#271204', marginBottom: 6 }}>{title}</p>
+      <div style={{ backgroundColor: '#e8dccf', border: '1px solid #b8a080', borderRadius: 10, overflow: 'hidden' }}>
         {children}
       </div>
     </div>
@@ -69,9 +69,9 @@ function InfoSection({ title, children, isDark: _d }) {
 function InfoRow({ label, value, mono, accent, isDark: _d }) {
   if (value == null || value === '' || value === '—' || value === 'null' || value === 'undefined') return null
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: '1px solid #fff4ea' }}>
-      <span style={{ fontSize: 11, color: '#704520', fontWeight: 600 }}>{label}</span>
-      <span style={{ fontSize: 12, color: accent ?? '#1c1208', fontWeight: 700, fontFamily: mono ? 'monospace' : 'inherit', maxWidth: '60%', textAlign: 'right', wordBreak: 'break-word' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: '1px solid #cdb89c' }}>
+      <span style={{ fontSize: 11, color: '#271204', fontWeight: 700 }}>{label}</span>
+      <span style={{ fontSize: 12, color: accent ?? '#0f0701', fontWeight: 800, fontFamily: mono ? 'monospace' : 'inherit', maxWidth: '60%', textAlign: 'right', wordBreak: 'break-word' }}>
         {String(value)}
       </span>
     </div>
@@ -81,19 +81,19 @@ function InfoRow({ label, value, mono, accent, isDark: _d }) {
 function OcupacaoBar({ ocupadas = 0, capacidade = 0, accent, isDark: _d }) {
   if (!capacidade) return null
   const pct = Math.round((ocupadas / capacidade) * 100)
-  const barColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : accent ?? '#16a34a'
+  const barColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#ff8000' : accent ?? '#16a34a'
   return (
-    <div style={{ padding: '12px 16px', backgroundColor: '#fffaf7', border: '1px solid #eed5be', borderRadius: 10, marginBottom: 12 }}>
+    <div style={{ padding: '12px 16px', backgroundColor: '#e8dccf', border: '1px solid #b8a080', borderRadius: 10, marginBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#704520' }}>Ocupação de Portas</span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#271204' }}>Ocupação de Portas</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: barColor }}>{ocupadas}/{capacidade} <span style={{ fontSize: 11, fontWeight: 600 }}>({pct}%)</span></span>
       </div>
-      <div style={{ height: 8, backgroundColor: '#eed5be', borderRadius: 4, overflow: 'hidden' }}>
+      <div style={{ height: 8, backgroundColor: '#b8a080', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: `linear-gradient(90deg, ${barColor}, ${barColor}cc)`, borderRadius: 4, transition: 'width .5s ease' }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-        <span style={{ fontSize: 10, color: '#a07040' }}>0</span>
-        <span style={{ fontSize: 10, color: '#a07040' }}>{capacidade}</span>
+        <span style={{ fontSize: 10, color: '#3d1f04' }}>0</span>
+        <span style={{ fontSize: 10, color: '#3d1f04' }}>{capacidade}</span>
       </div>
     </div>
   )
@@ -151,16 +151,16 @@ function CTOContent({ data, isAdmin, isTecnico, onAction, onIrAte, onMedirPotenc
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
         {/* Disponível para todos */}
-        <ActBtn onClick={() => onAction('movimentacao')} color="#86efac" bg="rgba(34,197,94,0.12)" border="rgba(34,197,94,0.3)"  icon="👤" label="Clientes" />
-        {onIrAte && <ActBtn onClick={onIrAte}           color="#93c5fd" bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.3)" icon="🧭" label="Ir Até" />}
+        <ActBtn onClick={() => onAction('movimentacao')} color="#0f0701" bg="rgba(34,197,94,0.20)" border="rgba(34,197,94,0.5)"  icon="👤" label="Clientes" />
+        {onIrAte && <ActBtn onClick={onIrAte}           color="#0f0701" bg="rgba(59,130,246,0.20)" border="rgba(59,130,246,0.5)" icon="🧭" label="Ir Até" />}
         {/* Técnico: medir potência */}
         {(isTecnico || isAdmin) && onMedirPotencia && (
-          <ActBtn onClick={onMedirPotencia} color="#fde68a" bg="rgba(234,179,8,0.12)" border="rgba(234,179,8,0.3)" icon="📶" label="Medir Sinal" />
+          <ActBtn onClick={onMedirPotencia} color="#0f0701" bg="rgba(234,179,8,0.25)" border="rgba(234,179,8,0.6)" icon="📶" label="Medir Sinal" />
         )}
         {/* Admin only */}
-        {isAdmin && <ActBtn onClick={() => onAction('fusoes')}       color="#fde68a" bg="rgba(234,179,8,0.12)"  border="rgba(234,179,8,0.3)"   icon="🧩" label="Fusões" />}
-        {isAdmin && <ActBtn onClick={() => onAction('reposicionar')} color="#fdba74" bg="rgba(249,115,22,0.12)" border="rgba(249,115,22,0.3)" icon="📍" label="Reposicionar" />}
-        {isAdmin && <ActBtn onClick={() => onAction('editar')}       color="#704520" bg="#fff4ea" border="#eed5be" icon="✏️" label="Editar" />}
+        {isAdmin && <ActBtn onClick={() => onAction('fusoes')}       color="#0f0701" bg="rgba(234,179,8,0.25)"  border="rgba(234,179,8,0.6)"   icon="🧩" label="Fusões" />}
+        {isAdmin && <ActBtn onClick={() => onAction('reposicionar')} color="#0f0701" bg="rgba(249,115,22,0.22)" border="rgba(249,115,22,0.55)" icon="📍" label="Reposicionar" />}
+        {isAdmin && <ActBtn onClick={() => onAction('editar')}       color="#0f0701" bg="#dfd0bc" border="#b8a080" icon="✏️" label="Editar" />}
       </div>
     </div>
   )
@@ -194,10 +194,10 @@ function CaixaContent({ data, isAdmin, onAction, onIrAte, isDark }) {
       </InfoSection>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-        {onIrAte && <ActBtn onClick={onIrAte} color="#93c5fd" bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.3)" icon="🧭" label="Ir Até" />}
-        {isAdmin && <ActBtn onClick={() => onAction('fusoes')}       color="#fde68a" bg="rgba(234,179,8,0.12)"  border="rgba(234,179,8,0.3)"   icon="🧩" label="Fusões" />}
-        {isAdmin && <ActBtn onClick={() => onAction('reposicionar')} color="#fdba74" bg="rgba(249,115,22,0.12)" border="rgba(249,115,22,0.3)" icon="📍" label="Reposicionar" />}
-        {isAdmin && <ActBtn onClick={() => onAction('editar')}       color="#704520" bg="#fff4ea" border="#eed5be" icon="✏️" label="Editar" />}
+        {onIrAte && <ActBtn onClick={onIrAte} color="#0f0701" bg="rgba(59,130,246,0.20)" border="rgba(59,130,246,0.5)" icon="🧭" label="Ir Até" />}
+        {isAdmin && <ActBtn onClick={() => onAction('fusoes')}       color="#0f0701" bg="rgba(234,179,8,0.25)"  border="rgba(234,179,8,0.6)"   icon="🧩" label="Fusões" />}
+        {isAdmin && <ActBtn onClick={() => onAction('reposicionar')} color="#0f0701" bg="rgba(249,115,22,0.22)" border="rgba(249,115,22,0.55)" icon="📍" label="Reposicionar" />}
+        {isAdmin && <ActBtn onClick={() => onAction('editar')}       color="#0f0701" bg="#dfd0bc" border="#b8a080" icon="✏️" label="Editar" />}
       </div>
     </div>
   )
@@ -221,8 +221,8 @@ function RotaContent({ data, isAdmin, onAction, isDark }) {
 
       {isAdmin && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-          <ActBtn onClick={() => onAction('editar_pontos')} color="#a5b4fc" bg="rgba(99,102,241,0.12)" border="rgba(99,102,241,0.35)" icon="🖊️" label="Mover pontos" />
-          <ActBtn onClick={() => onAction('editar')} color="#704520" bg="#fff4ea" border="#eed5be" icon="✏️" label="Editar dados" />
+          <ActBtn onClick={() => onAction('editar_pontos')} color="#0f0701" bg="rgba(99,102,241,0.22)" border="rgba(99,102,241,0.55)" icon="🖊️" label="Mover pontos" />
+          <ActBtn onClick={() => onAction('editar')} color="#0f0701" bg="#dfd0bc" border="#b8a080" icon="✏️" label="Editar dados" />
         </div>
       )}
     </div>
@@ -252,9 +252,9 @@ function PosteContent({ data, isAdmin, onAction, onIrAte, isDark }) {
       </InfoSection>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-        {onIrAte && <ActBtn onClick={onIrAte} color="#93c5fd" bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.3)" icon="🧭" label="Ir Até" />}
-        {isAdmin && <ActBtn onClick={() => onAction('reposicionar')} color="#fdba74" bg="rgba(249,115,22,0.12)" border="rgba(249,115,22,0.3)" icon="📍" label="Reposicionar" />}
-        {isAdmin && <ActBtn onClick={() => onAction('editar')}       color="#704520" bg="#fff4ea" border="#eed5be" icon="✏️" label="Editar" />}
+        {onIrAte && <ActBtn onClick={onIrAte} color="#0f0701" bg="rgba(59,130,246,0.20)" border="rgba(59,130,246,0.5)" icon="🧭" label="Ir Até" />}
+        {isAdmin && <ActBtn onClick={() => onAction('reposicionar')} color="#0f0701" bg="rgba(249,115,22,0.22)" border="rgba(249,115,22,0.55)" icon="📍" label="Reposicionar" />}
+        {isAdmin && <ActBtn onClick={() => onAction('editar')}       color="#0f0701" bg="#dfd0bc" border="#b8a080" icon="✏️" label="Editar" />}
       </div>
     </div>
   )
@@ -287,9 +287,9 @@ function OLTContent({ data, isAdmin, isNoc, onAction, onIrAte, isDark }) {
     window.location.href = `/admin/noc?olt_id=${encodeURIComponent(oltId)}`
   }
 
-  const muted     = '#704520'
-  const cardBg    = '#fffaf7'
-  const cardBord  = '#eed5be'
+  const muted     = '#271204'
+  const cardBg    = '#e8dccf'
+  const cardBord  = '#b8a080'
 
   return (
     <div>
@@ -359,7 +359,7 @@ function OLTContent({ data, isAdmin, isNoc, onAction, onIrAte, isDark }) {
                   color: stats.avgRx == null ? muted
                     : stats.avgRx > -20 ? '#22c55e'
                     : stats.avgRx >= -25 ? '#4ade80'
-                    : stats.avgRx >= -28 ? '#f59e0b' : '#ef4444',
+                    : stats.avgRx >= -28 ? '#ff8000' : '#ef4444',
                 }}>
                   {stats.avgRx != null ? `${stats.avgRx} dBm` : '—'}
                 </span>
@@ -393,8 +393,8 @@ function OLTContent({ data, isAdmin, isNoc, onAction, onIrAte, isDark }) {
             {/* Alerts */}
             {stats.alerts.length > 0 && (
               <div style={{
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
+                backgroundColor: '#fde8e8',
+                border: '1px solid #f87171',
                 borderRadius: 10, padding: '10px 12px', marginBottom: 10,
               }}>
                 <p style={{ fontSize: 9, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>
@@ -419,16 +419,16 @@ function OLTContent({ data, isAdmin, isNoc, onAction, onIrAte, isDark }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {/* NOC — available to admin and noc role */}
         {(isAdmin || isNoc) && (
-          <ActBtn onClick={openNoc} color="#38bdf8" bg="rgba(14,165,233,0.12)" border="rgba(14,165,233,0.35)" icon="📡" label="Abrir no NOC" full />
+          <ActBtn onClick={openNoc} color="#0f0701" bg="rgba(14,165,233,0.22)" border="rgba(14,165,233,0.55)" icon="📡" label="Abrir no NOC" full />
         )}
         {onIrAte && (
-          <ActBtn onClick={onIrAte} color="#38bdf8" bg="rgba(14,165,233,0.12)" border="rgba(14,165,233,0.35)" icon="🧭" label="Ir Até" />
+          <ActBtn onClick={onIrAte} color="#0f0701" bg="rgba(14,165,233,0.22)" border="rgba(14,165,233,0.55)" icon="🧭" label="Ir Até" />
         )}
         {isAdmin && (
-          <ActBtn onClick={() => onAction('reposicionar')} color="#fbbf24" bg="rgba(251,191,36,0.12)" border="rgba(251,191,36,0.35)" icon="📍" label="Reposicionar" />
+          <ActBtn onClick={() => onAction('reposicionar')} color="#0f0701" bg="rgba(251,191,36,0.25)" border="rgba(251,191,36,0.60)" icon="📍" label="Reposicionar" />
         )}
         {isAdmin && (
-          <ActBtn onClick={() => onAction('editar')} color="#704520" bg="#fff4ea" border="#eed5be" icon="✏️" label="Editar OLT" />
+          <ActBtn onClick={() => onAction('editar')} color="#0f0701" bg="#dfd0bc" border="#b8a080" icon="✏️" label="Editar OLT" />
         )}
       </div>
 
@@ -450,9 +450,9 @@ function CopyBtn({ text, isDark: _d }) {
       onClick={copy}
       style={{
         marginLeft: 8, padding: '2px 8px', fontSize: 10, fontWeight: 700, borderRadius: 6,
-        backgroundColor: copied ? 'rgba(34,197,94,0.18)' : '#fff4ea',
-        border: `1px solid ${copied ? 'rgba(34,197,94,0.4)' : '#eed5be'}`,
-        color: copied ? '#16a34a' : '#a07040',
+        backgroundColor: copied ? 'rgba(34,197,94,0.18)' : '#dfd0bc',
+        border: `1px solid ${copied ? 'rgba(34,197,94,0.4)' : '#b8a080'}`,
+        color: copied ? '#15803d' : '#271204',
         cursor: 'pointer', transition: 'all .2s', flexShrink: 0,
       }}
     >
@@ -464,10 +464,10 @@ function CopyBtn({ text, isDark: _d }) {
 function InfoRowCopy({ label, value, mono, accent, isDark: _d }) {
   if (value == null || value === '' || value === '—') return null
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: '1px solid #fff4ea' }}>
-      <span style={{ fontSize: 11, color: '#704520', fontWeight: 600, flexShrink: 0 }}>{label}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: '1px solid #cdb89c' }}>
+      <span style={{ fontSize: 11, color: '#271204', fontWeight: 700, flexShrink: 0 }}>{label}</span>
       <div style={{ display: 'flex', alignItems: 'center', maxWidth: '65%', justifyContent: 'flex-end' }}>
-        <span style={{ fontSize: 12, color: accent ?? '#1c1208', fontWeight: 700, fontFamily: mono ? 'monospace' : 'inherit', textAlign: 'right', wordBreak: 'break-word' }}>
+        <span style={{ fontSize: 12, color: accent ?? '#0f0701', fontWeight: 800, fontFamily: mono ? 'monospace' : 'inherit', textAlign: 'right', wordBreak: 'break-word' }}>
           {String(value)}
         </span>
         <CopyBtn text={value} />
@@ -559,14 +559,14 @@ function OSContent({ data, isAdmin, isTecnico, onAction, onIrAte, isDark }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
         <ActBtn
           onClick={() => onAction('abrir_os')}
-          color="#f472b6" bg="rgba(225,29,72,0.12)" border="rgba(225,29,72,0.35)"
+          color="#0f0701" bg="rgba(225,29,72,0.20)" border="rgba(225,29,72,0.50)"
           icon="📋" label="Ver OS completa" full
         />
         {onIrAte && (
-          <ActBtn onClick={onIrAte} color="#93c5fd" bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.3)" icon="🧭" label="Ir Até" />
+          <ActBtn onClick={onIrAte} color="#0f0701" bg="rgba(59,130,246,0.20)" border="rgba(59,130,246,0.5)" icon="🧭" label="Ir Até" />
         )}
         {(isAdmin || isTecnico) && (
-          <ActBtn onClick={() => onAction('editar')} color="#704520" bg="#fff4ea" border="#eed5be" icon="✏️" label="Editar OS" />
+          <ActBtn onClick={() => onAction('editar')} color="#0f0701" bg="#dfd0bc" border="#b8a080" icon="✏️" label="Editar OS" />
         )}
       </div>
     </div>
@@ -634,10 +634,10 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
       {/* Cabeçalho arrastável */}
       <div
         style={{
-          backgroundColor: '#fff9f5',
+          backgroundColor: '#d4c5b2',
           borderTop: `3px solid ${cfg.accent}`,
-          borderLeft: '1px solid #eed5be',
-          borderRight: '1px solid #eed5be',
+          borderLeft: '1px solid #b8a080',
+          borderRight: '1px solid #b8a080',
           borderRadius: '20px 20px 0 0',
           cursor: 'grab', padding: '10px 16px 12px',
           userSelect: 'none',
@@ -651,7 +651,7 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
         onTouchEnd={handleDragEnd}
       >
         {/* Handle bar */}
-        <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#eed5be', margin: '0 auto 12px' }} />
+        <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#b8a080', margin: '0 auto 12px' }} />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -667,8 +667,8 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
               {cfg.emoji}
             </div>
             <div>
-              <p style={{ fontSize: 10, color: '#a07040', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 2 }}>{cfg.label}</p>
-              <p style={{ fontSize: 17, fontWeight: 800, color: '#1c1208', lineHeight: 1.2, margin: 0 }}>{name}</p>
+              <p style={{ fontSize: 10, color: '#3d1f04', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 2 }}>{cfg.label}</p>
+              <p style={{ fontSize: 17, fontWeight: 800, color: '#0f0701', lineHeight: 1.2, margin: 0 }}>{name}</p>
             </div>
           </div>
           <button
@@ -676,9 +676,9 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
             onClick={onClose}
             style={{
               width: 32, height: 32, borderRadius: 8,
-              backgroundColor: '#fff4ea',
-              border: '1px solid #eed5be',
-              color: '#704520', fontSize: 16, lineHeight: 1,
+              backgroundColor: '#dfd0bc',
+              border: '1px solid #b8a080',
+              color: '#0f0701', fontSize: 16, lineHeight: 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', flexShrink: 0,
             }}
@@ -691,9 +691,9 @@ export default function BottomSheet({ element, onClose, session, userRole, onAct
 
       {/* Conteúdo scrollável */}
       <div style={{
-        backgroundColor: '#ffffff',
-        borderLeft: '1px solid #eed5be',
-        borderRight: '1px solid #eed5be',
+        backgroundColor: '#e8dccf',
+        borderLeft: '1px solid #b8a080',
+        borderRight: '1px solid #b8a080',
         padding: '12px 16px 32px',
         maxHeight: '55vh', overflowY: 'auto',
       }}>

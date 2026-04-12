@@ -226,7 +226,7 @@ export default function PostesClient({ postesIniciais, projetoId, userRole, idIn
               )}
               {postes.map((poste, i) => (
                 <tr key={poste._id} style={{ borderBottom: i < postes.length - 1 ? '1px solid var(--border-color)' : 'none' }} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-sky-400">{poste.poste_id}</td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: '#ff8000' }}>{poste.poste_id}</td>
                   <td className="px-4 py-3 text-slate-300 capitalize">{poste.tipo ?? '—'}</td>
                   <td className="px-4 py-3 text-xs capitalize">
                     <span className={STATUS_CORES[poste.status] ?? 'text-slate-400'}>{poste.status ?? '—'}</span>
@@ -237,7 +237,7 @@ export default function PostesClient({ postesIniciais, projetoId, userRole, idIn
                   <td className="px-4 py-3 text-slate-400 text-xs">{poste.bairro ?? '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <button onClick={() => abrirEditar(poste)} className="text-xs text-sky-400 hover:text-sky-300">Editar</button>
+                      <button onClick={() => abrirEditar(poste)} className="text-xs" style={{ color: '#ff8000' }}>Editar</button>
                       <span className="text-slate-700">|</span>
                       <button onClick={() => setConfirmDelete(poste)} className="text-xs text-red-400 hover:text-red-300">Excluir</button>
                     </div>
@@ -299,7 +299,7 @@ export default function PostesClient({ postesIniciais, projetoId, userRole, idIn
                   <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>Localização *</p>
                   <div className="flex gap-2">
                     <button type="button" onClick={usarGPS} disabled={gpsCarregando}
-                      style={{ backgroundColor: '#0c2340', border: '1px solid #0369a1', color: '#38bdf8', fontSize: 11, padding: '4px 10px', borderRadius: 8 }}
+                      style={{ backgroundColor: 'rgba(255,128,0,0.15)', border: '1px solid rgba(255,128,0,0.5)', color: '#ff8000', fontSize: 11, padding: '4px 10px', borderRadius: 8 }}
                       className="disabled:opacity-40 hover:brightness-110 transition-all flex items-center gap-1">
                       {gpsCarregando ? '⏳' : '📍'} GPS
                     </button>

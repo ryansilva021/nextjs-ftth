@@ -10,5 +10,7 @@
  * src/lib/auth.js para permitir reuso em Server Components e Server Actions.
  */
 
+export const runtime = 'nodejs'
+
 import { handlers } from '@/lib/auth'
 export const { GET, POST } = handlers

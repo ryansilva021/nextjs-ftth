@@ -59,8 +59,8 @@ const cardStyle = {
 
 // Tipo chip colors
 const TIPO_CHIP = {
-  CDO: { bg: '#1a2e1a', border: '#16a34a', color: '#4ade80' },
-  CE:  { bg: '#1e3a5f', border: '#2563eb', color: '#93c5fd' },
+  CDO: { bg: 'rgba(22,163,74,0.18)', border: 'rgba(22,163,74,0.5)', color: '#15803d' },
+  CE:  { bg: 'rgba(99,102,241,0.18)', border: 'rgba(99,102,241,0.5)', color: '#4338ca' },
 }
 
 export default function CaixasClient({ caixasIniciais, projetoId, userRole, idInicial }) {
@@ -241,7 +241,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
                 const chip = TIPO_CHIP[caixa.tipo] ?? TIPO_CHIP.CDO
                 return (
                   <tr key={caixa._id} style={{ borderBottom: i < caixas.length - 1 ? '1px solid var(--border-color)' : 'none' }} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-sky-400">{getCaixaId(caixa)}</td>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: '#ff8000' }}>{getCaixaId(caixa)}</td>
                     <td className="px-4 py-3 text-slate-200">{caixa.nome ?? '—'}</td>
                     <td className="px-4 py-3">
                       <span style={{ backgroundColor: chip.bg, border: `1px solid ${chip.border}`, color: chip.color }} className="text-xs px-2 py-0.5 rounded-full font-semibold">
@@ -253,7 +253,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
                     <td className="px-4 py-3 font-mono text-xs text-slate-400">{caixa.olt_id ?? '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => abrirEditar(caixa)} className="text-xs text-sky-400 hover:text-sky-300">Editar</button>
+                        <button onClick={() => abrirEditar(caixa)} className="text-xs" style={{ color: '#ff8000' }}>Editar</button>
                         <span className="text-slate-700">|</span>
                         <button onClick={() => setConfirmDelete(caixa)} className="text-xs text-red-400 hover:text-red-300">Excluir</button>
                       </div>
@@ -325,7 +325,7 @@ export default function CaixasClient({ caixasIniciais, projetoId, userRole, idIn
                   <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>Localização *</p>
                   <div className="flex gap-2">
                     <button type="button" onClick={usarGPS} disabled={gpsCarregando}
-                      style={{ backgroundColor: '#0c2340', border: '1px solid #0369a1', color: '#38bdf8', fontSize: 11, padding: '4px 10px', borderRadius: 8 }}
+                      style={{ backgroundColor: 'rgba(255,128,0,0.15)', border: '1px solid rgba(255,128,0,0.5)', color: '#ff8000', fontSize: 11, padding: '4px 10px', borderRadius: 8 }}
                       className="disabled:opacity-40 hover:brightness-110 transition-all flex items-center gap-1">
                       {gpsCarregando ? '⏳' : '📍'} GPS
                     </button>

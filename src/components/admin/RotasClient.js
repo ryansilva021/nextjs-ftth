@@ -227,7 +227,7 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole, idInic
                 const cfg = TIPO_CONFIG[tipo]
                 return (
                   <tr key={(rota.properties ?? rota)._id ?? i} style={{ borderBottom: i < rotas.length - 1 ? '1px solid var(--border-color)' : 'none' }} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-sky-400">{getRotaId(rota)}</td>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: '#ff8000' }}>{getRotaId(rota)}</td>
                     <td className="px-4 py-3 text-slate-200">{getRotaNome(rota)}</td>
                     <td className="px-4 py-3">
                       {cfg ? (
@@ -241,7 +241,7 @@ export default function RotasClient({ rotasIniciais, projetoId, userRole, idInic
                     <td className="px-4 py-3 text-slate-400 text-xs">{getRotaPontos(rota)} pts</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => abrirEditar(rota)} className="text-xs text-sky-400 hover:text-sky-300">Editar</button>
+                        <button onClick={() => abrirEditar(rota)} className="text-xs" style={{ color: '#ff8000' }}>Editar</button>
                         <span className="text-slate-700">|</span>
                         <button onClick={() => setConfirmDelete(rota)} className="text-xs text-red-400 hover:text-red-300">Excluir</button>
                       </div>

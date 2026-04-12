@@ -37,12 +37,12 @@ const modalBgStyle = {
 
 function RoleBadge({ role }) {
   const cores = {
-    superadmin: { bg: '#2e1065', color: '#c4b5fd', border: '#7c3aed44' },
-    admin:      { bg: '#0c2340', color: '#38bdf8',  border: '#0284c744' },
-    tecnico:    { bg: '#052e16', color: '#4ade80',  border: '#16a34a44' },
-    noc:        { bg: '#1a1a2e', color: '#818cf8',  border: '#6366f144' },
-    recepcao:   { bg: '#2d1a12', color: '#fb923c',  border: '#f9731644' },
-    user:       { bg: '#1c1917', color: '#a8a29e',  border: '#78716c44' },
+    superadmin: { bg: 'rgba(124,58,237,0.18)', color: '#5b21b6', border: 'rgba(124,58,237,0.4)' },
+    admin:      { bg: 'rgba(2,132,199,0.15)',  color: '#0369a1',  border: 'rgba(2,132,199,0.4)' },
+    tecnico:    { bg: 'rgba(22,163,74,0.15)',  color: '#15803d',  border: 'rgba(22,163,74,0.4)' },
+    noc:        { bg: 'rgba(99,102,241,0.15)', color: '#4338ca',  border: 'rgba(99,102,241,0.4)' },
+    recepcao:   { bg: 'rgba(234,88,12,0.15)',  color: '#c2410c',  border: 'rgba(234,88,12,0.4)' },
+    user:       { bg: 'rgba(120,113,108,0.15)',color: '#57534e',  border: 'rgba(120,113,108,0.4)' },
   }
   const c = cores[role] ?? cores.user
   return (
@@ -59,8 +59,9 @@ function StatusBadge({ ativo }) {
   return (
     <span
       style={{
-        backgroundColor: ativo ? '#052e16' : '#1c0a0a',
-        color: ativo ? '#4ade80' : '#f87171',
+        backgroundColor: ativo ? 'rgba(22,163,74,0.15)' : 'rgba(239,68,68,0.15)',
+        color: ativo ? '#15803d' : '#b91c1c',
+        border: `1px solid ${ativo ? 'rgba(22,163,74,0.4)' : 'rgba(239,68,68,0.4)'}`,
       }}
       className="text-xs px-2 py-0.5 rounded-full font-medium"
     >
@@ -304,7 +305,7 @@ export default function UsuariosClient({
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={modalBgStyle}>
           <div style={cardStyle} className="rounded-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-white mb-5">
+            <h2 className="text-lg font-bold text-slate-100 mb-5">
               {editando ? 'Editar Usuário' : 'Novo Usuário'}
             </h2>
             <div className="flex flex-col gap-4 mb-4">
@@ -422,9 +423,9 @@ export default function UsuariosClient({
       {modalSenha && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={modalBgStyle}>
           <div style={cardStyle} className="rounded-2xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-bold text-white mb-1">Redefinir Senha</h2>
+            <h2 className="text-lg font-bold text-slate-100 mb-1">Redefinir Senha</h2>
             <p className="text-sm text-slate-400 mb-4">
-              Usuário: <span className="text-white font-mono">{modalSenha.username}</span>
+              Usuário: <span className="text-slate-100 font-mono">{modalSenha.username}</span>
             </p>
             <div className="flex flex-col gap-1 mb-4">
               <label className="text-xs text-slate-400 uppercase tracking-wider">Nova senha</label>
@@ -469,9 +470,9 @@ export default function UsuariosClient({
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={modalBgStyle}>
           <div style={cardStyle} className="rounded-2xl w-full max-w-sm p-6 text-center">
-            <p className="text-white font-semibold mb-2">Excluir usuário?</p>
+            <p className="text-slate-100 font-semibold mb-2">Excluir usuário?</p>
             <p className="text-sm text-slate-400 mb-6">
-              O usuário <span className="text-white font-mono">{confirmDelete.username}</span> será
+              O usuário <span className="text-slate-100 font-mono">{confirmDelete.username}</span> será
               removido permanentemente.
             </p>
             <div className="flex gap-3">

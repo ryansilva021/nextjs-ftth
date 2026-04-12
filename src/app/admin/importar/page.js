@@ -36,7 +36,7 @@ export default async function ImportarPage() {
     <div className="p-4 sm:p-6 w-full">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-white">Importar / Exportar</h1>
+          <h1 className="text-xl font-bold text-slate-100">Importar / Exportar</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             {ctos.length} CTOs · {caixas.length} CDOs · {postes.length} Postes · {rotas?.features?.length ?? 0} Rotas
           </p>

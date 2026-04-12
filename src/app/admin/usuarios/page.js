@@ -22,7 +22,7 @@ export default async function UsuariosPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-white">Usuários</h1>
+          <h1 className="text-xl font-bold text-slate-100">Usuários</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             Gerenciamento de usuários — {usuarios.length} registros
           </p>

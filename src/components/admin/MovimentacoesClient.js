@@ -197,7 +197,7 @@ export default function MovimentacoesClient({ movimentacoesIniciais, projetoId, 
           style={modalBgStyle}
         >
           <div style={cardStyle} className="rounded-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-white mb-5">
+            <h2 className="text-lg font-bold text-slate-100 mb-5">
               Registrar Movimentação
             </h2>
 

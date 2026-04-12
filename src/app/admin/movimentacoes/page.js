@@ -22,7 +22,7 @@ export default async function MovimentacoesPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-white">Movimentações</h1>
+          <h1 className="text-xl font-bold text-slate-100">Movimentações</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             Histórico de instalações e desinstalações — {movimentacoes.length} registros
           </p>

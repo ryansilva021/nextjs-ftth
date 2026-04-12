@@ -22,7 +22,7 @@ export default async function OLTsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-white">OLTs</h1>
+          <h1 className="text-xl font-bold text-slate-100">OLTs</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             Optical Line Terminals — {olts.length} registros
           </p>
