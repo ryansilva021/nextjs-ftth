@@ -757,7 +757,14 @@ function DadosTab({ os, canWrite, canStatus, canDelete, isPending, nextStatuses,
       {/* OS */}
       <div style={DR}>
         <DLabel>OS</DLabel>
-        <span style={{ ...DV, fontFamily: 'monospace', fontWeight: 700, fontSize: 14 }}>{os.os_id}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ ...DV, fontFamily: 'monospace', fontWeight: 700, fontSize: 14 }}>{os.os_id}</span>
+          <a href={`/admin/os/${os.os_id}`} style={{
+            fontSize: 11, color: '#60a5fa', background: '#1d4ed822',
+            border: '1px solid #1d4ed855', borderRadius: 5,
+            padding: '2px 8px', textDecoration: 'none', fontWeight: 600,
+          }}>Abrir página ↗</a>
+        </div>
       </div>
 
       {/* Motivo / Tipo */}
@@ -1175,7 +1182,15 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
                 {os.cliente_contato && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>📞 {os.cliente_contato}</span>}
               </div>
             </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, padding: 4, flexShrink: 0 }}>✕</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <a href={`/admin/os/${os.os_id}`} style={{
+                fontSize: 11, fontWeight: 600, color: '#60a5fa',
+                background: '#1d4ed822', border: '1px solid #1d4ed855',
+                borderRadius: 6, padding: '4px 10px', textDecoration: 'none',
+                whiteSpace: 'nowrap',
+              }}>Abrir ↗</a>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, padding: 4 }}>✕</button>
+            </div>
           </div>
           <StatusStepper status={os.status} />
         </div>

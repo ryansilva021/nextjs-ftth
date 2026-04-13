@@ -34,7 +34,9 @@ import { Style, Circle as CircleStyle, Fill, Stroke, Text as TextStyle, Icon, Re
 import { Zoom, ScaleLine }  from 'ol/control'
 import { defaults as defaultControls } from 'ol/control/defaults'
 import { fromLonLat } from 'ol/proj'
-import XYZ from 'ol/source/XYZ'
+import XYZ      from 'ol/source/XYZ'
+import Draw     from 'ol/interaction/Draw'
+import Polygon  from 'ol/geom/Polygon'
 
 // ─── Singleton do mapa ──────────────────────────────────────────────────────
 let _map          = null  // ol/Map
@@ -47,6 +49,13 @@ let _popupEl      = null  // HTMLElement do popup
 let _popupOverlay = null  // ol/Overlay para popup
 let _animTimer    = null  // setInterval para animação de piscar
 let _animBright   = true  // estado do piscar
+
+// ─── Varinha: preview de rede gerada automaticamente ───────────────────────
+let _previewSource = null  // VectorSource para preview (rotas + CTOs gerados)
+let _previewLayer  = null  // VectorLayer de preview
+let _polySource    = null  // VectorSource para o polígono desenhado
+let _polyLayer     = null  // VectorLayer do polígono
+let _drawInter     = null  // Draw interaction (polygon)
 
 // ─── Mapa de visibilidade por tipo — usado na style function ────────────────
 // Permite toggle granular (CTO, Caixa, Poste, OLT) sem criar N layers
@@ -269,6 +278,78 @@ function _linkStyleFn(feature) {
 
   return new Style({
     stroke: new Stroke({ color, width, lineDash: dash }),
+  })
+}
+
+// ── Varinha: estilos de preview ───────────────────────────────────────────
+
+/** Estilo de rota gerada automaticamente */
+function _autoRouteStyle(feature) {
+  const tipo = feature.get('tipo')
+
+  // Rotas de distribuição CTO↔CTO (MST) — âmbar tracejado
+  if (tipo === 'DROP') {
+    return new Style({
+      stroke: new Stroke({ color: '#f59e0b', width: 2, lineDash: [5, 4] }),
+      zIndex: 21,
+    })
+  }
+  // Backbone — cyan sólido
+  if (tipo === 'BACKBONE') {
+    return new Style({
+      stroke: new Stroke({ color: '#00e5ff', width: 4, lineDash: [8, 4] }),
+      zIndex: 20,
+    })
+  }
+  // Ramal — cyan mais fino
+  return new Style({
+    stroke: new Stroke({ color: '#22d3ee', width: 2.5, lineDash: [6, 4] }),
+    zIndex: 19,
+  })
+}
+
+/** Estilo de CTO gerada automaticamente */
+function _autoCTOStyle(feature) {
+  return [
+    new Style({
+      image: new CircleStyle({
+        radius:  8,
+        fill:    new Fill({ color: '#00e5ff' }),
+        stroke:  new Stroke({ color: '#0f172a', width: 2 }),
+      }),
+      zIndex: 25,
+    }),
+    new Style({
+      text: new TextStyle({
+        text:     feature.get('nome') ?? '',
+        offsetY:  -16,
+        font:     'bold 9px sans-serif',
+        fill:     new Fill({ color: '#00e5ff' }),
+        stroke:   new Stroke({ color: '#0f172a', width: 2 }),
+        overflow: true,
+      }),
+      zIndex: 24,
+    }),
+  ]
+}
+
+/** Estilo do polígono de área desenhado */
+const _polygonStyle = new Style({
+  stroke: new Stroke({ color: '#00e5ff', width: 2, lineDash: [6, 3] }),
+  fill:   new Fill({ color: 'rgba(0,229,255,0.07)' }),
+  zIndex: 18,
+})
+
+/** Estilo do Draw interaction (live drawing) */
+function _drawStyle() {
+  return new Style({
+    stroke: new Stroke({ color: '#00e5ff', width: 2, lineDash: [5, 3] }),
+    fill:   new Fill({ color: 'rgba(0,229,255,0.05)' }),
+    image:  new CircleStyle({
+      radius: 5,
+      fill:   new Fill({ color: '#00e5ff' }),
+      stroke: new Stroke({ color: '#ffffff', width: 2 }),
+    }),
   })
 }
 
@@ -759,17 +840,139 @@ export function getNodeLayer()  { return _nodeLayer }
 export function getLinkLayer()  { return _linkLayer }
 
 // ===========================================================================
+// Varinha — preview de rede gerada e desenho de polígono
+// ===========================================================================
+
+/**
+ * Garante que as layers de preview existem e estão adicionadas ao mapa.
+ */
+function _ensurePreviewLayers() {
+  if (!_map) return
+
+  if (!_polySource) {
+    _polySource = new VectorSource({ wrapX: false })
+    _polyLayer  = new VectorLayer({ source: _polySource, style: _polygonStyle, zIndex: 18 })
+    _map.addLayer(_polyLayer)
+  }
+  if (!_previewSource) {
+    _previewSource = new VectorSource({ wrapX: false })
+    _previewLayer  = new VectorLayer({
+      source: _previewSource,
+      style:  (f) => f.get('_isCTO') ? _autoCTOStyle(f) : _autoRouteStyle(f),
+      zIndex: 20,
+    })
+    _map.addLayer(_previewLayer)
+  }
+}
+
+/**
+ * Renderiza polígono de área (preview enquanto configura a rede).
+ * @param {Array<[number,number]>} coords — [lng, lat][]
+ */
+export function renderPolygonPreview(coords) {
+  if (!_map || !coords?.length) return
+  _ensurePreviewLayers()
+  _polySource.clear()
+  if (coords.length >= 3) {
+    const ring   = [...coords, coords[0]]
+    const olRing = ring.map(([lng, lat]) => fromLonLat([lng, lat]))
+    _polySource.addFeature(new Feature({ geometry: new Polygon([olRing]) }))
+  }
+}
+
+/**
+ * Renderiza a rede gerada automaticamente (rotas neon + CTOs cyan).
+ * @param {{ routes: Array, ctos: Array }} network
+ */
+export function renderPreviewNetwork({ routes = [], ctos = [] } = {}) {
+  if (!_map) return
+  _ensurePreviewLayers()
+  _previewSource.clear()
+
+  for (const r of routes) {
+    if (!r.coordinates || r.coordinates.length < 2) continue
+    const f = new Feature({
+      geometry: new LineString(r.coordinates.map(([lng, lat]) => fromLonLat([lng, lat]))),
+      tipo:     r.tipo,
+      nome:     r.nome,
+    })
+    _previewSource.addFeature(f)
+  }
+
+  for (const c of ctos) {
+    if (c.lat == null || c.lng == null) continue
+    const f = new Feature({
+      geometry: new Point(fromLonLat([c.lng, c.lat])),
+      nome:     c.nome,
+      _isCTO:   true,
+    })
+    _previewSource.addFeature(f)
+  }
+}
+
+/**
+ * Limpa o preview (rotas geradas + polígono de área).
+ */
+export function clearPreview() {
+  _previewSource?.clear()
+  _polySource?.clear()
+}
+
+/**
+ * Ativa o modo de desenho de polígono no mapa.
+ * @param {function} onComplete — chamada com Array<[lng,lat]> ao fechar o polígono
+ */
+export function enablePolygonDraw(onComplete) {
+  if (!_map) return
+  disablePolygonDraw()
+
+  const tmpSource = new VectorSource({ wrapX: false })
+  _drawInter = new Draw({
+    source: tmpSource,
+    type:   'Polygon',
+    style:  _drawStyle(),
+  })
+
+  _drawInter.on('drawend', (e) => {
+    // Obter coordenadas e converter EPSG:3857 → WGS84
+    const ring   = e.feature.getGeometry().getCoordinates()[0]
+    const lngLats = ring.map(c => _toLonLat(c))
+    // Drop last point (OL fecha o anel duplicando o primeiro)
+    const open = lngLats.slice(0, -1)
+    if (typeof onComplete === 'function') onComplete(open)
+  })
+
+  _map.addInteraction(_drawInter)
+  _map.getViewport().style.cursor = 'crosshair'
+}
+
+/**
+ * Desativa o modo de desenho de polígono.
+ */
+export function disablePolygonDraw() {
+  if (_drawInter && _map) {
+    try { _map.removeInteraction(_drawInter) } catch (_) {}
+    _drawInter = null
+    if (_map?.getViewport()) _map.getViewport().style.cursor = ''
+  }
+}
+
+// ===========================================================================
 // destroyMap — cleanup completo (chame no unmount do componente React)
 // ===========================================================================
 
 export function destroyMap() {
   if (_animTimer) { clearInterval(_animTimer); _animTimer = null }
+  disablePolygonDraw()
   if (_map) {
+    if (_previewLayer) try { _map.removeLayer(_previewLayer) } catch (_) {}
+    if (_polyLayer)    try { _map.removeLayer(_polyLayer)    } catch (_) {}
     try { _map.setTarget(null) } catch (_) {}
     _map = null
   }
   _nodeSource = _linkSource = _nodeLayer = _linkLayer = _satLayer = null
   _popupEl = _popupOverlay = null
+  _previewSource = _previewLayer = _polySource = _polyLayer = null
   _animBright = true
   // Reseta toggles para que o próximo initMap comece com tudo visível
   _vis = { ctos: true, caixas: true, postes: true, olts: true }

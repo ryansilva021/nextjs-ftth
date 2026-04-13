@@ -204,13 +204,12 @@ export async function importRotas(features, projetoId) {
       continue
     }
     docs.push({
-      rota_id:       String(rota_id).trim(),
-      geometry_type: geom.type ?? 'LineString',
-      coordinates:   coords,
-      nome:          props.nome  ? String(props.nome).trim()  : null,
-      tipo:          props.tipo  ? String(props.tipo).trim()  : null,
-      cabo:          props.cabo  ? String(props.cabo).trim()  : null,
-      fibras:        props.fibras ? Number(props.fibras)       : null,
+      rota_id: String(rota_id).trim(),
+      geojson: { type: 'LineString', coordinates: coords },
+      nome:    props.nome  ? String(props.nome).trim()  : null,
+      tipo:    props.tipo  ? String(props.tipo).trim()  : null,
+      cabo:    props.cabo  ? String(props.cabo).trim()  : null,
+      fibras:  props.fibras ? Number(props.fibras)       : null,
     })
   }
 
