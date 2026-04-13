@@ -29,6 +29,7 @@ import ModalDiagramaCDO   from '@/components/map/ModalDiagramaCDO'
 import ModalTopologia     from '@/components/map/ModalTopologia'
 import BuscaMapa          from '@/components/map/BuscaMapa'
 import RegistroPotencia   from '@/components/map/RegistroPotencia'
+import VarinhaNetworkTool from '@/components/map/VarinhaNetworkTool'
 
 import { getCTOs, upsertCTO }   from '@/actions/ctos'
 import { getCaixas, upsertCaixa, addCaboToItem } from '@/actions/caixas'
@@ -141,6 +142,9 @@ export default function MapaFTTH({
 
   // ---- AGENT_CAMPO — registro de potência ----
   const [registroPotencia, setRegistroPotencia] = useState(null) // null | { ctoId }
+
+  // ---- Varinha de rede automática ----
+  const [varinhaMode, setVarinhaMode] = useState(false)
 
   // ---- Simulação de instalação ----
   const [simMode,    setSimMode]    = useState(false)
@@ -693,12 +697,27 @@ export default function MapaFTTH({
     setAddSaving(false)
   }
 
+  function enterVarinhaMode() {
+    setVarinhaMode(true)
+    setAddMode(null)
+    setSimMode(false)
+    setSimResult(null)
+    setSelectedElement(null)
+    setReposicionandoEl(null)
+    setMapPainel(false)
+  }
+
+  function cancelVarinhaMode() {
+    setVarinhaMode(false)
+  }
+
   function enterSimMode() {
     setSimMode(true)
     setSimResult(null)
     setSimConfirm(false)
     setSimCliente('')
     setAddMode(null)
+    setVarinhaMode(false)
     setSelectedElement(null)
     setReposicionandoEl(null)
     setMapPainel(false)
@@ -1004,6 +1023,31 @@ export default function MapaFTTH({
                     {label}
                   </button>
                 ))}
+
+                {/* Varinha de rede automática */}
+                <div style={{ height: 1, background: '#b8a080', margin: '4px 0' }} />
+                <button
+                  onClick={enterVarinhaMode}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '10px 12px', borderRadius: 10,
+                    background: varinhaMode ? 'rgba(0,229,255,0.18)' : 'rgba(0,229,255,0.08)',
+                    border: varinhaMode ? '1.5px solid #00e5ff' : '1px solid rgba(0,229,255,0.35)',
+                    color: '#0f0701',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer', width: '100%', textAlign: 'left',
+                    transition: 'all 0.18s',
+                  }}
+                >
+                  <span style={{ fontSize: 15 }}>🪄</span>
+                  Gerar Rede Automática
+                  {varinhaMode && (
+                    <span style={{
+                      marginLeft: 'auto', fontSize: 9, fontWeight: 800,
+                      background: 'rgba(0,229,255,0.2)', color: '#00e5ff',
+                      padding: '2px 5px', borderRadius: 4,
+                    }}>ATIVO</span>
+                  )}
+                </button>
               </>
             )}
           </div>
@@ -1040,6 +1084,18 @@ export default function MapaFTTH({
           {mapPainel ? '▶' : '◀'}
         </button>
       </div>
+
+      {/* Varinha de Criação Automática de Rede */}
+      {varinhaMode && (userRole === 'admin' || userRole === 'superadmin') && (
+        <VarinhaNetworkTool
+          projetoId={projetoId}
+          onSaved={({ ctos, routes }) => {
+            cancelVarinhaMode()
+            reloadData()
+          }}
+          onClose={cancelVarinhaMode}
+        />
+      )}
 
       {/* Erro GPS flutuante */}
       {gpsError && (
