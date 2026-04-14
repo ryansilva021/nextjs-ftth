@@ -2,11 +2,7 @@
 
 /**
  * src/components/map/VarinhaNetworkTool.js
- * ─────────────────────────────────────────────────────────────────
- * Painel flutuante da Varinha de Criação Automática de Rede.
- *
- * Máquina de estados:
- *   idle → drawing → fetching → generating → preview → saving → idle
+ * Painel de geração automática de rede FTTH — tema do projeto (amber/brown).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -18,9 +14,31 @@ import {
   clearPreview,
 } from '@/lib/olMap'
 import { autoBuildNetwork } from '@/services/network/autoBuildNetwork'
-import { importCTOs, importRotas } from '@/actions/imports'
+import { importCTOs, importCDOsBulk, importRotas } from '@/actions/imports'
+import { getOLTs } from '@/actions/olts'
 
-// ─────────────────────────────────────────────────────────────────
+// ── Tema do projeto ──────────────────────────────────────────────
+const T = {
+  canvas:       '#2a2218',
+  panelBg:      'rgba(38,28,16,0.98)',
+  panelBorder:  '#ff800055',
+  accent:       '#ff8000',
+  accentDim:    '#ff800033',
+  accentHover:  'rgba(255,128,0,0.18)',
+  text:         '#f0e4d0',
+  muted:        '#c8a878',
+  subtle:       '#7a6040',
+  inputBg:      'rgba(255,255,255,0.05)',
+  inputBorder:  '#ff800033',
+  danger:       '#ef4444',
+  dangerDim:    'rgba(239,68,68,0.12)',
+  success:      '#22c55e',
+  cdoColor:     '#ff8000',
+  ctoColor:     '#22d3ee',
+  distColor:    '#c084fc',
+  bbColor:      '#ff8000',
+}
+
 const STEPS = {
   IDLE:       'idle',
   DRAWING:    'drawing',
@@ -30,21 +48,36 @@ const STEPS = {
   SAVING:     'saving',
 }
 
-// ─────────────────────────────────────────────────────────────────
 export default function VarinhaNetworkTool({ projetoId, onSaved, onClose }) {
   const [step,          setStep]         = useState(STEPS.IDLE)
   const [network,       setNetwork]      = useState(null)
   const [error,         setError]        = useState(null)
   const [progress,      setProgress]     = useState('')
+
   const [prefix,        setPrefix]       = useState('CTO')
   const [capac,         setCapac]        = useState(16)
   const [spacingM,      setSpacingM]     = useState(80)
   const [genDistRoutes, setGenDistRoutes] = useState(true)
+  const [mode,          setMode]         = useState('ctos')
+  const [cdoPrefix,     setCdoPrefix]    = useState('CDO')
+  const [ctosPerCdo,    setCtosPerCdo]   = useState(8)
+  const [selectedOlt,   setSelectedOlt]  = useState(null)
+  const [olts,          setOlts]         = useState([])
+  const [oltsLoading,   setOltsLoading]  = useState(false)
+
   const networkRef = useRef(null)
+
+  useEffect(() => {
+    if (mode !== 'layers' || !projetoId || olts.length > 0) return
+    setOltsLoading(true)
+    getOLTs(projetoId)
+      .then(data => setOlts(data ?? []))
+      .catch(() => setOlts([]))
+      .finally(() => setOltsLoading(false))
+  }, [mode, projetoId])
 
   useEffect(() => () => { disablePolygonDraw(); clearPreview() }, [])
 
-  // ── Iniciar desenho ───────────────────────────────────────────
   function handleStartDraw() {
     setStep(STEPS.DRAWING)
     setError(null)
@@ -53,7 +86,6 @@ export default function VarinhaNetworkTool({ projetoId, onSaved, onClose }) {
     enablePolygonDraw(handlePolygonComplete)
   }
 
-  // ── Polígono desenhado ─────────────────────────────────────────
   const handlePolygonComplete = useCallback(async (coords) => {
     disablePolygonDraw()
     if (coords.length < 3) {
@@ -67,14 +99,22 @@ export default function VarinhaNetworkTool({ projetoId, onSaved, onClose }) {
     renderPolygonPreview(coords)
 
     try {
+      const layersMode = mode === 'layers'
       const result = await autoBuildNetwork(coords, {
         spacingM,
         capacidade: capac,
         prefix,
         genDistRoutes,
+        genCDOs:    layersMode,
+        ctosPerCdo: layersMode ? ctosPerCdo : 8,
+        cdoPrefix:  layersMode ? cdoPrefix  : 'CDO',
+        oltId:      layersMode && selectedOlt ? selectedOlt.id  : null,
+        oltLat:     layersMode && selectedOlt ? selectedOlt.lat : null,
+        oltLng:     layersMode && selectedOlt ? selectedOlt.lng : null,
         onProgress: (msg) => {
           setProgress(msg)
-          if (msg.includes('posicionando') || msg.includes('CTOs') || msg.includes('distribuição')) {
+          if (msg.includes('posicionando') || msg.includes('CTOs') ||
+              msg.includes('distribuição') || msg.includes('CDO')) {
             setStep(STEPS.GENERATING)
           }
         },
@@ -89,11 +129,12 @@ export default function VarinhaNetworkTool({ projetoId, onSaved, onClose }) {
 
       networkRef.current = result
       setNetwork(result)
-
-      // Preview: infra routes + dist routes + CTOs
       renderPreviewNetwork({
-        routes: [...result.routes, ...result.distRoutes],
-        ctos:   result.ctos,
+        routes:         result.routes,
+        backboneRoutes: result.backboneRoutes,
+        distRoutes:     result.distRoutes,
+        ctos:           result.ctos,
+        cdos:           result.cdos,
       })
       setStep(STEPS.PREVIEW)
     } catch (e) {
@@ -102,39 +143,43 @@ export default function VarinhaNetworkTool({ projetoId, onSaved, onClose }) {
       clearPreview()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capac, prefix, spacingM, genDistRoutes])
+  }, [capac, prefix, spacingM, genDistRoutes, mode, cdoPrefix, ctosPerCdo, selectedOlt])
 
-  // ── Confirmar e salvar ────────────────────────────────────────
   async function handleConfirm() {
     const net = networkRef.current
     if (!net || !projetoId) return
     setStep(STEPS.SAVING)
     setError(null)
-
     try {
       const ctoRows = net.ctos.map(c => ({
         cto_id: c.cto_id, nome: c.nome,
         lat: c.lat, lng: c.lng,
         capacidade: c.capacidade, status: c.status ?? 'ativo',
+        cdo_id: c.cdo_id ?? null, porta_cdo: c.porta_cdo ?? null,
       }))
-
-      // Salvar rotas de infraestrutura + rotas de distribuição
-      const allRoutes = [...net.routes, ...net.distRoutes]
+      const allRoutes    = [...net.routes, ...net.backboneRoutes, ...net.distRoutes]
       const rotaFeatures = allRoutes.map(r => ({
-        rota_id: r.rota_id, nome: r.nome,
-        tipo: r.tipo, coordinates: r.coordinates,
+        rota_id: r.rota_id, nome: r.nome, tipo: r.tipo, coordinates: r.coordinates,
       }))
 
-      const [ctoRes, rotaRes] = await Promise.all([
+      const promises = [
         importCTOs(ctoRows, projetoId),
-        rotaFeatures.length > 0 ? importRotas(rotaFeatures, projetoId) : Promise.resolve({ inserted: 0, modified: 0 }),
-      ])
+        rotaFeatures.length > 0
+          ? importRotas(rotaFeatures, projetoId)
+          : Promise.resolve({ inserted: 0, modified: 0 }),
+      ]
+      if (net.cdos?.length > 0) promises.push(importCDOsBulk(net.cdos, projetoId))
 
+      const [ctoRes, rotaRes, cdoRes] = await Promise.all(promises)
       clearPreview()
       setStep(STEPS.IDLE)
       setNetwork(null)
       networkRef.current = null
-      onSaved?.({ ctos: ctoRes.inserted + ctoRes.modified, routes: rotaRes.inserted + rotaRes.modified })
+      onSaved?.({
+        ctos:   ctoRes.inserted + ctoRes.modified,
+        routes: rotaRes.inserted + rotaRes.modified,
+        cdos:   cdoRes ? cdoRes.inserted + cdoRes.modified : 0,
+      })
     } catch (e) {
       setError(e.message)
       setStep(STEPS.PREVIEW)
@@ -142,119 +187,198 @@ export default function VarinhaNetworkTool({ projetoId, onSaved, onClose }) {
   }
 
   function handleDiscard() {
-    disablePolygonDraw()
-    clearPreview()
-    setStep(STEPS.IDLE)
-    setNetwork(null)
-    networkRef.current = null
-    setError(null)
-    setProgress('')
+    disablePolygonDraw(); clearPreview()
+    setStep(STEPS.IDLE); setNetwork(null)
+    networkRef.current = null; setError(null); setProgress('')
   }
 
-  const isBusy = step === STEPS.FETCHING || step === STEPS.GENERATING || step === STEPS.SAVING
+  const isBusy   = step === STEPS.FETCHING || step === STEPS.GENERATING || step === STEPS.SAVING
+  const isLayers = mode === 'layers'
 
-  // ─────────────────────────────────────────────────────────────
   return (
     <div style={{
       position: 'absolute', bottom: 80, left: '50%', transform: 'translateX(-50%)',
-      zIndex: 55, width: 340,
-      background: 'rgba(10,18,36,0.97)',
-      border: '1.5px solid #00e5ff44', borderRadius: 14,
-      boxShadow: '0 0 32px rgba(0,229,255,0.15), 0 8px 32px rgba(0,0,0,0.6)',
-      fontFamily: 'system-ui, sans-serif', overflow: 'hidden',
+      zIndex: 55, width: 360,
+      background: T.panelBg,
+      border: `1.5px solid ${T.panelBorder}`,
+      borderRadius: 14,
+      boxShadow: `0 0 32px ${T.accentDim}, 0 8px 32px rgba(0,0,0,0.7)`,
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+      overflow: 'hidden',
     }}>
-      <style>{`@keyframes varinha-spin { to { transform: rotate(360deg) } }`}</style>
+      <style>{`@keyframes vr-spin{to{transform:rotate(360deg)}}`}</style>
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 16px',
-        background: 'rgba(0,229,255,0.06)', borderBottom: '1px solid #00e5ff22',
+        padding: '11px 16px',
+        background: `linear-gradient(135deg, rgba(255,128,0,0.12), rgba(255,128,0,0.04))`,
+        borderBottom: `1px solid ${T.panelBorder}`,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 18 }}>🪄</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: 'rgba(255,128,0,0.15)', border: `1px solid ${T.panelBorder}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16,
+          }}>🪄</div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#00e5ff', letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: T.accent, letterSpacing: '0.04em' }}>
               Varinha de Rede
             </div>
-            <div style={{ fontSize: 10, color: '#475569' }}>OSM + IA de roteamento</div>
+            <div style={{ fontSize: 10, color: T.subtle }}>OSM + geração automática</div>
           </div>
         </div>
-        <button onClick={() => { handleDiscard(); onClose?.() }} disabled={isBusy}
-          style={{ background: 'none', border: 'none', color: '#64748b',
-            cursor: isBusy ? 'not-allowed' : 'pointer', fontSize: 16, padding: '2px 4px' }}>
-          ✕
-        </button>
+        <button onClick={() => { handleDiscard(); onClose?.() }} disabled={isBusy} style={{
+          background: 'none', border: 'none', color: T.subtle,
+          cursor: isBusy ? 'not-allowed' : 'pointer', fontSize: 16, padding: '3px 5px',
+          borderRadius: 5, lineHeight: 1,
+        }}>✕</button>
       </div>
 
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-        {/* Erro */}
+        {/* ── Erro ── */}
         {error && (
-          <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)',
-            borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#fca5a5', lineHeight: 1.4 }}>
-            {error}
+          <div style={{
+            background: T.dangerDim, border: `1px solid ${T.danger}44`,
+            borderRadius: 8, padding: '8px 12px', fontSize: 12,
+            color: '#fca5a5', lineHeight: 1.5,
+          }}>
+            ⚠ {error}
           </div>
         )}
 
-        {/* ── IDLE: configuração ── */}
+        {/* ── IDLE ── */}
         {step === STEPS.IDLE && (
           <>
-            <p style={{ fontSize: 12, color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>
-              Desenhe uma área e a IA posicionará CTOs nas <strong style={{ color: '#e2e8f0' }}>ruas reais</strong> (OSM),
-              priorizando esquinas e cobrindo toda a área. Numeração sequencial geográfica.
-            </p>
+            {/* Seletor de modo */}
+            <div style={{
+              display: 'flex', gap: 4,
+              background: 'rgba(0,0,0,0.3)', border: `1px solid ${T.panelBorder}`,
+              borderRadius: 9, padding: 3,
+            }}>
+              {[
+                { value: 'ctos',   label: '📡 Só CTOs'    },
+                { value: 'layers', label: '🏗 Em Camadas' },
+              ].map(opt => (
+                <button key={opt.value} onClick={() => setMode(opt.value)} style={{
+                  flex: 1, padding: '6px 10px', borderRadius: 6, border: 'none',
+                  cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                  background: mode === opt.value ? T.accentHover : 'transparent',
+                  color:      mode === opt.value ? T.accent : T.subtle,
+                  transition: 'all 0.15s',
+                  boxShadow:  mode === opt.value ? `inset 0 0 0 1px ${T.panelBorder}` : 'none',
+                }}>{opt.label}</button>
+              ))}
+            </div>
 
-            {/* Configurações */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Row label="Prefixo CTO">
+            {/* Config comum */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <ConfigRow label="Prefixo CTO">
                 <input value={prefix}
                   onChange={e => setPrefix(e.target.value.trim().toUpperCase() || 'CTO')}
-                  maxLength={10} style={inputStyle} />
-              </Row>
-              <Row label="Portas / CTO">
-                <select value={capac} onChange={e => setCapac(Number(e.target.value))} style={selectStyle}>
-                  {[8, 16, 32].map(n => <option key={n} value={n} style={{ background: '#0a1224' }}>{n} portas</option>)}
+                  maxLength={10} style={inputSt} />
+              </ConfigRow>
+              <ConfigRow label="Portas / CTO">
+                <select value={capac} onChange={e => setCapac(Number(e.target.value))} style={selectSt}>
+                  {[8, 16, 32].map(n => <option key={n} value={n} style={{ background: '#1a1208' }}>{n} portas</option>)}
                 </select>
-              </Row>
-              <Row label="Espaç. entre CTOs">
-                <select value={spacingM} onChange={e => setSpacingM(Number(e.target.value))} style={selectStyle}>
+              </ConfigRow>
+              <ConfigRow label="Espaç. entre CTOs">
+                <select value={spacingM} onChange={e => setSpacingM(Number(e.target.value))} style={selectSt}>
                   {[40, 60, 80, 100, 120, 150, 200].map(m => (
-                    <option key={m} value={m} style={{ background: '#0a1224' }}>~{m} m</option>
+                    <option key={m} value={m} style={{ background: '#1a1208' }}>~{m} m</option>
                   ))}
                 </select>
-              </Row>
+              </ConfigRow>
+            </div>
 
-              {/* Toggle rotas de distribuição */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                <button
-                  onClick={() => setGenDistRoutes(v => !v)}
-                  style={{
-                    width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer',
-                    background: genDistRoutes ? '#f59e0b' : '#1e293b',
-                    position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-                  }}
-                >
-                  <div style={{
-                    position: 'absolute', top: 2, left: genDistRoutes ? 18 : 2,
-                    width: 16, height: 16, borderRadius: '50%', background: '#fff',
-                    transition: 'left 0.2s',
-                  }} />
-                </button>
-                <span style={{ fontSize: 11, color: genDistRoutes ? '#fbbf24' : '#475569' }}>
+            {/* Config camadas */}
+            {isLayers && (
+              <div style={{
+                background: 'rgba(255,128,0,0.06)',
+                border: `1px solid ${T.panelBorder}`,
+                borderRadius: 10, padding: '10px 12px',
+                display: 'flex', flexDirection: 'column', gap: 8,
+              }}>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: '0.08em', color: T.accent, marginBottom: 1,
+                }}>
+                  ◆ Camada CDO
+                </div>
+
+                <ConfigRow label="Prefixo CDO">
+                  <input value={cdoPrefix}
+                    onChange={e => setCdoPrefix(e.target.value.trim().toUpperCase() || 'CDO')}
+                    maxLength={10} style={inputSt} />
+                </ConfigRow>
+
+                <ConfigRow label="CTOs por CDO">
+                  <select value={ctosPerCdo} onChange={e => setCtosPerCdo(Number(e.target.value))} style={selectSt}>
+                    {[4, 6, 8, 12, 16, 24].map(n => (
+                      <option key={n} value={n} style={{ background: '#1a1208' }}>{n} CTOs</option>
+                    ))}
+                  </select>
+                </ConfigRow>
+
+                <ConfigRow label="OLT (backbone)">
+                  {oltsLoading
+                    ? <span style={{ fontSize: 11, color: T.subtle }}>carregando…</span>
+                    : (
+                      <select
+                        value={selectedOlt?.id ?? ''}
+                        onChange={e => {
+                          const olt = olts.find(o => o.id === e.target.value) ?? null
+                          setSelectedOlt(olt ? { id: olt.id, nome: olt.nome, lat: olt.lat, lng: olt.lng } : null)
+                        }}
+                        style={selectSt}
+                      >
+                        <option value="" style={{ background: '#1a1208' }}>— sem backbone —</option>
+                        {olts.map(o => (
+                          <option key={o.id ?? o._id} value={o.id} style={{ background: '#1a1208' }}>
+                            {o.nome ?? o.id}
+                          </option>
+                        ))}
+                      </select>
+                    )
+                  }
+                </ConfigRow>
+
+                {/* Diagrama de camadas */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap',
+                  background: 'rgba(0,0,0,0.25)', borderRadius: 7,
+                  padding: '7px 10px', marginTop: 2,
+                }}>
+                  {selectedOlt && (
+                    <>
+                      <LayerTag color="#22d3ee" label="OLT" />
+                      <FlowArrow color={T.bbColor} label="backbone" />
+                    </>
+                  )}
+                  <LayerTag color={T.cdoColor} label="CDO" />
+                  <FlowArrow color={T.distColor} label="dist." />
+                  <LayerTag color={T.ctoColor} label="CTO" />
+                  <FlowArrow color="#4ade80" label="ramal" />
+                  <LayerTag color="#86efac" label="ONUs" />
+                </div>
+              </div>
+            )}
+
+            {/* Toggle rotas distribuição (modo plano) */}
+            {!isLayers && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Toggle active={genDistRoutes} onToggle={() => setGenDistRoutes(v => !v)} />
+                <span style={{ fontSize: 11, color: genDistRoutes ? T.muted : T.subtle }}>
                   Gerar rotas de distribuição (MST)
                 </span>
               </div>
-              {genDistRoutes && (
-                <div style={{ fontSize: 10, color: '#475569', paddingLeft: 46, marginTop: -4 }}>
-                  Calcula o menor caminho de fibra para conectar todas as CTOs.
-                </div>
-              )}
-            </div>
+            )}
 
-            <button onClick={handleStartDraw} style={primaryBtn}>
-              <span style={{ fontSize: 15 }}>✏️</span>
-              Desenhar Área no Mapa
+            <button onClick={handleStartDraw} style={primaryBtnSt}>
+              ✏ Desenhar Área no Mapa
             </button>
           </>
         )}
@@ -262,21 +386,23 @@ export default function VarinhaNetworkTool({ projetoId, onSaved, onClose }) {
         {/* ── DRAWING ── */}
         {step === STEPS.DRAWING && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10,
-              background: 'rgba(0,229,255,0.08)', border: '1px solid #00e5ff33',
-              borderRadius: 8, padding: '10px 12px' }}>
-              <span style={{ fontSize: 20, lineHeight: 1, marginTop: 2 }}>✏️</span>
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              background: T.accentHover, border: `1px solid ${T.panelBorder}`,
+              borderRadius: 9, padding: '10px 13px',
+            }}>
+              <span style={{ fontSize: 20, lineHeight: 1, marginTop: 1 }}>✏️</span>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#00e5ff', marginBottom: 3 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: T.accent, marginBottom: 3 }}>
                   Modo de desenho ativo
                 </div>
-                <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
+                <div style={{ fontSize: 11, color: T.muted, lineHeight: 1.55 }}>
                   Clique para adicionar vértices.<br/>
-                  <strong style={{ color: '#e2e8f0' }}>Duplo-clique</strong> para fechar e gerar.
+                  <strong style={{ color: T.text }}>Duplo-clique</strong> para fechar e gerar.
                 </div>
               </div>
             </div>
-            <button onClick={handleDiscard} style={cancelBtn}>Cancelar</button>
+            <button onClick={handleDiscard} style={cancelBtnSt}>Cancelar</button>
           </div>
         )}
 
@@ -286,14 +412,20 @@ export default function VarinhaNetworkTool({ projetoId, onSaved, onClose }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{
                 width: 18, height: 18, borderRadius: '50%',
-                border: '2.5px solid #00e5ff33', borderTop: '2.5px solid #00e5ff',
-                animation: 'varinha-spin 0.8s linear infinite', flexShrink: 0,
+                border: `2.5px solid ${T.accentDim}`, borderTopColor: T.accent,
+                animation: 'vr-spin 0.8s linear infinite', flexShrink: 0,
               }} />
-              <span style={{ fontSize: 12, color: '#94a3b8' }}>{progress || 'Processando…'}</span>
+              <span style={{ fontSize: 12, color: T.muted }}>{progress || 'Processando…'}</span>
             </div>
-            <ProgressBar pct={step === STEPS.GENERATING ? 75 : 35} />
-            <div style={{ fontSize: 10, color: '#475569' }}>
-              {step === STEPS.FETCHING ? 'Consultando OpenStreetMap…' : 'Algoritmo MST + Dijkstra…'}
+            <div style={{ height: 3, background: 'rgba(0,0,0,0.3)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 2, transition: 'width 0.5s ease',
+                background: `linear-gradient(90deg, ${T.accent}, #fbbf24)`,
+                width: `${step === STEPS.GENERATING ? 75 : 35}%`,
+              }} />
+            </div>
+            <div style={{ fontSize: 10, color: T.subtle }}>
+              {step === STEPS.FETCHING ? 'Consultando OpenStreetMap…' : 'Calculando camadas de rede…'}
             </div>
           </div>
         )}
@@ -301,74 +433,81 @@ export default function VarinhaNetworkTool({ projetoId, onSaved, onClose }) {
         {/* ── PREVIEW / SAVING ── */}
         {(step === STEPS.PREVIEW || step === STEPS.SAVING) && network && (
           <>
-            {/* Badge de fonte */}
+            {/* Badge fonte */}
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
-              background: network.source === 'osm' ? 'rgba(0,229,255,0.1)' : 'rgba(99,102,241,0.1)',
-              border: `1px solid ${network.source === 'osm' ? '#00e5ff44' : '#6366f144'}`,
-              borderRadius: 20, padding: '3px 10px', fontSize: 10, fontWeight: 700,
-              color: network.source === 'osm' ? '#00e5ff' : '#818cf8',
+              background: T.accentHover, border: `1px solid ${T.panelBorder}`,
+              borderRadius: 20, padding: '3px 11px', fontSize: 10, fontWeight: 700, color: T.accent,
             }}>
-              {network.source === 'osm' ? '🗺 Ruas reais (OSM) + IA' : '⊞ Grade + IA'}
+              {network.source === 'osm' ? '🗺 Ruas reais (OSM) + IA' : '⊞ Grade automática'}
             </div>
 
-            {/* Métricas — grid 2×3 */}
+            {/* Métricas */}
             <div style={{
-              background: 'rgba(0,229,255,0.05)', border: '1px solid #00e5ff22',
+              background: 'rgba(0,0,0,0.25)', border: `1px solid ${T.panelBorder}`,
               borderRadius: 10, padding: '12px 14px',
-              display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px 8px',
+              display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px 8px',
             }}>
-              <MetricItem label="CTOs"        value={network.metrics.totalCTOs}    icon="📡" color="#00e5ff" />
-              <MetricItem label="Vias"        value={network.metrics.totalRoutes}  icon="〰️" color="#22d3ee" />
-              {network.metrics.distRoutes > 0
-                ? <MetricItem label="Dist."   value={network.metrics.distRoutes}   icon="🔀" color="#f59e0b" />
-                : <MetricItem label="Cap. máx" value={`${network.metrics.totalClients}`} icon="👥" color="#a5f3fc" />
+              {network.metrics.totalCDOs > 0 && (
+                <Metric label="CDOs"      value={network.metrics.totalCDOs}    icon="◆" color={T.cdoColor} />
+              )}
+              <Metric label="CTOs"        value={network.metrics.totalCTOs}    icon="●" color={T.ctoColor} />
+              <Metric label="Vias"        value={network.metrics.totalRoutes}  icon="〰" color={T.muted} />
+              {network.metrics.backboneRoutes > 0
+                ? <Metric label="Backbone" value={network.metrics.backboneRoutes} icon="⚡" color={T.accent} />
+                : network.metrics.distRoutes > 0
+                  ? <Metric label="Dist." value={network.metrics.distRoutes} icon="⟁" color={T.distColor} />
+                  : null
               }
-              <MetricItem
-                label="Total fibra"
+              <Metric
+                label="Cabo total"
                 value={network.metrics.totalLengthM >= 1000
                   ? `${(network.metrics.totalLengthM / 1000).toFixed(1)} km`
                   : `${network.metrics.totalLengthM} m`}
-                icon="📏" color="#67e8f9"
+                icon="📏" color={T.muted}
               />
-              {network.metrics.distRoutes > 0 && (
-                <MetricItem
-                  label="Fibra dist."
-                  value={network.metrics.distLengthM >= 1000
-                    ? `${(network.metrics.distLengthM / 1000).toFixed(1)} km`
-                    : `${network.metrics.distLengthM} m`}
-                  icon="🔀" color="#fbbf24"
-                />
-              )}
-              <MetricItem label="Cap. máx." value={`${network.metrics.totalClients} cli.`} icon="👥" color="#a5f3fc" />
+              <Metric label="Cap. máx." value={`${network.metrics.totalClients}`} icon="👥" color={T.subtle} />
             </div>
 
-            {/* Legenda de cores */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <LegendItem color="#00e5ff" label="Via / Backbone" />
-              <LegendItem color="#22d3ee" label="Ramal" dashed />
-              {network.distRoutes?.length > 0 && (
-                <LegendItem color="#f59e0b" label="Distribuição CTO" dashed />
+            {/* Legenda */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              {network.metrics.backboneRoutes > 0 && (
+                <LegendLine color={T.bbColor}   label="Backbone OLT→CDO" />
               )}
-              <LegendItem color="#00e5ff" circle label="CTOs" />
+              {network.metrics.totalCDOs > 0 && (
+                <>
+                  <LegendLine color={T.distColor} label="Distribuição CDO→CTO" dashed />
+                  <LegendDot  color={T.cdoColor}  label="CDOs" diamond />
+                </>
+              )}
+              {network.metrics.distRoutes > 0 && network.metrics.totalCDOs === 0 && (
+                <LegendLine color="#f59e0b" label="Distribuição" dashed />
+              )}
+              <LegendLine color={T.ctoColor} label="Vias / Infra" dashed />
+              <LegendDot  color={T.ctoColor} label="CTOs" />
             </div>
 
             {/* Ações */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button onClick={handleConfirm} disabled={step === STEPS.SAVING}
-                style={{ ...primaryBtn, opacity: step === STEPS.SAVING ? 0.6 : 1,
-                  cursor: step === STEPS.SAVING ? 'not-allowed' : 'pointer' }}>
+              <button onClick={handleConfirm} disabled={step === STEPS.SAVING} style={{
+                ...primaryBtnSt,
+                opacity: step === STEPS.SAVING ? 0.65 : 1,
+                cursor:  step === STEPS.SAVING ? 'not-allowed' : 'pointer',
+              }}>
                 {step === STEPS.SAVING ? (
-                  <>
-                    <div style={{ width: 14, height: 14, borderRadius: '50%',
-                      border: '2px solid #00e5ff33', borderTop: '2px solid #00e5ff',
-                      animation: 'varinha-spin 0.8s linear infinite' }} />
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{
+                      display: 'inline-block', width: 13, height: 13, borderRadius: '50%',
+                      border: `2px solid ${T.accentDim}`, borderTopColor: T.accent,
+                      animation: 'vr-spin 0.8s linear infinite',
+                    }} />
                     Salvando…
-                  </>
-                ) : <>💾 Confirmar e Salvar</>}
+                  </span>
+                ) : '💾 Confirmar e Salvar'}
               </button>
-              <button onClick={handleDiscard} disabled={step === STEPS.SAVING}
-                style={{ ...cancelBtn, opacity: step === STEPS.SAVING ? 0.4 : 1 }}>
+              <button onClick={handleDiscard} disabled={step === STEPS.SAVING} style={{
+                ...cancelBtnSt, opacity: step === STEPS.SAVING ? 0.4 : 1,
+              }}>
                 🗑 Descartar
               </button>
             </div>
@@ -380,69 +519,112 @@ export default function VarinhaNetworkTool({ projetoId, onSaved, onClose }) {
 }
 
 // ─── Sub-componentes ──────────────────────────────────────────────
-function MetricItem({ label, value, icon, color }) {
+
+function Metric({ label, value, icon, color }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2 }}>{icon} {label}</div>
+      <div style={{ fontSize: 10, color: '#7a6040', marginBottom: 2 }}>{icon} {label}</div>
       <div style={{ fontSize: 15, fontWeight: 800, color }}>{value}</div>
     </div>
   )
 }
 
-function Row({ label, children }) {
+function ConfigRow({ label, children }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <label style={{ fontSize: 11, color: '#64748b', minWidth: 110 }}>{label}</label>
+      <label style={{ fontSize: 11, color: '#7a6040', minWidth: 112 }}>{label}</label>
       {children}
     </div>
   )
 }
 
-function ProgressBar({ pct }) {
+function Toggle({ active, onToggle }) {
   return (
-    <div style={{ height: 3, background: '#1e293b', borderRadius: 2, overflow: 'hidden' }}>
-      <div style={{ height: '100%', borderRadius: 2, transition: 'width 0.5s ease',
-        background: 'linear-gradient(90deg, #00e5ff, #22d3ee)', width: `${pct}%` }} />
+    <button onClick={onToggle} style={{
+      width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer',
+      background: active ? T.accent : '#3a2c18',
+      position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+    }}>
+      <div style={{
+        position: 'absolute', top: 2, left: active ? 18 : 2,
+        width: 16, height: 16, borderRadius: '50%', background: '#fff',
+        transition: 'left 0.2s',
+      }} />
+    </button>
+  )
+}
+
+function LayerTag({ color, label }) {
+  return (
+    <div style={{
+      padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+      background: color + '22', border: `1px solid ${color}55`, color, flexShrink: 0,
+    }}>
+      {label}
     </div>
   )
 }
 
-function LegendItem({ color, label, dashed, circle }) {
+function FlowArrow({ color, label }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-      {circle ? (
-        <div style={{ width: 10, height: 10, borderRadius: '50%',
-          background: color, border: '2px solid #0f172a', flexShrink: 0 }} />
-      ) : (
-        <div style={{ width: 20, height: 2, flexShrink: 0,
-          background: color, opacity: dashed ? 0.7 : 1,
-          borderTop: dashed ? `2px dashed ${color}` : `2px solid ${color}`, borderRadius: 1 }} />
-      )}
-      <span style={{ fontSize: 9, color: '#64748b' }}>{label}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+      <div style={{ fontSize: 8, color, marginBottom: 1, whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ color, fontSize: 11, lineHeight: 1 }}>→</div>
     </div>
   )
 }
 
-// ─── Estilos reutilizáveis ────────────────────────────────────────
-const inputStyle = {
-  flex: 1, background: 'rgba(255,255,255,0.05)',
-  border: '1px solid #1e40af55', borderRadius: 6,
-  color: '#e2e8f0', fontSize: 12, padding: '5px 8px', outline: 'none',
+function LegendLine({ color, label, dashed }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      <svg width={20} height={8}>
+        <line x1={0} y1={4} x2={20} y2={4}
+          stroke={color} strokeWidth={dashed ? 1.5 : 2}
+          strokeDasharray={dashed ? '5,3' : undefined} />
+      </svg>
+      <span style={{ fontSize: 9, color: T.subtle }}>{label}</span>
+    </div>
+  )
 }
-const selectStyle = {
-  flex: 1, background: '#0d1526',
-  border: '1px solid #1e40af55', borderRadius: 6,
-  color: '#e2e8f0', fontSize: 12, padding: '5px 8px', outline: 'none', cursor: 'pointer',
+
+function LegendDot({ color, label, diamond }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      {diamond
+        ? <svg width={12} height={12} viewBox="-6 -6 12 12">
+            <polygon points="0,-5 5,0 0,5 -5,0" fill={color} stroke="#1a1208" strokeWidth="1.5" />
+          </svg>
+        : <div style={{ width: 9, height: 9, borderRadius: '50%', background: color, border: '1.5px solid #1a1208' }} />
+      }
+      <span style={{ fontSize: 9, color: T.subtle }}>{label}</span>
+    </div>
+  )
 }
-const primaryBtn = {
+
+// ─── Estilos inline reutilizáveis ─────────────────────────────────
+
+const inputSt = {
+  flex: 1, background: T.inputBg,
+  border: `1px solid ${T.inputBorder}`, borderRadius: 6,
+  color: T.text, fontSize: 12, padding: '5px 8px', outline: 'none',
+}
+
+const selectSt = {
+  flex: 1, background: '#1a1208',
+  border: `1px solid ${T.inputBorder}`, borderRadius: 6,
+  color: T.text, fontSize: 12, padding: '5px 8px', outline: 'none', cursor: 'pointer',
+}
+
+const primaryBtnSt = {
   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-  padding: '11px 16px', borderRadius: 10,
-  background: 'rgba(0,229,255,0.12)', border: '1.5px solid #00e5ff66',
-  color: '#00e5ff', fontSize: 13, fontWeight: 700, cursor: 'pointer', width: '100%',
+  padding: '11px 16px', borderRadius: 10, width: '100%',
+  background: T.accentHover, border: `1.5px solid ${T.accent}88`,
+  color: T.accent, fontSize: 13, fontWeight: 700, cursor: 'pointer',
   transition: 'all 0.15s',
 }
-const cancelBtn = {
-  padding: '9px 16px', borderRadius: 10,
-  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-  color: '#fca5a5', fontSize: 12, fontWeight: 600, cursor: 'pointer', width: '100%',
+
+const cancelBtnSt = {
+  padding: '9px 16px', borderRadius: 10, width: '100%',
+  background: T.dangerDim, border: `1px solid ${T.danger}33`,
+  color: '#fca5a5', fontSize: 12, fontWeight: 600, cursor: 'pointer',
 }

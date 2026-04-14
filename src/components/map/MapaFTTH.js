@@ -1089,7 +1089,7 @@ export default function MapaFTTH({
       {varinhaMode && (userRole === 'admin' || userRole === 'superadmin') && (
         <VarinhaNetworkTool
           projetoId={projetoId}
-          onSaved={({ ctos, routes }) => {
+          onSaved={({ ctos, routes, cdos }) => {
             cancelVarinhaMode()
             reloadData()
           }}

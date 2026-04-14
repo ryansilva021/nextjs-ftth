@@ -39,7 +39,7 @@ function _tipoRota(highway = '') {
  * }>>}
  */
 export async function fetchStreetsInPolygon(polygon, opts = {}) {
-  const { maxWays = 300 } = opts
+  const { maxWays = 800 } = opts
 
   // Overpass polygon: "lat1 lng1 lat2 lng2 …"  (atenção: lat antes de lng!)
   const polyStr = polygon.map(([lng, lat]) => `${lat.toFixed(6)} ${lng.toFixed(6)}`).join(' ')

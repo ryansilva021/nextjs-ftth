@@ -287,25 +287,59 @@ function _linkStyleFn(feature) {
 function _autoRouteStyle(feature) {
   const tipo = feature.get('tipo')
 
-  // Rotas de distribuição CTO↔CTO (MST) — âmbar tracejado
+  // Backbone OLT→CDO — laranja espesso sólido
+  if (tipo === 'BACKBONE') {
+    return new Style({
+      stroke: new Stroke({ color: '#ff8000', width: 4 }),
+      zIndex: 22,
+    })
+  }
+  // Distribuição CDO→CTO — roxo médio tracejado
+  if (tipo === 'DISTRIBUICAO') {
+    return new Style({
+      stroke: new Stroke({ color: '#c084fc', width: 2.5, lineDash: [8, 4] }),
+      zIndex: 21,
+    })
+  }
+  // Rotas MST CTO↔CTO (modo plano) — âmbar tracejado
   if (tipo === 'DROP') {
     return new Style({
       stroke: new Stroke({ color: '#f59e0b', width: 2, lineDash: [5, 4] }),
       zIndex: 21,
     })
   }
-  // Backbone — cyan sólido
-  if (tipo === 'BACKBONE') {
-    return new Style({
-      stroke: new Stroke({ color: '#00e5ff', width: 4, lineDash: [8, 4] }),
-      zIndex: 20,
-    })
-  }
-  // Ramal — cyan mais fino
+  // Via / infraestrutura OSM — cyan fino tracejado
   return new Style({
-    stroke: new Stroke({ color: '#22d3ee', width: 2.5, lineDash: [6, 4] }),
+    stroke: new Stroke({ color: '#22d3ee', width: 2, lineDash: [6, 4] }),
     zIndex: 19,
   })
+}
+
+/** Estilo de CDO gerado automaticamente — diamante laranja */
+function _autoCDOStyle(feature) {
+  return [
+    new Style({
+      image: new RegularShape({
+        points:  4,
+        radius:  10,
+        angle:   Math.PI / 4,
+        fill:    new Fill({ color: '#ff8000' }),
+        stroke:  new Stroke({ color: '#0f172a', width: 2 }),
+      }),
+      zIndex: 26,
+    }),
+    new Style({
+      text: new TextStyle({
+        text:     feature.get('nome') ?? '',
+        offsetY:  -18,
+        font:     'bold 9px sans-serif',
+        fill:     new Fill({ color: '#ff8000' }),
+        stroke:   new Stroke({ color: '#0f172a', width: 2 }),
+        overflow: true,
+      }),
+      zIndex: 25,
+    }),
+  ]
 }
 
 /** Estilo de CTO gerada automaticamente */
@@ -858,7 +892,7 @@ function _ensurePreviewLayers() {
     _previewSource = new VectorSource({ wrapX: false })
     _previewLayer  = new VectorLayer({
       source: _previewSource,
-      style:  (f) => f.get('_isCTO') ? _autoCTOStyle(f) : _autoRouteStyle(f),
+      style:  (f) => f.get('_isCDO') ? _autoCDOStyle(f) : f.get('_isCTO') ? _autoCTOStyle(f) : _autoRouteStyle(f),
       zIndex: 20,
     })
     _map.addLayer(_previewLayer)
@@ -881,32 +915,43 @@ export function renderPolygonPreview(coords) {
 }
 
 /**
- * Renderiza a rede gerada automaticamente (rotas neon + CTOs cyan).
- * @param {{ routes: Array, ctos: Array }} network
+ * Renderiza a rede gerada automaticamente.
+ * Suporta modo plano (routes + ctos) e modo camadas (+ cdos + backboneRoutes).
+ * @param {{ routes, ctos, cdos, backboneRoutes }} network
  */
-export function renderPreviewNetwork({ routes = [], ctos = [] } = {}) {
+export function renderPreviewNetwork({ routes = [], ctos = [], cdos = [], backboneRoutes = [], distRoutes = [] } = {}) {
   if (!_map) return
   _ensurePreviewLayers()
   _previewSource.clear()
 
-  for (const r of routes) {
+  // Todas as rotas (infra + backbone + distribuição CDO→CTO)
+  for (const r of [...routes, ...backboneRoutes, ...distRoutes]) {
     if (!r.coordinates || r.coordinates.length < 2) continue
-    const f = new Feature({
+    _previewSource.addFeature(new Feature({
       geometry: new LineString(r.coordinates.map(([lng, lat]) => fromLonLat([lng, lat]))),
       tipo:     r.tipo,
       nome:     r.nome,
-    })
-    _previewSource.addFeature(f)
+    }))
   }
 
+  // CTOs
   for (const c of ctos) {
     if (c.lat == null || c.lng == null) continue
-    const f = new Feature({
+    _previewSource.addFeature(new Feature({
       geometry: new Point(fromLonLat([c.lng, c.lat])),
       nome:     c.nome,
       _isCTO:   true,
-    })
-    _previewSource.addFeature(f)
+    }))
+  }
+
+  // CDOs (modo camadas)
+  for (const c of cdos) {
+    if (c.lat == null || c.lng == null) continue
+    _previewSource.addFeature(new Feature({
+      geometry: new Point(fromLonLat([c.lng, c.lat])),
+      nome:     c.nome ?? c.id,
+      _isCDO:   true,
+    }))
   }
 }
 

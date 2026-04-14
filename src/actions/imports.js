@@ -222,6 +222,60 @@ export async function importRotas(features, projetoId) {
 }
 
 // ---------------------------------------------------------------------------
+// POST /api/import_cdos_bulk → importCDOsBulk
+// ---------------------------------------------------------------------------
+
+/**
+ * Importa CDOs em lote (geração automática de rede em camadas).
+ * Usa o campo `id` do modelo CaixaEmendaCDO como chave única.
+ *
+ * @param {Array}  rows         — array de objetos CDO
+ * @param {string} [projetoId]
+ * @returns {Promise<{ inserted: number, modified: number, errors: Array }>}
+ */
+export async function importCDOsBulk(rows, projetoId) {
+  const session = await requireActiveEmpresa(WRITE_ROLES)
+  const { role, projeto_id: userProjeto } = session.user
+  const targetProjeto = role === 'superadmin' ? projetoId : userProjeto
+
+  if (!targetProjeto) throw new Error('projeto_id é obrigatório')
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error('rows deve ser array não-vazio')
+
+  await connectDB()
+
+  const errors = []
+  const docs   = []
+
+  for (const [i, row] of rows.entries()) {
+    if (!row.id) {
+      errors.push({ linha: i + 1, erro: 'id é obrigatório' })
+      continue
+    }
+    if (row.lat == null || row.lng == null) {
+      errors.push({ linha: i + 1, erro: 'lat e lng são obrigatórios' })
+      continue
+    }
+    docs.push({
+      id:        String(row.id).trim(),
+      nome:      row.nome  ? String(row.nome).trim()  : String(row.id).trim(),
+      tipo:      row.tipo  ? String(row.tipo).trim()  : 'CDO',
+      lat:       Number(row.lat),
+      lng:       Number(row.lng),
+      olt_id:    row.olt_id   ? String(row.olt_id).trim()  : null,
+      porta_olt: row.porta_olt != null ? Number(row.porta_olt) : null,
+    })
+  }
+
+  const result = await bulkUpsert(CaixaEmendaCDO, 'id', targetProjeto, docs)
+  result.errors.push(...errors)
+
+  revalidatePath('/')
+  revalidatePath('/admin/campo')
+
+  return result
+}
+
+// ---------------------------------------------------------------------------
 // POST /api/import_postes → importPostes
 // ---------------------------------------------------------------------------
 

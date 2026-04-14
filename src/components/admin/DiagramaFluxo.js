@@ -45,17 +45,24 @@ function mkTheme() {
     oltBg:  '#1a2840', oltBdr: '#3b82f6', oltHdr: '#93c5fd', oltHdrBg: '#1e3a5a',
     // CDO — roxo
     cdoBg:  '#221830', cdoBdr: '#a855f7', cdoHdr: '#d8b4fe', cdoHdrBg: '#2e1a48',
-    // Splitter — amber (identidade do projeto)
+    // Splitter — amber/laranja (identidade do projeto)
     splBg:  '#2e2010', splBdr: '#ff8000', splHdr: '#fcd34d', splHdrBg: '#3a280e',
     // CTO — verde
     ctoBg:  '#102210', ctoBdr: '#22c55e', ctoHdr: '#86efac', ctoHdrBg: '#143214',
-    // Panels
-    panelBg: 'rgba(42,34,24,0.97)', panelBorder: '#5a4830',
-    mmBg: '#3a2e22', mmMask: '#5a483088',
+    // Panels — borda laranja (cor do projeto)
+    panelBg: 'rgba(38,28,16,0.97)', panelBorder: '#ff800055',
+    panelAccent: '#ff8000',
+    mmBg: '#2e2010', mmMask: '#ff800022',
     // Edges
-    feeder:  { stroke: '#60a5fa', strokeWidth: 3 },
-    distrib: { stroke: '#c084fc', strokeWidth: 2 },
-    drop:    { stroke: '#4ade80', strokeWidth: 1.5 },
+    //   backbone = tronco principal OLT→CDO  (laranja espesso)
+    //   distrib  = distribuição CDO→Splitter  (roxo médio)
+    //   ramal    = ramal Splitter→CTO         (verde fino, por fibra ABNT)
+    backbone: { stroke: '#ff8000', strokeWidth: 4 },
+    distrib:  { stroke: '#c084fc', strokeWidth: 2 },
+    ramal:    { stroke: '#4ade80', strokeWidth: 1.5 },
+    // compat aliases
+    feeder: { stroke: '#ff8000', strokeWidth: 4 },
+    drop:   { stroke: '#4ade80', strokeWidth: 1.5 },
   }
 }
 
@@ -745,8 +752,19 @@ function buildGraph(topologia, T) {
   const allCaixas = topologia[0]._allCaixas ?? []
 
   let ei = 0
+  // edgeKind: 'backbone' | 'distrib' | 'ramal' | 'cascade'
+  // backbone → smoothstep (trajetória reta, sem curvas cruzadas no tronco)
+  // distrib  → default/bezier (curva suave CDO→SPL)
+  // ramal    → smoothstep (roteamento ortogonal evita cruzamentos nos ramais)
+  // cascade  → step
   function edge(src, tgt, style, opts = {}) {
-    edges.push({ id: `e${ei++}`, source: src, target: tgt, style, type: 'default', ...opts })
+    const kind = opts._kind ?? 'ramal'
+    delete opts._kind
+    const type = kind === 'backbone' ? 'smoothstep'
+               : kind === 'distrib'  ? 'default'
+               : kind === 'cascade'  ? 'step'
+               : 'smoothstep'   // ramal: ortogonal = sem cruzamentos
+    edges.push({ id: `e${ei++}`, source: src, target: tgt, style, type, _kind: kind, ...opts })
   }
 
   function lookupCTO(id) {
@@ -883,6 +901,7 @@ function buildGraph(topologia, T) {
       edge(prevNodeId, `cto-${cKey}`,
         { ...T.drop, stroke: outHex, strokeWidth: 1.5, strokeDasharray: '6,3' },
         {
+          _kind: 'cascade',
           sourceHandle: srcHandle, targetHandle: 'in',
           label: `F${outFibra}`,
           labelStyle:   { fill: outHex, fontSize: 9, fontWeight: 700 },
@@ -940,6 +959,7 @@ function buildGraph(topologia, T) {
         edge(nodeId, `cto-${targetKey}`,
           { ...T.drop, stroke: fHex, strokeWidth: 1.5, strokeDasharray: '6,3' },
           {
+            _kind: 'cascade',
             sourceHandle: srcHandle, targetHandle: 'in',
             ...(outFibra != null ? {
               label: `F${outFibra}`,
@@ -985,7 +1005,10 @@ function buildGraph(topologia, T) {
 
     // Edge: parent → CDO — PON label só faz sentido quando vem diretamente da OLT
     const ponLabel = parentSrcHandle === 'out' && entrada?.pon != null ? `PON ${entrada.pon}` : undefined
+    // OLT→CDO = backbone; CDO→CDO cascata = distrib
+    const isBackbone = parentId.startsWith('olt-')
     edge(parentId, cdoId, parentStyle, {
+      _kind: isBackbone ? 'backbone' : 'distrib',
       sourceHandle: parentSrcHandle, targetHandle: 'in',
       ...(ponLabel ? {
         label: ponLabel,
@@ -1035,6 +1058,7 @@ function buildGraph(topologia, T) {
       const fLabel    = splFibra != null ? `F${splFibra}` : undefined
       const eStyle    = { ...T.distrib, stroke: splHex || T.distrib.stroke }
       edge(cdoId, splNodeId, eStyle, {
+        _kind: 'distrib',
         sourceHandle: srcHandle, targetHandle: 'in',
         ...(fLabel ? {
           label: fLabel,
@@ -1084,13 +1108,13 @@ function buildGraph(topologia, T) {
                 data: { T, nome: s.obs?.trim() || `CDO ${s.cto_id}`, tipo: 'CDO', entrada: {}, bandejas: [], ponFusoes: [] },
               })
               edge(splNodeId, `cdo-${cdoKey}`, eStyle,
-                { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+                { _kind: 'ramal', sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
               )
             }
           } else {
             // CDO já no grafo — adiciona apenas a aresta deste splitter
             edge(splNodeId, `cdo-${cdoKey}`, eStyle,
-              { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+              { _kind: 'ramal', sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
             )
           }
           continue
@@ -1108,7 +1132,7 @@ function buildGraph(topologia, T) {
           }
           edge(splNodeId, miscId,
             { ...T.drop, stroke: portaHex, strokeWidth: 1.5, strokeDasharray: '5,3' },
-            { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+            { _kind: 'ramal', sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
           )
           continue
         }
@@ -1129,7 +1153,7 @@ function buildGraph(topologia, T) {
           }
           edge(splNodeId, ponId,
             { ...T.drop, stroke: portaHex, strokeWidth: 1.5 },
-            { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+            { _kind: 'ramal', sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
           )
 
           // ── Continuação PON: CTOs conectadas em série a partir do nó PON ──
@@ -1158,7 +1182,7 @@ function buildGraph(topologia, T) {
             }
             edge(ponPrevId, `cto-${cKey}`,
               { ...T.drop, stroke: outHex, strokeWidth: 1.5, strokeDasharray: '6,3' },
-              { sourceHandle: 'out', targetHandle: 'in',
+              { _kind: 'cascade', sourceHandle: 'out', targetHandle: 'in',
                 label: `F${outFibra}`,
                 labelStyle:   { fill: outHex, fontSize: 9, fontWeight: 700 },
                 labelBgStyle: { fill: T.ctoBg + 'cc', borderRadius: 3 },
@@ -1184,7 +1208,7 @@ function buildGraph(topologia, T) {
           }
           edge(splNodeId, conId,
             { ...T.drop, stroke: portaHex, strokeWidth: 1.5, strokeDasharray: '4,3' },
-            { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+            { _kind: 'ramal', sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
           )
           continue
         }
@@ -1214,7 +1238,7 @@ function buildGraph(topologia, T) {
 
         edge(splNodeId, `cto-${ctoKey}`,
           { ...T.drop, stroke: portaHex, strokeWidth: 2 },
-          { sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+          { _kind: 'ramal', sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
         )
 
         // ── Cascata via ctos_cascata (pré-mapa global) ──
@@ -1254,6 +1278,7 @@ function buildGraph(topologia, T) {
         edge(cdoId, `cto-${ctoKey}`,
           { ...T.drop, stroke: fHex, strokeWidth: 1.5 },
           {
+            _kind: 'ramal',
             sourceHandle: 'out', targetHandle: 'in',
             ...(outFibra != null ? {
               label: `F${outFibra}`,
@@ -1533,10 +1558,10 @@ function dagreLayout(nodes, edges) {
 function LegendPanel({ T }) {
   const [open, setOpen] = useState(false)
   const links = [
-    { label: 'OLT→CDO',  color: T.feeder.stroke,  w: 3,   dash: '' },
-    { label: 'CDO→SPL',  color: T.distrib.stroke, w: 2,   dash: '' },
-    { label: 'SPL→CTO',  color: T.drop.stroke,    w: 1.5, dash: '' },
-    { label: 'Cascata',  color: T.drop.stroke,    w: 1.5, dash: '5,3' },
+    { label: 'Backbone (OLT→CDO)',    color: T.feeder.stroke,  w: 3,   dash: '' },
+    { label: 'Distribuição (CDO→SPL)', color: T.distrib.stroke, w: 2,   dash: '' },
+    { label: 'Ramal (SPL→CTO)',        color: T.drop.stroke,    w: 1.5, dash: '' },
+    { label: 'Cascata (CTO→CTO)',      color: T.drop.stroke,    w: 1.5, dash: '5,3' },
   ]
   return (
     <div style={{
@@ -1964,7 +1989,7 @@ function DiagramaFluxoInner({ projetoId }) {
 
   const btnStyle = {
     padding: '7px 14px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-    border: `1px solid ${T.panelBorder}`, background: T.panelBg,
+    border: `1px solid ${T.panelAccent}55`, background: T.panelBg,
     color: T.text, backdropFilter: 'blur(4px)',
     display: 'flex', alignItems: 'center', gap: 5,
   }
@@ -2141,13 +2166,14 @@ function DiagramaFluxoInner({ projetoId }) {
                   Tipos de enlace
                 </div>
                 {[
-                  { label: 'Feeder — OLT → CDO',       color: T.feeder.stroke,  w: 3 },
-                  { label: 'Distribuição — CDO → SPL',  color: T.distrib.stroke, w: 2 },
-                  { label: 'Drop — SPL → CTO',          color: T.drop.stroke,    w: 1.5 },
+                  { label: 'Backbone — OLT → CDO',      color: T.feeder.stroke,  w: 3 },
+                  { label: 'Distribuição — CDO → SPL',   color: T.distrib.stroke, w: 2 },
+                  { label: 'Ramal — SPL → CTO',          color: T.drop.stroke,    w: 1.5 },
+                  { label: 'Cascata — CTO → CTO',        color: T.drop.stroke,    w: 1.5, dash: '5,3' },
                 ].map(it => (
                   <div key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                     <svg width={36} height={12} style={{ flexShrink: 0 }}>
-                      <line x1={0} y1={6} x2={36} y2={6} stroke={it.color} strokeWidth={it.w} />
+                      <line x1={0} y1={6} x2={36} y2={6} stroke={it.color} strokeWidth={it.w} strokeDasharray={it.dash || undefined} />
                     </svg>
                     <span style={{ fontSize: 14, color: T.text }}>{it.label}</span>
                   </div>
