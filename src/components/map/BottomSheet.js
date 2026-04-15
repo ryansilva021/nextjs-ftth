@@ -279,8 +279,8 @@ function OLTContent({ data, isAdmin, isNoc, onAction, onIrAte, isDark }) {
     return () => { cancelled = true }
   }, [oltId])
 
-  function openNoc() {
-    window.location.href = `/admin/noc?olt_id=${encodeURIComponent(oltId)}`
+  function openTopologia() {
+    window.location.href = `/admin/topologia`
   }
 
   const muted     = '#271204'
@@ -413,9 +413,9 @@ function OLTContent({ data, isAdmin, isNoc, onAction, onIrAte, isDark }) {
 
       {/* Action buttons */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {/* NOC — available to admin and noc role */}
+        {/* Topologia — available to admin and noc role */}
         {(isAdmin || isNoc) && (
-          <ActBtn onClick={openNoc} color="#0f0701" bg="rgba(14,165,233,0.22)" border="rgba(14,165,233,0.55)" icon="📡" label="Abrir no NOC" full />
+          <ActBtn onClick={openTopologia} color="#0f0701" bg="rgba(14,165,233,0.22)" border="rgba(14,165,233,0.55)" icon="🌐" label="Ver Topologia" full />
         )}
         {onIrAte && (
           <ActBtn onClick={onIrAte} color="#0f0701" bg="rgba(14,165,233,0.22)" border="rgba(14,165,233,0.55)" icon="🧭" label="Ir Até" />

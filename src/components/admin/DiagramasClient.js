@@ -600,9 +600,10 @@ function EditorModal({ title, onClose, children }) {
 // ---------------------------------------------------------------------------
 export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, tabInicial, idInicial, userRole }) {
   const readOnly = userRole === 'tecnico'
-  const [aba, setAba] = useState(tabInicial ?? 'olts')
+  const [aba, setAba] = useState(tabInicial ?? 'topologia')
   const [ctoModal, setCTOModal]     = useState(null)   // CTO aberta no modal
   const [cdoModal, setCDOModal]     = useState(null)   // CDO/CE aberta no modal
+  const [fabAberto, setFabAberto]   = useState(false)  // Menu FAB mobile
 
   // Auto-seleciona item se veio via URL (ex: clique no mapa)
   useEffect(() => {
@@ -619,8 +620,103 @@ export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, ta
 
   const idCDOModal = cdoModal ? (cdoModal.ce_id ?? cdoModal.id ?? '') : ''
 
+  function irParaAba(novaAba) {
+    setAba(novaAba)
+    setFabAberto(false)
+  }
+
   return (
     <div style={S.container}>
+      {/* ── Mobile: overlay full-screen quando em topologia ── */}
+      {aba === 'topologia' && (
+        <div className="lg:hidden fixed top-[52px] inset-x-0 bottom-0 z-40" style={{ backgroundColor: 'var(--background)' }}>
+          <DiagramaFluxo projetoId={projetoId} altura="100%" />
+
+          {/* FAB Camadas */}
+          <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 50 }}>
+            <button
+              onClick={() => setFabAberto(p => !p)}
+              style={{
+                width: 44, height: 44, borderRadius: 12,
+                background: 'linear-gradient(135deg,#0284c7,#0369a1)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                boxShadow: '0 4px 14px rgba(2,132,199,0.5)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: '#fff',
+              }}
+              aria-label="Menu de camadas"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                <polyline points="2 17 12 22 22 17"/>
+                <polyline points="2 12 12 17 22 12"/>
+              </svg>
+            </button>
+
+            {/* Menu popup */}
+            {fabAberto && (
+              <div style={{
+                position: 'absolute', top: 52, right: 0,
+                background: 'var(--card-bg)', border: '1px solid var(--border-color)',
+                borderRadius: 12, padding: '6px', minWidth: 180,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              }}>
+                {[
+                  { key: 'olts',  label: 'OLTs',       icon: '🔌', count: olts.length },
+                  { key: 'cdos',  label: 'CEO / CDOs', icon: '📦', count: caixas.length },
+                  { key: 'ctos',  label: 'CTOs',        icon: '📡', count: ctos.length },
+                ].map(item => (
+                  <button
+                    key={item.key}
+                    onClick={() => irParaAba(item.key)}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 12px', borderRadius: 8, border: 'none',
+                      background: 'transparent', cursor: 'pointer', textAlign: 'left',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(2,132,199,0.12)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <span style={{ fontSize: 16 }}>{item.icon}</span>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--foreground)' }}>{item.label}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', backgroundColor: 'var(--border-color)', padding: '2px 8px', borderRadius: 10 }}>{item.count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Fechar FAB ao clicar fora */}
+          {fabAberto && (
+            <div style={{ position: 'absolute', inset: 0, zIndex: 49 }} onClick={() => setFabAberto(false)} />
+          )}
+        </div>
+      )}
+
+      {/* ── Mobile: botão voltar ao mapa quando em outras abas ── */}
+      {aba !== 'topologia' && (
+        <div className="lg:hidden flex items-center gap-3 mb-4">
+          <button
+            onClick={() => irParaAba('topologia')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 12, fontWeight: 600,
+              color: '#38bdf8', background: 'rgba(56,189,248,0.08)',
+              border: '1px solid rgba(56,189,248,0.25)',
+              borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Ver Mapa
+          </button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>
+            { aba === 'olts' ? 'OLTs' : aba === 'cdos' ? 'CEO / CDOs' : 'CTOs' }
+          </span>
+        </div>
+      )}
+
       {/* Modal CTO */}
       {ctoModal && (
         <EditorModal
@@ -656,8 +752,8 @@ export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, ta
         </EditorModal>
       )}
 
-      {/* Abas */}
-      <div style={S.tabBar}>
+      {/* Abas — visível apenas no desktop */}
+      <div className="hidden lg:flex" style={S.tabBar}>
         <button style={aba === 'topologia' ? S.tabAtiva : S.tabInativa}
           onClick={() => setAba('topologia')}>
           🗺 Topologia
@@ -676,9 +772,9 @@ export default function DiagramasClient({ ctos, caixas, olts = [], projetoId, ta
         </button>
       </div>
 
-      {/* Aba Topologia */}
+      {/* Aba Topologia — desktop apenas (mobile usa overlay acima) */}
       {aba === 'topologia' && (
-        <div style={{ height: 'calc(100vh - 220px)', minHeight: 480, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+        <div className="hidden lg:block" style={{ height: 'calc(100vh - 220px)', minHeight: 480, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
           <DiagramaFluxo projetoId={projetoId} altura="100%" />
         </div>
       )}

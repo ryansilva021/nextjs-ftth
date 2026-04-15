@@ -16,9 +16,6 @@ const GROUPS = { public: 0, staff: 1, admin: 2, superadmin: 3 }
 const NAV_ITEMS = [
   { href: '/',                     label: 'Mapa',              icon: '🗺️', group: GROUPS.public  },
 
-  // NOC (apenas role noc/admin)
-  { href: '/admin/noc',            label: 'NOC',               icon: '🖥️', perm: PERM.ACCESS_NOC,          group: GROUPS.staff },
-
   // Visão de rede
   { href: '/admin/topologia', label: 'Topologia', icon: '🌐', perm: PERM.VIEW_TOPOLOGY, group: GROUPS.staff },
   { href: '/admin/campo',     label: 'Campo',      icon: '📡', perm: PERM.VIEW_FIELD,   group: GROUPS.staff },
@@ -203,35 +200,32 @@ export default function SidebarLayout({ session, children }) {
             borderBottom: "1px solid var(--sidebar-border)",
             flexShrink: 0,
           }}
-          className="sticky top-0 z-[60] flex items-center justify-between px-4 py-3 lg:hidden"
+          className="sticky top-0 z-[60] flex items-center px-4 py-3 lg:hidden relative"
         >
+          {/* Esquerda: hambúrguer */}
           <button
             onClick={() => setAberta(prev => !prev)}
-            className="text-slate-400 hover:text-white p-1"
+            className="text-slate-400 hover:text-white p-1 z-10"
             aria-label={aberta ? 'Fechar menu' : 'Abrir menu'}
           >
             {aberta ? (
-              // X (fechar)
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             ) : (
-              // Hambúrguer
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             )}
           </button>
-          <span style={{ color: 'var(--foreground)' }} className="text-sm font-bold">FiberOps</span>
-          {/* Badge de role no header mobile */}
-          <span style={{
-            fontSize: 10, fontWeight: 600,
-            padding: '2px 8px', borderRadius: 99,
-            color: roleColor.color, backgroundColor: roleColor.bg,
-            border: `1px solid ${roleColor.border}`,
-          }}>
-            {roleLabel}
+
+          {/* Centro: apenas FiberOps centralizado */}
+          <span className="absolute left-1/2 -translate-x-1/2 text-sm font-bold" style={{ color: 'var(--foreground)' }}>
+            FiberOps
           </span>
+
+          {/* Direita: espaço reservado para simetria */}
+          <div className="ml-auto w-7" />
         </header>
 
         {/* Conteúdo */}

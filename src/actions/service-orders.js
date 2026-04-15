@@ -16,6 +16,7 @@ import { connectDB } from '@/lib/db'
 import { requireActiveEmpresa } from '@/lib/tenant-guard'
 import { ALL_ROLES, WRITE_ROLES } from '@/lib/auth'
 import { ServiceOrder } from '@/models/ServiceOrder'
+import osEmitter from '@/lib/os-events'
 
 // Pode executar/atualizar OS (técnicos de campo)
 const TECNICO_UP   = ['superadmin', 'admin', 'tecnico']
@@ -125,7 +126,19 @@ export async function createOS(data) {
   })
 
   revalidatePath('/admin/os')
-  return { ...os.toObject(), _id: os._id.toString() }
+
+  // Broadcast real-time notification to SSE clients in the same project
+  const osObj = os.toObject()
+  osEmitter.emit('nova-os', {
+    projeto_id,
+    os_id:       osObj.os_id,
+    cliente_nome: osObj.cliente_nome,
+    tipo:         osObj.tipo,
+    status:       osObj.status,
+    criado_em:    osObj.data_abertura?.toISOString() ?? new Date().toISOString(),
+  })
+
+  return { ...osObj, _id: os._id.toString() }
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +259,6 @@ export async function concludeInstallation(osId, { serial, cliente, oltId, ponPo
   if (!os) throw new Error('OS não encontrada')
 
   revalidatePath('/admin/os')
-  revalidatePath('/admin/noc')
   return { os: { ...os, _id: os._id.toString() }, provResult }
 }
 

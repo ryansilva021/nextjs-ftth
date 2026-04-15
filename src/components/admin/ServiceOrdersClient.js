@@ -21,9 +21,15 @@ const GLOBAL_STYLES = `
 .os-copy-btn:hover   { background:#1d4ed855 !important; color:#93c5fd !important; }
 .os-action-btn:hover { opacity:0.82 !important; transform:translateY(-1px); }
 .os-mat-row:hover    { background:#ffffff09 !important; }
-@media (max-width:768px) {
-  .os-table-wrap { display:none }
-  .os-cards-wrap { display:flex; flex-direction:column; gap:10px }
+@media (max-width:1024px) {
+  .os-table-wrap  { display:none }
+  .os-cards-wrap  { display:flex; flex-direction:column; gap:8px }
+  .os-desktop-only { display:none !important }
+  .os-mobile-toolbar { display:flex !important }
+  .os-status-tabs { overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; flex-wrap:nowrap !important; gap:6px !important; padding-bottom:2px }
+  .os-status-tabs::-webkit-scrollbar { display:none }
+  .os-status-tabs button { padding:5px 12px !important; font-size:11px !important; white-space:nowrap; flex-shrink:0 }
+  .os-detail-panel { top: 52px !important }
 }
 `
 
@@ -445,33 +451,57 @@ function KanbanCard({ os, onOpen }) {
 // ─── Mobile Card ───────────────────────────────────────────────────────────────
 
 function MobileCard({ os, onOpen }) {
-  const pm = PRIO_META[os.prioridade]
-  const strip = pm?.strip && pm.strip !== 'transparent' ? pm.strip : 'transparent'
+  const sm = STATUS_META[os.status] ?? STATUS_META.aberta
+  const tm = TIPO_META[os.tipo]
+  const isUrgente = os.prioridade === 'urgente' || os.prioridade === 'alta'
   return (
     <div
       onClick={() => onOpen(os)}
       style={{
-        background: 'var(--card-bg)', border: '1px solid var(--border-color)',
+        background: 'var(--card-bg)',
+        border: `1px solid var(--border-color)`,
+        borderLeft: `3px solid ${sm.color}`,
         borderRadius: 10, padding: '12px 14px', cursor: 'pointer',
-        borderLeft: strip !== 'transparent' ? `4px solid ${strip}` : '1px solid var(--border-color)',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: STATUS_META[os.status]?.color }}>{os.os_id}</div>
-          <div style={{ marginTop: 4 }}><TipoBadge tipo={os.tipo} /></div>
-        </div>
+      {/* Linha 1: cliente + status */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--foreground)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {os.cliente_nome ?? '—'}
+        </span>
         <StatusBadge status={os.status} />
       </div>
-      <div style={{ marginTop: 8, fontSize: 13, color: 'var(--foreground)', fontWeight: 500 }}>{os.cliente_nome ?? '—'}</div>
-      {os.tecnico_nome && (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-          🔧 {os.tecnico_nome}{os.auxiliar_nome ? ` + ${os.auxiliar_nome}` : ''}
-        </div>
-      )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, alignItems: 'center' }}>
-        <PrioBadge prioridade={os.prioridade} />
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{fmtDate(os.data_abertura)}</span>
+
+      {/* Linha 2: tipo + endereço */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
+        <span style={{ fontSize: 12, color: tm?.color ?? 'var(--text-muted)', fontWeight: 600 }}>
+          {tm?.icon} {tm?.label ?? os.tipo}
+        </span>
+        {os.cliente_endereco && (
+          <>
+            <span style={{ color: 'var(--border-color)', fontSize: 10 }}>·</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+              {os.cliente_endereco}
+            </span>
+          </>
+        )}
+      </div>
+
+      {/* Linha 3: técnico + data + urgente */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+        {os.tecnico_nome ? (
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            🔧 {os.tecnico_nome}
+          </span>
+        ) : (
+          <span style={{ fontSize: 11, color: '#ef444488', flex: 1 }}>Sem técnico</span>
+        )}
+        {isUrgente && (
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', background: '#ef444415', border: '1px solid #ef444430', borderRadius: 4, padding: '1px 6px' }}>
+            {os.prioridade === 'urgente' ? 'URGENTE' : 'ALTA'}
+          </span>
+        )}
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{fmtDate(os.data_abertura)}</span>
       </div>
     </div>
   )
@@ -479,11 +509,11 @@ function MobileCard({ os, onOpen }) {
 
 // ─── Create Modal ──────────────────────────────────────────────────────────────
 
-function CreateModal({ onClose, onCreated, olts, userRole }) {
+function CreateModal({ onClose, onCreated, olts, userRole, usuarios = [] }) {
   const [form, setForm] = useState({
     tipo: 'instalacao', prioridade: 'normal',
     cliente_nome: '', cliente_contato: '', cliente_endereco: '',
-    tecnico_nome: '', auxiliar_nome: '',
+    tecnico_nome: '', tecnico_id: '', auxiliar_nome: '', auxiliar_id: '',
     olt_id: '', pon: '', cto_id: '', porta_cto: '',
     onu_serial: '', descricao: '', data_agendamento: '',
   })
@@ -522,7 +552,7 @@ function CreateModal({ onClose, onCreated, olts, userRole }) {
   )
 
   return (
-    <div style={{
+    <div className="os-detail-panel" style={{
       position: 'fixed', inset: 0, zIndex: 1000,
       background: 'rgba(0,0,0,0.7)', display: 'flex',
       alignItems: 'center', justifyContent: 'center', padding: 16,
@@ -616,11 +646,33 @@ function CreateModal({ onClose, onCreated, olts, userRole }) {
             <div style={ROW2}>
               <div style={COL}>
                 <label style={LBL}>Técnico Responsável</label>
-                <input style={INP} value={form.tecnico_nome} onChange={e => set('tecnico_nome', e.target.value)} placeholder="Nome do técnico" />
+                {usuarios.length > 0 ? (
+                  <select style={INP} value={form.tecnico_id} onChange={e => {
+                    const u = usuarios.find(u => u._id === e.target.value || u.username === e.target.value)
+                    set('tecnico_id', e.target.value)
+                    set('tecnico_nome', u ? (u.nome_completo || u.username) : '')
+                  }}>
+                    <option value="">— Nenhum —</option>
+                    {usuarios.map(u => { const n = u.nome_completo || u.username; return <option key={u._id} value={u._id ?? u.username}>{n}</option> })}
+                  </select>
+                ) : (
+                  <input style={INP} value={form.tecnico_nome} onChange={e => set('tecnico_nome', e.target.value)} placeholder="Nome do técnico" />
+                )}
               </div>
               <div style={COL}>
                 <label style={LBL}>Auxiliar / Ajudante</label>
-                <input style={INP} value={form.auxiliar_nome} onChange={e => set('auxiliar_nome', e.target.value)} placeholder="Nome do auxiliar" />
+                {usuarios.length > 0 ? (
+                  <select style={INP} value={form.auxiliar_id} onChange={e => {
+                    const u = usuarios.find(u => u._id === e.target.value || u.username === e.target.value)
+                    set('auxiliar_id', e.target.value)
+                    set('auxiliar_nome', u ? (u.nome_completo || u.username) : '')
+                  }}>
+                    <option value="">— Nenhum —</option>
+                    {usuarios.map(u => { const n = u.nome_completo || u.username; return <option key={u._id} value={u._id ?? u.username}>{n}</option> })}
+                  </select>
+                ) : (
+                  <input style={INP} value={form.auxiliar_nome} onChange={e => set('auxiliar_nome', e.target.value)} placeholder="Nome do auxiliar" />
+                )}
               </div>
             </div>
 
@@ -1148,7 +1200,7 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
   const hasConexao = !!(conexaoForm.login || conexaoForm.ip || conexaoForm.mac || os.onu_serial)
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 900, display: 'flex' }}>
+    <div className="os-detail-panel" style={{ position: 'fixed', inset: 0, zIndex: 900, display: 'flex' }}>
       <div onClick={onClose} style={{ flex: 1, background: 'rgba(0,0,0,0.55)' }} />
 
       <div style={{
@@ -1711,6 +1763,31 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
     setSelectedOS(null)
   }
 
+  // ── SSE: real-time OS notifications ──────────────────────────────────────
+  const [sseToasts, setSseToasts] = useState([])
+  const myOsIds = useRef(new Set((initialItems ?? []).map(o => o.os_id)))
+
+  useEffect(() => {
+    let es
+    try {
+      es = new EventSource('/api/os-events')
+      es.addEventListener('message', (e) => {
+        try {
+          const event = JSON.parse(e.data)
+          if (!event.os_id || myOsIds.current.has(event.os_id)) return
+          myOsIds.current.add(event.os_id)
+          const id = Date.now()
+          setSseToasts(p => [...p, { id, ...event }])
+          setTimeout(() => setSseToasts(p => p.filter(t => t.id !== id)), 6000)
+          // Auto-refresh the list
+          reload()
+        } catch (_) {}
+      })
+    } catch (_) {}
+    return () => { try { es?.close() } catch (_) {} }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ── Toggle filter helpers ──
   function toggleStatus(s) { setFilterStatus(p => p === s ? '' : s) }
   function toggleTipo(k)   { setFilterTipo(p => p === k ? '' : k) }
@@ -1722,9 +1799,40 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
       {/* Inject global animations */}
       <style>{GLOBAL_STYLES}</style>
 
-      {/* ── SGP Stats Strip ── */}
+      {/* ── SSE Toast Notifications ── */}
+      {sseToasts.length > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+          display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 340,
+        }}>
+          {sseToasts.map(t => (
+            <div key={t.id} style={{
+              background: 'linear-gradient(135deg,#1e3a5f,#0f172a)',
+              border: '1px solid #3b82f6',
+              borderLeft: '4px solid #3b82f6',
+              borderRadius: 12, padding: '12px 16px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+              animation: 'fadeInUp 0.3s ease',
+              color: 'var(--foreground)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 16 }}>{TIPO_META[t.tipo]?.icon ?? '📋'}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa' }}>Nova OS — {TIPO_META[t.tipo]?.label ?? t.tipo}</span>
+                <button
+                  onClick={() => setSseToasts(p => p.filter(x => x.id !== t.id))}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
+                >✕</button>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{t.cliente_nome ?? '—'}</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{t.os_id}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── SGP Stats Strip — desktop only ── */}
       {stats && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        <div className="os-desktop-only" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
           {STATS_STRIP.map(({ key, status, label, color }) => (
             <button
               key={key}
@@ -1753,7 +1861,7 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
       )}
 
       {/* ── SGP Status Tabs ── */}
-      <div style={{
+      <div className="os-status-tabs" style={{
         display: 'flex', gap: 4, flexWrap: 'wrap',
         marginBottom: 16,
         borderBottom: '1px solid var(--border-color)',
@@ -1783,9 +1891,32 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
         })}
       </div>
 
-      {/* ── Toolbar ── */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
-        {/* Search */}
+      {/* ── Toolbar mobile (busca + nova OS) ── */}
+      <div className="os-mobile-toolbar" style={{ display: 'none', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+        <input
+          placeholder="Buscar cliente ou OS..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{
+            flex: 1, minWidth: 0,
+            background: 'var(--inp-bg)', border: '1px solid var(--border-color)',
+            borderRadius: 8, padding: '9px 12px', color: 'var(--foreground)', fontSize: 14,
+          }}
+        />
+        {canCreate && (
+          <button
+            onClick={() => setShowCreate(true)}
+            style={{
+              padding: '9px 16px', borderRadius: 8, border: 'none',
+              background: '#3b82f6', color: '#fff', cursor: 'pointer',
+              fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+          >+ Nova</button>
+        )}
+      </div>
+
+      {/* ── Toolbar desktop ── */}
+      <div className="os-desktop-only" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
         <input
           placeholder="Buscar OS, cliente, tecnico, serial..."
           value={search}
@@ -1796,88 +1927,52 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
             borderRadius: 7, padding: '7px 12px', color: 'var(--foreground)', fontSize: 13,
           }}
         />
-
-        {/* Tipo chip filters */}
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {Object.entries(TIPO_META).map(([k, v]) => (
-            <button
-              key={k}
-              onClick={() => toggleTipo(k)}
-              style={{
-                padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
-                border: `1px solid ${filterTipo === k ? v.color : 'var(--border-color)'}`,
-                background: filterTipo === k ? `${v.color}22` : 'transparent',
-                color: filterTipo === k ? v.color : 'var(--text-muted)',
-                fontWeight: filterTipo === k ? 700 : 400,
-                transition: 'all 0.12s',
-              }}
-            >{v.icon} {v.label}</button>
+            <button key={k} onClick={() => toggleTipo(k)} style={{
+              padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+              border: `1px solid ${filterTipo === k ? v.color : 'var(--border-color)'}`,
+              background: filterTipo === k ? `${v.color}22` : 'transparent',
+              color: filterTipo === k ? v.color : 'var(--text-muted)',
+              fontWeight: filterTipo === k ? 700 : 400, transition: 'all 0.12s',
+            }}>{v.icon} {v.label}</button>
           ))}
         </div>
-
-        {/* View toggle */}
-        <div style={{
-          display: 'flex', border: '1px solid var(--border-color)',
-          borderRadius: 7, overflow: 'hidden', flexShrink: 0,
-        }}>
+        <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 7, overflow: 'hidden', flexShrink: 0 }}>
           {[['list', '≡ Lista'], ['kanban', '⬛ Kanban']].map(([v, label]) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              style={{
-                padding: '6px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                border: 'none',
-                background: view === v ? '#3b82f6' : 'transparent',
-                color: view === v ? '#fff' : 'var(--text-muted)',
-                transition: 'all 0.12s',
-              }}
-            >{label}</button>
+            <button key={v} onClick={() => setView(v)} style={{
+              padding: '6px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
+              background: view === v ? '#3b82f6' : 'transparent',
+              color: view === v ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s',
+            }}>{label}</button>
           ))}
         </div>
-
-        {/* Reload */}
-        <button
-          onClick={reload}
-          disabled={loading}
-          title="Recarregar"
-          style={{
-            padding: '6px 11px', borderRadius: 7, border: '1px solid var(--border-color)',
-            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 15,
-            flexShrink: 0,
-          }}
-        >
-          <span style={{ display: 'inline-block', animation: loading ? 'spin 0.8s linear infinite' : 'none' }}>
-            ↻
-          </span>
+        <button onClick={reload} disabled={loading} title="Recarregar" style={{
+          padding: '6px 11px', borderRadius: 7, border: '1px solid var(--border-color)',
+          background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 15, flexShrink: 0,
+        }}>
+          <span style={{ display: 'inline-block', animation: loading ? 'spin 0.8s linear infinite' : 'none' }}>↻</span>
         </button>
-
-        {/* New OS */}
         {canCreate && (
-          <button
-            onClick={() => setShowCreate(true)}
-            style={{
-              padding: '7px 18px', borderRadius: 7, border: 'none',
-              background: '#3b82f6', color: '#fff', cursor: 'pointer',
-              fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
-            }}
-          >+ Nova OS</button>
+          <button onClick={() => setShowCreate(true)} style={{
+            padding: '7px 18px', borderRadius: 7, border: 'none',
+            background: '#3b82f6', color: '#fff', cursor: 'pointer',
+            fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
+          }}>+ Nova OS</button>
         )}
       </div>
 
-      {/* ── Result count ── */}
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* ── Result count — desktop only ── */}
+      <div className="os-desktop-only" style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
         <span>
           {filtered.length} {filtered.length === 1 ? 'ordem de servico' : 'ordens de servico'}
           {filtered.length !== total && ` (de ${total} carregadas)`}
         </span>
         {hasFilters && (
-          <button
-            onClick={() => { setFilterStatus(''); setFilterTipo(''); setSearch('') }}
-            style={{
-              fontSize: 11, color: '#3b82f6', background: 'none',
-              border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0,
-            }}
-          >Limpar filtros</button>
+          <button onClick={() => { setFilterStatus(''); setFilterTipo(''); setSearch('') }} style={{
+            fontSize: 11, color: '#3b82f6', background: 'none',
+            border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0,
+          }}>Limpar filtros</button>
         )}
       </div>
 
@@ -2084,6 +2179,7 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
           onCreated={handleCreated}
           olts={olts}
           userRole={userRole}
+          usuarios={usuarios}
         />
       )}
 

@@ -39,8 +39,8 @@ export default async function OSPage() {
   }
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4, flexWrap: 'wrap' }}>
+    <div className="lg:p-6 p-3">
+      <div className="hidden lg:flex" style={{ alignItems: 'center', gap: 12, marginBottom: 4, flexWrap: 'wrap' }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>
           Ordens de Serviço
         </h1>
@@ -53,7 +53,7 @@ export default async function OSPage() {
           OS · Fluxo FTTH
         </span>
       </div>
-      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+      <p className="hidden lg:block" style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
         Instalações, manutenções e suporte técnico · {session?.user?.projeto_nome ?? session?.user?.projeto_id}
       </p>
 

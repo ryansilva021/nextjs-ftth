@@ -101,7 +101,6 @@ export const authConfig = {
 
       // Mapa de rotas → roles permitidos (sem depender de DB, só JWT)
       const ROUTE_ROLES = {
-        '/admin/noc':       ['superadmin', 'admin', 'noc'],
         '/admin/campo':     ['superadmin', 'admin'],
         '/admin/diagramas': ['superadmin', 'admin', 'tecnico'],
         '/admin/topologia': ['superadmin', 'admin', 'tecnico', 'noc'],

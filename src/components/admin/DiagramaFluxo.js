@@ -22,7 +22,7 @@ import { ABNT, abntHex } from '@/lib/topologia-ftth'
 function useMobile() {
   const [mobile, setMobile] = useState(false)
   useEffect(() => {
-    const check = () => setMobile(window.innerWidth < 768)
+    const check = () => setMobile(window.innerWidth < 1024)
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
@@ -498,13 +498,9 @@ function CTONode({ data }) {
       animation: cheio ? 'cto-glow 1.6s ease-in-out infinite' : undefined,
     }}>
       <Handle type="target" position={Position.Left} id="in"
-        style={{ ...HANDLE_BASE, background: alertC, left: -6 }} />
-      {/* Generic out handle — hidden when bandeja-specific handles exist */}
+        style={{ ...HANDLE_BASE, background: alertC, left: -6, opacity: ocupacao > 0 ? 0 : 1 }} />
       <Handle type="source" position={Position.Right} id="out"
-        style={{
-          ...HANDLE_BASE, background: alertC, right: -6,
-          opacity: bandejas.some(b => (b.fusoes ?? []).some(f => f.tipo !== 'livre')) ? 0 : 1,
-        }} />
+        style={{ ...HANDLE_BASE, background: 'transparent', border: 'none', right: -6, opacity: 0 }} />
 
       {/* Header */}
       <div style={{
@@ -1009,6 +1005,7 @@ function buildGraph(topologia, T) {
     const isBackbone = parentId.startsWith('olt-')
     edge(parentId, cdoId, parentStyle, {
       _kind: isBackbone ? 'backbone' : 'distrib',
+      animated: true,
       sourceHandle: parentSrcHandle, targetHandle: 'in',
       ...(ponLabel ? {
         label: ponLabel,
@@ -1059,6 +1056,7 @@ function buildGraph(topologia, T) {
       const eStyle    = { ...T.distrib, stroke: splHex || T.distrib.stroke }
       edge(cdoId, splNodeId, eStyle, {
         _kind: 'distrib',
+        animated: true,
         sourceHandle: srcHandle, targetHandle: 'in',
         ...(fLabel ? {
           label: fLabel,
@@ -1238,7 +1236,7 @@ function buildGraph(topologia, T) {
 
         edge(splNodeId, `cto-${ctoKey}`,
           { ...T.drop, stroke: portaHex, strokeWidth: 2 },
-          { _kind: 'ramal', sourceHandle: `s-${porta}`, targetHandle: 'in', ...edgeLabelOpts }
+          { _kind: 'ramal', sourceHandle: `s-${porta}`, targetHandle: 'in', animated: true, ...edgeLabelOpts }
         )
 
         // ── Cascata via ctos_cascata (pré-mapa global) ──
@@ -2119,7 +2117,7 @@ function DiagramaFluxoInner({ projetoId }) {
         <button
           onClick={() => setLegendOpen(o => !o)}
           style={{
-            position: 'absolute', right: 14, bottom: 80, zIndex: 50,
+            position: 'absolute', right: 14, bottom: 24, zIndex: 50,
             width: 48, height: 48, borderRadius: '50%',
             background: T.feeder.stroke, color: '#fff',
             border: 'none', cursor: 'pointer', fontSize: 20,

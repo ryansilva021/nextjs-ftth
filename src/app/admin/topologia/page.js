@@ -35,8 +35,8 @@ export default async function TopologiaPage({ searchParams }) {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="lg:p-6 p-4">
+      <div className="hidden lg:flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>Topologia da Rede</h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>

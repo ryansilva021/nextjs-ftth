@@ -145,7 +145,6 @@ export const ROLE_COLORS = {
 // Usado pelo middleware e pelo controle de acesso nas páginas
 
 export const ROUTE_PERMISSIONS = {
-  '/admin/noc':         PERM.ACCESS_NOC,
   '/admin/campo':       PERM.VIEW_FIELD,
   '/admin/diagramas':   PERM.VIEW_FUSIONS,
   '/admin/topologia':   PERM.VIEW_TOPOLOGY,
