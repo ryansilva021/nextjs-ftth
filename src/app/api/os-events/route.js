@@ -2,8 +2,12 @@
  * GET /api/os-events
  * Server-Sent Events stream for real-time OS notifications.
  *
+ * Delivery rules:
+ *   - admin / superadmin / recepcao / noc → receive ALL new OS in the projeto
+ *   - tecnico → receives ONLY OS where tecnico_id or auxiliar_id matches their username
+ *
  * Each connected client receives:
- *   - `nova-os`   — when a new service order is created in the same projeto
+ *   - `nova-os`   — when a new service order is created (filtered per role)
  *   - `: ping`    — heartbeat every 25 s to keep the connection alive
  */
 
@@ -19,7 +23,8 @@ export async function GET(request) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const projetoId = session.user.projeto_id
+  const { projeto_id: projetoId, role, username } = session.user
+  const isTecnico = role === 'tecnico'
   const encoder   = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -28,7 +33,17 @@ export async function GET(request) {
       controller.enqueue(encoder.encode(': connected\n\n'))
 
       function handleNova(event) {
+        // Always filter by project
         if (event.projeto_id !== projetoId) return
+
+        // Técnicos only see OS assigned to them
+        if (isTecnico) {
+          const isAssigned =
+            event.tecnico_id  === username ||
+            event.auxiliar_id === username
+          if (!isAssigned) return
+        }
+
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
         } catch (_) {

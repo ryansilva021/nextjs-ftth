@@ -127,14 +127,19 @@ export async function createOS(data) {
 
   revalidatePath('/admin/os')
 
-  // Broadcast real-time notification to SSE clients in the same project
+  // Broadcast real-time notification to SSE clients in the same project.
+  // tecnico_id / auxiliar_id are included so the SSE route can filter
+  // delivery per-technician (técnicos only receive their own OS).
   const osObj = os.toObject()
   osEmitter.emit('nova-os', {
     projeto_id,
-    os_id:       osObj.os_id,
+    os_id:        osObj.os_id,
     cliente_nome: osObj.cliente_nome,
+    cliente_endereco: osObj.cliente_endereco ?? null,
     tipo:         osObj.tipo,
     status:       osObj.status,
+    tecnico_id:   osObj.tecnico_id ?? null,
+    auxiliar_id:  osObj.auxiliar_id ?? null,
     criado_em:    osObj.data_abertura?.toISOString() ?? new Date().toISOString(),
   })
 

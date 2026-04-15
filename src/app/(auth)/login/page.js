@@ -60,11 +60,19 @@ function LoginForm() {
         style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
         className="rounded-2xl p-8"
       >
-        <h2 className="text-lg font-semibold text-white mb-6">Entrar na conta</h2>
+        <h2
+          style={{ color: 'var(--foreground)' }}
+          className="text-lg font-semibold mb-6"
+        >
+          Entrar na conta
+        </h2>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+            <label
+              style={{ color: 'var(--text-muted)' }}
+              className="text-xs font-medium uppercase tracking-wider"
+            >
               Usuário
             </label>
             <input
@@ -76,15 +84,18 @@ function LoginForm() {
               placeholder="seu.usuario"
               style={{
                 backgroundColor: 'var(--inp-bg)',
-                border: '1px solid var(--border-color)',
+                border: '1px solid var(--border-color-strong)',
                 color: 'var(--foreground)',
               }}
-              className="rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder-slate-600"
+              className="rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+            <label
+              style={{ color: 'var(--text-muted)' }}
+              className="text-xs font-medium uppercase tracking-wider"
+            >
               Senha
             </label>
             <input
@@ -96,10 +107,10 @@ function LoginForm() {
               placeholder="••••••••"
               style={{
                 backgroundColor: 'var(--inp-bg)',
-                border: '1px solid var(--border-color)',
+                border: '1px solid var(--border-color-strong)',
                 color: 'var(--foreground)',
               }}
-              className="rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder-slate-600"
+              className="rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
 
@@ -115,7 +126,11 @@ function LoginForm() {
           <button
             type="submit"
             disabled={carregando}
-            className="mt-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg text-sm transition-colors"
+            style={{
+              backgroundColor: 'var(--accent)',
+              color: '#fff',
+            }}
+            className="mt-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed font-semibold py-2.5 rounded-lg text-sm transition-opacity"
           >
             {carregando ? 'Entrando...' : 'Entrar'}
           </button>
@@ -123,9 +138,13 @@ function LoginForm() {
       </div>
 
       {/* Link para cadastro */}
-      <p className="text-center text-sm text-slate-500 mt-6">
+      <p style={{ color: 'var(--text-muted)' }} className="text-center text-sm mt-6">
         Sem conta?{' '}
-        <Link href="/cadastro" className="text-sky-400 hover:text-sky-300 transition-colors">
+        <Link
+          href="/cadastro"
+          style={{ color: 'var(--accent)' }}
+          className="font-medium hover:opacity-80 transition-opacity"
+        >
           Solicitar acesso
         </Link>
       </p>

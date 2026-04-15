@@ -1307,7 +1307,68 @@ function buildGraph(topologia, T) {
     }
   }
 
-  return { nodes, edges }
+  return { nodes, edges: spreadParallelEdges(edges) }
+}
+
+// ─── spreadParallelEdges ─────────────────────────────────────────────────────
+//
+// Detecta arestas paralelas (mesmo nó de origem + mesmo handle de saída) e
+// distribui suas trajetórias em leque, evitando sobreposição visual nas CTOs.
+//
+// Estratégia:
+//   • Agrupa por  source:sourceHandle  (ponto de saída compartilhado)
+//   • Agrupa por  target:targetHandle  (ponto de chegada compartilhado)
+//   • Para cada grupo > 1, aplica pathOptions.offset escalonado:
+//     ex. 3 arestas → offsets  -20 | 0 | +20  (spread de 40 px)
+//   • Usa type='smoothstep' + borderRadius para curvas suaves
+
+function spreadParallelEdges(edges) {
+  // ── 1. Agrupa por ponto de SAÍDA ──────────────────────────────────────────
+  const bySource = {}
+  for (const e of edges) {
+    const key = `${e.source}:${e.sourceHandle ?? '_'}`
+    ;(bySource[key] = bySource[key] ?? []).push(e)
+  }
+
+  // ── 2. Agrupa por ponto de CHEGADA ────────────────────────────────────────
+  const byTarget = {}
+  for (const e of edges) {
+    const key = `${e.target}:${e.targetHandle ?? '_'}`
+    ;(byTarget[key] = byTarget[key] ?? []).push(e)
+  }
+
+  // ── 3. Calcula offset para cada aresta ───────────────────────────────────
+  function calcOffset(group, edgeId) {
+    if (group.length <= 1) return null
+    const idx = group.findIndex(e => e.id === edgeId)
+    if (idx < 0) return null
+    const n      = group.length
+    const spread = Math.min(n * 16, 96)          // spread máx 96 px
+    const step   = n > 1 ? spread / (n - 1) : 0
+    return Math.round(-spread / 2 + idx * step)
+  }
+
+  return edges.map(e => {
+    const srcKey = `${e.source}:${e.sourceHandle ?? '_'}`
+    const tgtKey = `${e.target}:${e.targetHandle ?? '_'}`
+
+    const srcOffset = calcOffset(bySource[srcKey], e.id)
+    const tgtOffset = calcOffset(byTarget[tgtKey], e.id)
+
+    // Usa o maior offset absoluto; não aplica se só uma aresta naquele grupo
+    const offset = srcOffset ?? tgtOffset
+    if (offset === null || offset === 0) return e
+
+    return {
+      ...e,
+      type: 'smoothstep',
+      pathOptions: {
+        ...(e.pathOptions ?? {}),
+        offset,
+        borderRadius: 14,
+      },
+    }
+  })
 }
 
 // ─── Layout Dagre ─────────────────────────────────────────────────────────────
@@ -1746,32 +1807,55 @@ function MapPanel({ T, rfNodes, rfEdges }) {
             </defs>
             <g clipPath="url(#map-clip-inner)">
 
-              {/* 1. Arestas — na cor da fibra */}
+              {/* 1. Arestas — na cor da fibra, com offset de handle para evitar sobreposição */}
               {bbox && edges.map(e => {
                 const src = nodeById.get(e.source)
                 const tgt = nodeById.get(e.target)
                 if (!src || !tgt) return null
-                const sw = (src.measured?.width  ?? NODE_W[src.type] ?? 220) * scale
-                const sh = (src.measured?.height ?? NODE_H[src.type] ?? 140) * scale
-                const tw = (tgt.measured?.width  ?? NODE_W[tgt.type] ?? 220) * scale
-                const th = (tgt.measured?.height ?? NODE_H[tgt.type] ?? 140) * scale
+
+                const srcH = src.measured?.height ?? NODE_H[src.type] ?? 140
+                const tgtH = tgt.measured?.height ?? NODE_H[tgt.type] ?? 140
+                const sw   = (src.measured?.width ?? NODE_W[src.type] ?? 220) * scale
+                const sh   = srcH * scale
+                const tw   = (tgt.measured?.width ?? NODE_W[tgt.type] ?? 220) * scale
+                const th   = tgtH * scale
+
                 const [sx, sy] = toSvg(src.position.x, src.position.y)
                 const [tx, ty] = toSvg(tgt.position.x, tgt.position.y)
-                // LR layout: saída do lado direito do src, entrada no lado esquerdo do tgt
-                const x1 = sx + sw, y1 = sy + sh / 2
-                const x2 = tx,      y2 = ty + th / 2
-                const color = e.style?.stroke ?? T.muted
+
+                // Calcula Y do handle de saída (splitter: s-N; outros: centro)
+                function handleY(nodeH, handle, nodeType) {
+                  if (nodeType === 'splitter') {
+                    const m = handle?.match(/^s-(\d+)$/)
+                    if (m) {
+                      const porta = parseInt(m[1], 10)
+                      const raw = SPL_HEADER_H + SPL_ENTRY_H + (porta - 1) * SPL_ROW_H + SPL_ROW_H / 2
+                      return Math.min(raw / nodeH, 0.95)
+                    }
+                  }
+                  return 0.5 // centro
+                }
+
+                const srcYRatio = handleY(srcH, e.sourceHandle, src.type)
+                const tgtYRatio = 0.5 // entrada sempre no centro esquerdo
+
+                // LR layout: saída no lado direito do src, entrada no lado esquerdo do tgt
+                const x1 = sx + sw
+                const y1 = sy + sh * srcYRatio
+                const x2 = tx
+                const y2 = ty + th * tgtYRatio
+
+                const color  = e.style?.stroke ?? T.muted
                 const dashed = !!(e.style?.strokeDasharray)
-                // Curva bezier suave
                 const cx = (x1 + x2) / 2
                 return (
                   <path key={e.id}
                     d={`M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}`}
                     fill="none"
                     stroke={color}
-                    strokeWidth={dashed ? 0.7 : 1}
+                    strokeWidth={dashed ? 0.6 : 0.9}
                     strokeDasharray={dashed ? '3,2' : undefined}
-                    opacity={0.75}
+                    opacity={0.8}
                   />
                 )
               })}

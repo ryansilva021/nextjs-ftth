@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { hasPermission, PERM, ROLE_LABELS, ROLE_COLORS } from '@/lib/permissions'
+import { useOSNotification } from '@/hooks/useOSNotification'
+import OSToast from '@/components/shared/OSToast'
+
+// Roles que recebem notificações de OS
+const ROLES_COM_NOTIFICACAO = ['superadmin', 'admin', 'tecnico', 'recepcao', 'noc']
 
 // ── Grupos de separação visual ──────────────────────────────────────────────
 const GROUPS = { public: 0, staff: 1, admin: 2, superadmin: 3 }
@@ -55,6 +60,21 @@ export default function SidebarLayout({ session, children }) {
   const roleColor = ROLE_COLORS[role] ?? ROLE_COLORS.user
 
   const itensVisiveis = NAV_ITEMS.filter(item => isItemVisible(item, role))
+
+  // ── Notificações OS em tempo real ────────────────────────────────────────
+  const [toasts, setToasts] = useState([])
+
+  const handleNova = useCallback((event) => {
+    const id = `${event.os_id ?? Date.now()}-${Math.random()}`
+    setToasts(prev => [...prev.slice(-4), { ...event, id }]) // máx 5 toasts simultâneos
+  }, [])
+
+  const removeToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }, [])
+
+  const notificacoesAtivas = ROLES_COM_NOTIFICACAO.includes(role)
+  useOSNotification(notificacoesAtivas ? { onNova: handleNova } : {})
 
   const sidebarStyle = {
     backgroundColor: "var(--sidebar-bg)",
@@ -233,6 +253,11 @@ export default function SidebarLayout({ session, children }) {
           {children}
         </main>
       </div>
+
+      {/* Notificações OS em tempo real */}
+      {notificacoesAtivas && (
+        <OSToast notifications={toasts} onRemove={removeToast} />
+      )}
     </div>
   );
 }
