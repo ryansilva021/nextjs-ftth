@@ -61,6 +61,46 @@ export async function listOS({ status, tipo, tecnico_id, limit = 100, skip = 0 }
 }
 
 // ---------------------------------------------------------------------------
+// getMinhasOS — OS criadas pelo usuário logado (admin/recepcao/noc)
+// ---------------------------------------------------------------------------
+
+const ROLES_MINHAS_OS = ['admin', 'recepcao', 'noc']
+
+export async function getMinhasOS({ filtro = 'todas' } = {}) {
+  const session = await requireActiveEmpresa(ROLES_MINHAS_OS)
+  const { projeto_id, name, username } = session.user
+
+  await connectDB()
+
+  const agora = new Date()
+  const hoje  = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate())
+  const amanha = new Date(hoje.getTime() + 86_400_000)
+
+  // criado_por pode ser o name ou o username dependendo do cadastro
+  const filter = {
+    projeto_id,
+    $or: [{ criado_por: name }, { criado_por: username }],
+  }
+
+  if (filtro === 'hoje') {
+    filter.data_abertura = { $gte: hoje, $lt: amanha }
+  } else if (filtro === 'atrasadas') {
+    filter.data_agendamento = { $lt: agora }
+    filter.status = { $nin: ['concluida', 'cancelada'] }
+  } else if (filtro === 'finalizadas') {
+    filter.status = { $in: ['concluida', 'cancelada'] }
+  }
+
+  const items = await ServiceOrder.find(filter)
+    .sort({ created_at: -1 })
+    .limit(50)
+    .select('os_id tipo status prioridade cliente_nome tecnico_nome data_abertura data_agendamento')
+    .lean()
+
+  return items.map(s => ({ ...s, _id: s._id.toString() }))
+}
+
+// ---------------------------------------------------------------------------
 // getOS
 // ---------------------------------------------------------------------------
 
@@ -131,17 +171,48 @@ export async function createOS(data) {
   // tecnico_id / auxiliar_id are included so the SSE route can filter
   // delivery per-technician (técnicos only receive their own OS).
   const osObj = os.toObject()
-  osEmitter.emit('nova-os', {
+
+  const ssePayload = {
     projeto_id,
-    os_id:        osObj.os_id,
-    cliente_nome: osObj.cliente_nome,
+    os_id:            osObj.os_id,
+    cliente_nome:     osObj.cliente_nome,
     cliente_endereco: osObj.cliente_endereco ?? null,
-    tipo:         osObj.tipo,
-    status:       osObj.status,
-    tecnico_id:   osObj.tecnico_id ?? null,
-    auxiliar_id:  osObj.auxiliar_id ?? null,
-    criado_em:    osObj.data_abertura?.toISOString() ?? new Date().toISOString(),
-  })
+    tipo:             osObj.tipo,
+    status:           osObj.status,
+    tecnico_id:       osObj.tecnico_id ?? null,
+    auxiliar_id:      osObj.auxiliar_id ?? null,
+    criado_em:        osObj.data_abertura?.toISOString() ?? new Date().toISOString(),
+  }
+  osEmitter.emit('nova-os', ssePayload)
+
+  // Web Push — notifica fora do app (dispositivos com SW registrado)
+  const TIPO_LABEL = {
+    instalacao: 'Instalação', manutencao: 'Manutenção',
+    suporte: 'Suporte', cancelamento: 'Cancelamento',
+  }
+  const pushTitle = `Nova OS · ${TIPO_LABEL[osObj.tipo] ?? osObj.tipo}`
+  const pushBody  = osObj.cliente_endereco
+    ? `${osObj.cliente_nome} — ${osObj.cliente_endereco}`
+    : osObj.cliente_nome
+  const pushUrl   = `/admin/os`
+
+  // Importação dinâmica para não impactar o bundle em ambientes sem Node crypto
+  try {
+    const { sendPushToUser } = await import('@/lib/webpush')
+    const targets = [osObj.tecnico_id, osObj.auxiliar_id].filter(Boolean)
+    console.log('[createOS] push targets:', targets)
+    if (targets.length === 0) {
+      console.log('[createOS] nenhum tecnico_id definido — push ignorado')
+    }
+    const results = await Promise.allSettled(
+      targets.map(uid => sendPushToUser(uid, { title: pushTitle, body: pushBody, url: pushUrl }))
+    )
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') console.error(`[createOS] push falhou para ${targets[i]}:`, r.reason)
+    })
+  } catch (err) {
+    console.error('[createOS] erro no bloco push:', err)
+  }
 
   return { ...osObj, _id: os._id.toString() }
 }

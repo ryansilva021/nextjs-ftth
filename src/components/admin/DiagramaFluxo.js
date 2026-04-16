@@ -11,6 +11,7 @@ import {
   ReactFlow, Controls, Background, BackgroundVariant,
   Panel, Handle, Position, useReactFlow, ReactFlowProvider,
   useViewport, useStore,
+  getBezierPath, BaseEdge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import Dagre from '@dagrejs/dagre'
@@ -34,7 +35,7 @@ function useMobile() {
 
 function mkTheme() {
   return {
-    canvas:     '#2a2218',
+    canvas:     '#1a1510',
     bg:         '#3a2e22',
     bg2:        '#2e2418',
     border:     '#5a4830',
@@ -733,6 +734,45 @@ function CTONode({ data }) {
 
 const NODE_TYPES = { olt: OLTNode, cdo: CDONode, splitter: SplitterNode, cto: CTONode, passagem: PassagemNode }
 
+// ─── FanEdge — aresta com offset Y real para separar conexões paralelas ───────
+//
+// Aplica um deslocamento vertical (data.fanOffset) ao ponto de saída da aresta,
+// criando um leque visual quando múltiplas arestas saem do mesmo nó/handle.
+//
+function FanEdge({
+  id, sourceX, sourceY, targetX, targetY,
+  sourcePosition, targetPosition,
+  style, markerEnd, markerStart, label, labelStyle, labelBgStyle,
+  data,
+}) {
+  const offset = data?.fanOffset ?? 0
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY: sourceY + offset,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    curvature: 0.25,
+  })
+  return (
+    <BaseEdge
+      id={id}
+      path={edgePath}
+      style={style}
+      markerEnd={markerEnd}
+      markerStart={markerStart}
+      label={label}
+      labelX={labelX}
+      labelY={labelY}
+      labelStyle={labelStyle}
+      labelBgStyle={labelBgStyle}
+    />
+  )
+}
+
+const EDGE_TYPES = { fan: FanEdge }
+
 // ─── buildGraph ───────────────────────────────────────────────────────────────
 
 function buildGraph(topologia, T) {
@@ -1307,66 +1347,46 @@ function buildGraph(topologia, T) {
     }
   }
 
-  return { nodes, edges: spreadParallelEdges(edges) }
+  return { nodes, edges: fanOutEdges(edges) }
 }
 
-// ─── spreadParallelEdges ─────────────────────────────────────────────────────
+// ─── fanOutEdges ──────────────────────────────────────────────────────────────
 //
-// Detecta arestas paralelas (mesmo nó de origem + mesmo handle de saída) e
-// distribui suas trajetórias em leque, evitando sobreposição visual nas CTOs.
+// Detecta arestas que saem do mesmo nó-origem (mesmo source node) e distribui
+// em leque aplicando um deslocamento Y real no ponto de saída via FanEdge.
 //
 // Estratégia:
-//   • Agrupa por  source:sourceHandle  (ponto de saída compartilhado)
-//   • Agrupa por  target:targetHandle  (ponto de chegada compartilhado)
-//   • Para cada grupo > 1, aplica pathOptions.offset escalonado:
-//     ex. 3 arestas → offsets  -20 | 0 | +20  (spread de 40 px)
-//   • Usa type='smoothstep' + borderRadius para curvas suaves
+//   • Agrupa por source node id (não por handle — garante separação mesmo
+//     quando múltiplos handles ficam muito próximos verticalmente)
+//   • Para N arestas no grupo, distribui offsets Y: -spread/2 … +spread/2
+//   • Somente ramal/cascade recebem fan-out; backbone não é tocado
 
-function spreadParallelEdges(edges) {
-  // ── 1. Agrupa por ponto de SAÍDA ──────────────────────────────────────────
+function fanOutEdges(edges) {
+  // Agrupa por nó de origem (apenas ramal/cascade)
   const bySource = {}
   for (const e of edges) {
-    const key = `${e.source}:${e.sourceHandle ?? '_'}`
-    ;(bySource[key] = bySource[key] ?? []).push(e)
-  }
-
-  // ── 2. Agrupa por ponto de CHEGADA ────────────────────────────────────────
-  const byTarget = {}
-  for (const e of edges) {
-    const key = `${e.target}:${e.targetHandle ?? '_'}`
-    ;(byTarget[key] = byTarget[key] ?? []).push(e)
-  }
-
-  // ── 3. Calcula offset para cada aresta ───────────────────────────────────
-  function calcOffset(group, edgeId) {
-    if (group.length <= 1) return null
-    const idx = group.findIndex(e => e.id === edgeId)
-    if (idx < 0) return null
-    const n      = group.length
-    const spread = Math.min(n * 16, 96)          // spread máx 96 px
-    const step   = n > 1 ? spread / (n - 1) : 0
-    return Math.round(-spread / 2 + idx * step)
+    if (e._kind === 'backbone') continue
+    ;(bySource[e.source] = bySource[e.source] ?? []).push(e)
   }
 
   return edges.map(e => {
-    const srcKey = `${e.source}:${e.sourceHandle ?? '_'}`
-    const tgtKey = `${e.target}:${e.targetHandle ?? '_'}`
+    if (e._kind === 'backbone') return e
 
-    const srcOffset = calcOffset(bySource[srcKey], e.id)
-    const tgtOffset = calcOffset(byTarget[tgtKey], e.id)
+    const group = bySource[e.source]
+    if (!group || group.length <= 1) return e
 
-    // Usa o maior offset absoluto; não aplica se só uma aresta naquele grupo
-    const offset = srcOffset ?? tgtOffset
-    if (offset === null || offset === 0) return e
+    const n      = group.length
+    const spread = Math.min(n * 14, 84)          // máx 84 px de spread total
+    const step   = spread / (n - 1)
+    const idx    = group.findIndex(g => g.id === e.id)
+    const offset = idx < 0 ? 0 : Math.round(-spread / 2 + idx * step)
+
+    if (offset === 0) return e
 
     return {
       ...e,
-      type: 'smoothstep',
-      pathOptions: {
-        ...(e.pathOptions ?? {}),
-        offset,
-        borderRadius: 14,
-      },
+      type: 'fan',
+      data: { ...(e.data ?? {}), fanOffset: offset },
     }
   })
 }
@@ -1696,8 +1716,10 @@ function hexAlpha(hex, a) {
 
 function MapPanel({ T, rfNodes, rfEdges }) {
   const [open, setOpen] = useState(true)
+  const dragging = useRef(false)
 
   const { x: vpX, y: vpY, zoom } = useViewport()
+  const { setViewport } = useReactFlow()
   const rfW = useStore(s => s.width)
   const rfH = useStore(s => s.height)
 
@@ -1751,6 +1773,44 @@ function MapPanel({ T, rfNodes, rfEdges }) {
     offY + (wy - (bbox?.minY ?? 0)) * scale,
   ]
 
+  // Converte coordenada SVG → mundo → viewport centrado naquele ponto
+  function navigateTo(svgX, svgY) {
+    if (!bbox || !rfW || !rfH || scale <= 0) return
+    const wx = (svgX - offX) / scale + bbox.minX
+    const wy = (svgY - offY) / scale + bbox.minY
+    setViewport({
+      x: -(wx * zoom) + rfW / 2,
+      y: -(wy * zoom) + rfH / 2,
+      zoom,
+    })
+  }
+
+  function getSvgXY(e, svgEl) {
+    const rect = svgEl.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    return [clientX - rect.left, clientY - rect.top]
+  }
+
+  function onMapPointerDown(e) {
+    if (!bbox) return
+    e.preventDefault()
+    dragging.current = true
+    const [sx, sy] = getSvgXY(e, e.currentTarget)
+    navigateTo(sx, sy)
+  }
+
+  function onMapPointerMove(e) {
+    if (!dragging.current || !bbox) return
+    e.preventDefault()
+    const [sx, sy] = getSvgXY(e, e.currentTarget)
+    navigateTo(sx, sy)
+  }
+
+  function onMapPointerUp() {
+    dragging.current = false
+  }
+
   // Retângulo do viewport visível
   const vpRect = bbox && rfW && rfH ? (() => {
     const [rx, ry] = toSvg(-vpX / zoom, -vpY / zoom)
@@ -1799,7 +1859,17 @@ function MapPanel({ T, rfNodes, rfEdges }) {
             display: 'block',
             borderTop: `1px solid ${T.panelBorder}`,
             background: T.mmBg,
-          }}>
+            cursor: bbox ? 'crosshair' : 'default',
+            touchAction: 'none',
+          }}
+            onMouseDown={onMapPointerDown}
+            onMouseMove={onMapPointerMove}
+            onMouseUp={onMapPointerUp}
+            onMouseLeave={onMapPointerUp}
+            onTouchStart={onMapPointerDown}
+            onTouchMove={onMapPointerMove}
+            onTouchEnd={onMapPointerUp}
+          >
             <defs>
               <clipPath id="map-clip-inner">
                 <rect x={0} y={0} width={MAP_W} height={MAP_H} />
@@ -2133,6 +2203,7 @@ function DiagramaFluxoInner({ projetoId }) {
       nodes={nodes}
       edges={edges}
       nodeTypes={NODE_TYPES}
+      edgeTypes={EDGE_TYPES}
       defaultEdgeOptions={{ type: 'default' }}
       fitView
       minZoom={0.08}
@@ -2140,12 +2211,14 @@ function DiagramaFluxoInner({ projetoId }) {
       style={{ background: T.canvas }}
       proOptions={{ hideAttribution: true }}
     >
-      <Background
-        variant={BackgroundVariant.Lines}
-        color="rgba(255,255,255,0.04)"
-        gap={32}
-        lineWidth={0.5}
-      />
+      {!isMobile && (
+        <Background
+          variant={BackgroundVariant.Lines}
+          color="rgba(255,255,255,0.04)"
+          gap={32}
+          lineWidth={0.5}
+        />
+      )}
       <Controls
         style={{
           background: T.panelBg, border: `1px solid ${T.panelBorder}`,

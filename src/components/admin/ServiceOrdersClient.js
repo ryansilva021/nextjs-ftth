@@ -648,12 +648,12 @@ function CreateModal({ onClose, onCreated, olts, userRole, usuarios = [] }) {
                 <label style={LBL}>Técnico Responsável</label>
                 {usuarios.length > 0 ? (
                   <select style={INP} value={form.tecnico_id} onChange={e => {
-                    const u = usuarios.find(u => u._id === e.target.value || u.username === e.target.value)
+                    const u = usuarios.find(u => u.username === e.target.value)
                     set('tecnico_id', e.target.value)
                     set('tecnico_nome', u ? (u.nome_completo || u.username) : '')
                   }}>
                     <option value="">— Nenhum —</option>
-                    {usuarios.map(u => { const n = u.nome_completo || u.username; return <option key={u._id} value={u._id ?? u.username}>{n}</option> })}
+                    {usuarios.map(u => { const n = u.nome_completo || u.username; return <option key={u._id} value={u.username}>{n}</option> })}
                   </select>
                 ) : (
                   <input style={INP} value={form.tecnico_nome} onChange={e => set('tecnico_nome', e.target.value)} placeholder="Nome do técnico" />
@@ -663,12 +663,12 @@ function CreateModal({ onClose, onCreated, olts, userRole, usuarios = [] }) {
                 <label style={LBL}>Auxiliar / Ajudante</label>
                 {usuarios.length > 0 ? (
                   <select style={INP} value={form.auxiliar_id} onChange={e => {
-                    const u = usuarios.find(u => u._id === e.target.value || u.username === e.target.value)
+                    const u = usuarios.find(u => u.username === e.target.value)
                     set('auxiliar_id', e.target.value)
                     set('auxiliar_nome', u ? (u.nome_completo || u.username) : '')
                   }}>
                     <option value="">— Nenhum —</option>
-                    {usuarios.map(u => { const n = u.nome_completo || u.username; return <option key={u._id} value={u._id ?? u.username}>{n}</option> })}
+                    {usuarios.map(u => { const n = u.nome_completo || u.username; return <option key={u._id} value={u.username}>{n}</option> })}
                   </select>
                 ) : (
                   <input style={INP} value={form.auxiliar_nome} onChange={e => set('auxiliar_nome', e.target.value)} placeholder="Nome do auxiliar" />

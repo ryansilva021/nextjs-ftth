@@ -116,9 +116,10 @@ export default function CreateOSClient({ tecnicos = [], userRole, userName }) {
   }
 
   function handleTecnicoSelect(e) {
-    const chosen = tecnicos.find(t => t.id === e.target.value)
+    const login = e.target.value
+    const chosen = tecnicos.find(t => t.login === login)
     if (chosen) {
-      setTecnicoId(chosen.id)
+      setTecnicoId(chosen.login)   // username — usado para SSE e push filtering
       setTecnicoNome(chosen.nome)
     } else {
       setTecnicoId('')
@@ -302,7 +303,7 @@ export default function CreateOSClient({ tecnicos = [], userRole, userName }) {
               >
                 <option value="">— Nenhum selecionado —</option>
                 {tecnicos.map(t => (
-                  <option key={t.id} value={t.id}>{t.nome}</option>
+                  <option key={t.id} value={t.login}>{t.nome}</option>
                 ))}
               </select>
             </div>

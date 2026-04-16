@@ -28,6 +28,7 @@ import ModalDiagrama      from '@/components/map/ModalDiagrama'
 import ModalDiagramaCDO   from '@/components/map/ModalDiagramaCDO'
 import ModalTopologia     from '@/components/map/ModalTopologia'
 import BuscaMapa          from '@/components/map/BuscaMapa'
+import WeatherWidget      from '@/components/map/WeatherWidget'
 import RegistroPotencia   from '@/components/map/RegistroPotencia'
 import VarinhaNetworkTool from '@/components/map/VarinhaNetworkTool'
 
@@ -792,11 +793,14 @@ export default function MapaFTTH({
       {/* Container do mapa */}
       <div ref={containerRef} className="absolute inset-0 w-full h-full" aria-label="Mapa FTTH" role="application" />
 
-      {/* Status de conexão — sempre visível no mobile */}
+      {/* Widget de clima — canto superior esquerdo */}
+      <WeatherWidget />
+
+      {/* Status de conexão — só no desktop (mobile usa o header) */}
       <div
         role="status"
         aria-live="polite"
-        className="absolute top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full shadow-lg pointer-events-none"
+        className="hidden lg:flex absolute top-3 left-1/2 -translate-x-1/2 z-40 items-center gap-1.5 px-3 py-2 rounded-full shadow-lg pointer-events-none"
         style={{
           background:  isOnline ? 'rgba(22,101,52,0.92)' : 'rgba(180,83,9,0.95)',
           border:      `1px solid ${isOnline ? 'rgba(34,197,94,0.4)' : 'rgba(251,191,36,0.5)'}`,

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { hasPermission, PERM, ROLE_LABELS, ROLE_COLORS } from '@/lib/permissions'
-import { useOSNotification } from '@/hooks/useOSNotification'
+import { useOSNotification }    from '@/hooks/useOSNotification'
+import { playNotifSound }       from '@/lib/notifSound'
 import OSToast from '@/components/shared/OSToast'
 
 // Roles que recebem notificações de OS
@@ -61,12 +62,27 @@ export default function SidebarLayout({ session, children }) {
 
   const itensVisiveis = NAV_ITEMS.filter(item => isItemVisible(item, role))
 
-  // ── Notificações OS em tempo real ────────────────────────────────────────
+  // ── Online / Offline ─────────────────────────────────────────────────────
+  const [isOnline, setIsOnline] = useState(true)
+  useEffect(() => {
+    setIsOnline(navigator.onLine)
+    const on  = () => setIsOnline(true)
+    const off = () => setIsOnline(false)
+    window.addEventListener('online',  on)
+    window.addEventListener('offline', off)
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
+  }, [])
+
+  // ── Notificações OS em tempo real (SSE in-app) ───────────────────────────
   const [toasts, setToasts] = useState([])
 
   const handleNova = useCallback((event) => {
     const id = `${event.os_id ?? Date.now()}-${Math.random()}`
-    setToasts(prev => [...prev.slice(-4), { ...event, id }]) // máx 5 toasts simultâneos
+    setToasts(prev => [...prev.slice(-4), { ...event, id }])
+    try {
+      const soundOn = localStorage.getItem('pref_notif_sound')
+      if (soundOn !== 'false') playNotifSound()
+    } catch (_) {}
   }, [])
 
   const removeToast = useCallback((id) => {
@@ -244,8 +260,25 @@ export default function SidebarLayout({ session, children }) {
             FiberOps
           </span>
 
-          {/* Direita: espaço reservado para simetria */}
-          <div className="ml-auto w-7" />
+          {/* Direita: badge online/offline */}
+          <div className="ml-auto flex items-center">
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '3px 8px', borderRadius: 99,
+              background: isOnline ? 'rgba(22,101,52,0.85)' : 'rgba(180,83,9,0.90)',
+              border: `1px solid ${isOnline ? 'rgba(34,197,94,0.35)' : 'rgba(251,191,36,0.45)'}`,
+            }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: isOnline ? '#4ade80' : '#fbbf24',
+                boxShadow: isOnline ? '0 0 5px #4ade80' : '0 0 5px #fbbf24',
+                flexShrink: 0,
+              }} />
+              <span style={{ fontSize: 10, fontWeight: 700, color: isOnline ? '#bbf7d0' : '#fef3c7' }}>
+                {isOnline ? 'Online' : 'Offline'}
+              </span>
+            </div>
+          </div>
         </header>
 
         {/* Conteúdo */}

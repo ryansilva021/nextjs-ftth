@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getProjetoConfig, updateProjetoConfig } from '@/actions/projetos'
+import { testPushNotification } from '@/actions/push'
+import { usePushNotification } from '@/hooks/usePushNotification'
+import { playNotifSound } from '@/lib/notifSound'
 
 // ---------------------------------------------------------------------------
 // Helpers de persistência (localStorage)
@@ -83,7 +86,29 @@ function Toggle({ value, onChange }) {
 export default function ConfiguracoesPage() {
   const router = useRouter()
 
-  const [campoMode, setCampoMode] = useState(false)
+  const [campoMode,    setCampoMode]    = useState(false)
+  const [notifSound,   setNotifSound]   = useState(true)
+
+  // Push notifications
+  const { status: pushStatus, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } =
+    usePushNotification()
+  const [pushTestMsg, setPushTestMsg] = useState('')
+  const [pushTesting, setPushTesting] = useState(false)
+
+  async function testPush() {
+    setPushTesting(true)
+    setPushTestMsg('')
+    try {
+      const data = await testPushNotification()
+      if (data.error) setPushTestMsg(`Erro: ${data.error}`)
+      else setPushTestMsg('Enviado! Verifique suas notificações.')
+    } catch {
+      setPushTestMsg('Falha na requisição.')
+    } finally {
+      setPushTesting(false)
+      setTimeout(() => setPushTestMsg(''), 6000)
+    }
+  }
 
   // Fibras Ópticas (salvo no servidor)
   const [fiberStandard, setFiberStandard]   = useState('ABNT')
@@ -98,6 +123,7 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     setCampoMode(loadPref('pref_campo_mode', false))
+    setNotifSound(loadPref('pref_notif_sound', true))
 
     const localStandard = loadPref('pref_fiber_standard', null)
     if (localStandard) setFiberStandard(localStandard)
@@ -199,6 +225,100 @@ export default function ConfiguracoesPage() {
                 savePref('pref_campo_mode', v)
               }}
             />
+          </SettingRow>
+        </div>
+
+        {/* ── Notificações ── */}
+        <div style={card}>
+          <SectionTitle>Notificações</SectionTitle>
+
+          {/* Som */}
+          <SettingRow
+            label="Som de notificação"
+            description="Toca um som quando uma nova OS for atribuída a você"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {notifSound && (
+                <button
+                  onClick={() => playNotifSound()}
+                  title="Testar som"
+                  style={{
+                    background: 'none', border: '1px solid var(--border-color)',
+                    borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
+                    fontSize: 14, color: 'var(--text-muted)',
+                  }}
+                >
+                  ▶
+                </button>
+              )}
+              <Toggle
+                value={notifSound}
+                onChange={v => { setNotifSound(v); savePref('pref_notif_sound', v) }}
+              />
+            </div>
+          </SettingRow>
+
+          {/* Push notifications */}
+          <SettingRow
+            label="Notificações fora do app"
+            description={
+              pushStatus === 'unsupported'
+                ? 'Seu navegador não suporta notificações push'
+                : pushStatus === 'denied'
+                  ? 'Permissão bloqueada — reative nas configurações do navegador'
+                  : pushStatus === 'subscribed'
+                    ? 'Você receberá notificações mesmo com o app fechado'
+                    : 'Receba notificações mesmo com o app fechado ou minimizado'
+            }
+            last
+          >
+            {pushStatus === 'unsupported' || pushStatus === 'denied' ? (
+              <span style={{
+                fontSize: 12, color: 'var(--text-muted)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 8, padding: '6px 12px',
+              }}>
+                {pushStatus === 'denied' ? '🔕 Bloqueado' : '—'}
+              </span>
+            ) : pushStatus === 'loading' ? (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>...</span>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {pushTestMsg && (
+                  <span style={{ fontSize: 12, color: pushTestMsg.startsWith('Erro') ? '#f85149' : '#3fb950' }}>
+                    {pushTestMsg}
+                  </span>
+                )}
+                {pushStatus === 'subscribed' && (
+                  <button
+                    onClick={testPush}
+                    disabled={pushTesting}
+                    title="Enviar push de teste agora"
+                    style={{
+                      padding: '7px 12px', borderRadius: 8, cursor: pushTesting ? 'not-allowed' : 'pointer',
+                      fontSize: 13, border: '1px solid var(--border-color)',
+                      background: 'var(--card-bg-active)', color: 'var(--text-muted)',
+                      opacity: pushTesting ? 0.6 : 1,
+                    }}
+                  >
+                    {pushTesting ? '...' : '▶ Testar'}
+                  </button>
+                )}
+                <button
+                  onClick={pushStatus === 'subscribed' ? pushUnsubscribe : pushSubscribe}
+                  style={{
+                    padding: '7px 16px', borderRadius: 8, cursor: 'pointer',
+                    fontSize: 13, fontWeight: 600,
+                    border: `1px solid ${pushStatus === 'subscribed' ? 'var(--accent)' : 'var(--border-color)'}`,
+                    background: pushStatus === 'subscribed' ? 'rgba(212,98,43,0.10)' : 'var(--card-bg-active)',
+                    color: pushStatus === 'subscribed' ? 'var(--accent)' : 'var(--foreground)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {pushStatus === 'subscribed' ? '🔔 Ativo — Desativar' : '🔔 Ativar'}
+                </button>
+              </div>
+            )}
           </SettingRow>
         </div>
 
