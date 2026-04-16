@@ -1308,43 +1308,59 @@ function buildGraph(topologia, T) {
     }
   }
 
-  return { nodes, edges: fanOutEdges(edges) }
+  return { nodes, edges }
 }
 
-// ─── fanOutEdges ──────────────────────────────────────────────────────────────
+// ─── separateParallelEdges ────────────────────────────────────────────────────
 //
-// Detecta arestas paralelas (mesmo source node) e aplica curvatura bezier
-// variável para separá-las visualmente sem desconectá-las dos handles.
+// Runs AFTER dagreLayout when node positions are known.
+// Groups non-backbone edges by source node, sorts by target Y, assigns
+// smoothstep with varying `offset` so edges fan out at different horizontal
+// distances before turning — creating a clear staircase separation.
 //
 // Estratégia:
-//   • Agrupa por source:sourceHandle (mesmo ponto de saída exato)
-//   • Para N > 1 arestas, distribui curvatura de 0.10 … 0.70
-//   • Backbone nunca é tocado; 1 aresta no grupo → curvatura padrão 0.25
+//   • Agrupa por source node (não por handle individual)
+//   • Ordena pelo Y do nó destino (topo → baixo)
+//   • Atribui offset crescente: 20, 45, 70, … px (step≤25, max≈180)
+//   • Backbone nunca é tocado; grupos de 1 aresta → sem offset especial
 
-function fanOutEdges(edges) {
-  const byHandle = {}
+function separateParallelEdges(nodes, edges) {
+  const nodePos = new Map(nodes.map(n => [n.id, n.position]))
+
+  // Group by source node
+  const bySource = new Map()
   for (const e of edges) {
     if (e._kind === 'backbone') continue
-    const key = `${e.source}::${e.sourceHandle ?? '_'}`
-    ;(byHandle[key] = byHandle[key] ?? []).push(e)
+    if (!bySource.has(e.source)) bySource.set(e.source, [])
+    bySource.get(e.source).push(e)
+  }
+
+  // Build offset map keyed by edge id
+  const offsetMap = new Map()
+  for (const [, group] of bySource) {
+    if (group.length <= 1) continue
+
+    // Sort by target node Y so top-most target gets shortest offset
+    const sorted = [...group].sort((a, b) => {
+      const ay = nodePos.get(a.target)?.y ?? 0
+      const by_ = nodePos.get(b.target)?.y ?? 0
+      return ay - by_
+    })
+
+    const step = Math.min(25, Math.floor(160 / Math.max(sorted.length - 1, 1)))
+    sorted.forEach((e, idx) => {
+      offsetMap.set(e.id, 20 + idx * step)
+    })
   }
 
   return edges.map(e => {
     if (e._kind === 'backbone') return e
-
-    const key   = `${e.source}::${e.sourceHandle ?? '_'}`
-    const group = byHandle[key]
-    if (!group || group.length <= 1) return e
-
-    const n   = group.length
-    const idx = group.findIndex(g => g.id === e.id)
-    // Distribui curvatura entre 0.10 (quase reta) e 0.65 (muito curvada)
-    const curvature = n > 1 ? 0.10 + (idx / (n - 1)) * 0.55 : 0.25
-
+    const offset = offsetMap.get(e.id)
+    if (offset == null) return e
     return {
       ...e,
-      type: 'default',
-      pathOptions: { ...(e.pathOptions ?? {}), curvature },
+      type: 'smoothstep',
+      pathOptions: { borderRadius: 8, offset },
     }
   })
 }
@@ -2035,7 +2051,7 @@ function DiagramaFluxoInner({ projetoId }) {
 
     const laid = dagreLayout(visibleNs, visibleEs)
     setNodes(laid)
-    setEdges(visibleEs)
+    setEdges(separateParallelEdges(laid, visibleEs))
     setTimeout(() => fitView({ padding: 0.12, duration: 400 }), 60)
   }, [fitView])
 
@@ -2060,7 +2076,7 @@ function DiagramaFluxoInner({ projetoId }) {
         // Apply with empty set (show everything)
         const laid = dagreLayout(allNodesRef.current, es)
         setNodes(laid)
-        setEdges(es)
+        setEdges(separateParallelEdges(laid, es))
         setTimeout(() => fitView({ padding: 0.12, duration: 500 }), 80)
       })
       .catch(e => setError(e?.message ?? 'Erro ao carregar topologia'))
@@ -2091,10 +2107,15 @@ function DiagramaFluxoInner({ projetoId }) {
   }, [collapsedNodes])
 
   const handleOrganize = useCallback(() => {
-    const laid = dagreLayout(nodes, edges)
+    const visibleIds = new Set(nodes.map(n => n.id))
+    const rawEdges = allEdgesRef.current.filter(
+      e => visibleIds.has(e.source) && visibleIds.has(e.target)
+    )
+    const laid = dagreLayout(nodes, rawEdges)
     setNodes(laid)
+    setEdges(separateParallelEdges(laid, rawEdges))
     setTimeout(() => fitView({ padding: 0.12, duration: 500 }), 80)
-  }, [nodes, edges, fitView])
+  }, [nodes, fitView])
   const handleFitView  = useCallback(() => fitView({ padding: 0.12, duration: 500 }), [fitView])
 
   const btnStyle = {

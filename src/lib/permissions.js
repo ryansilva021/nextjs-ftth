@@ -48,6 +48,9 @@ export const PERM = {
   MANAGE_USERS:          'manage_users',
   VIEW_IMPORT:           'view_import',
   VIEW_LOGS:             'view_logs',
+
+  // Controle de ponto
+  PUNCH_CLOCK:           'punch_clock',
 }
 
 // ── Mapa de permissões por role ─────────────────────────────────────────────
@@ -67,6 +70,7 @@ export const ROLE_PERMISSIONS = {
     PERM.VIEW_SERVICE_ORDERS,
     PERM.EXECUTE_SERVICE_ORDER,
     PERM.VIEW_CLIENTS,
+    PERM.PUNCH_CLOCK,
   ],
 
   noc: [
@@ -78,6 +82,7 @@ export const ROLE_PERMISSIONS = {
     PERM.RUN_OLT_COMMANDS,
     PERM.VIEW_ONUS,
     PERM.VIEW_SERVICE_ORDERS,
+    PERM.PUNCH_CLOCK,
   ],
 
   recepcao: [
@@ -86,6 +91,7 @@ export const ROLE_PERMISSIONS = {
     PERM.CREATE_SERVICE_ORDER,
     PERM.VIEW_CLIENTS,
     PERM.EDIT_CLIENTS,
+    PERM.PUNCH_CLOCK,
   ],
 
   user: [

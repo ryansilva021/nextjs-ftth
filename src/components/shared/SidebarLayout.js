@@ -29,6 +29,7 @@ const NAV_ITEMS = [
 
   // Ordens de Serviço (tecnico, noc, recepcao)
   { href: '/admin/os',             label: 'Ordens de Serviço', icon: '📋', perm: PERM.VIEW_SERVICE_ORDERS,  group: GROUPS.staff },
+  { href: '/ponto',                label: 'Bater Ponto',        icon: '🕐', perm: PERM.PUNCH_CLOCK,          group: GROUPS.staff },
 
   // Admin
   { href: '/admin/usuarios',       label: 'Usuários',          icon: '👥', perm: PERM.MANAGE_USERS,         group: GROUPS.admin },
