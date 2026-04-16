@@ -11,7 +11,6 @@ import {
   ReactFlow, Controls, Background, BackgroundVariant,
   Panel, Handle, Position, useReactFlow, ReactFlowProvider,
   useViewport, useStore,
-  getBezierPath, BaseEdge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import Dagre from '@dagrejs/dagre'
@@ -734,44 +733,6 @@ function CTONode({ data }) {
 
 const NODE_TYPES = { olt: OLTNode, cdo: CDONode, splitter: SplitterNode, cto: CTONode, passagem: PassagemNode }
 
-// ─── FanEdge — aresta com offset Y real para separar conexões paralelas ───────
-//
-// Aplica um deslocamento vertical (data.fanOffset) ao ponto de saída da aresta,
-// criando um leque visual quando múltiplas arestas saem do mesmo nó/handle.
-//
-function FanEdge({
-  id, sourceX, sourceY, targetX, targetY,
-  sourcePosition, targetPosition,
-  style, markerEnd, markerStart, label, labelStyle, labelBgStyle,
-  data,
-}) {
-  const offset = data?.fanOffset ?? 0
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY: sourceY + offset,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-    curvature: 0.25,
-  })
-  return (
-    <BaseEdge
-      id={id}
-      path={edgePath}
-      style={style}
-      markerEnd={markerEnd}
-      markerStart={markerStart}
-      label={label}
-      labelX={labelX}
-      labelY={labelY}
-      labelStyle={labelStyle}
-      labelBgStyle={labelBgStyle}
-    />
-  )
-}
-
-const EDGE_TYPES = { fan: FanEdge }
 
 // ─── buildGraph ───────────────────────────────────────────────────────────────
 
@@ -1352,41 +1313,38 @@ function buildGraph(topologia, T) {
 
 // ─── fanOutEdges ──────────────────────────────────────────────────────────────
 //
-// Detecta arestas que saem do mesmo nó-origem (mesmo source node) e distribui
-// em leque aplicando um deslocamento Y real no ponto de saída via FanEdge.
+// Detecta arestas paralelas (mesmo source node) e aplica curvatura bezier
+// variável para separá-las visualmente sem desconectá-las dos handles.
 //
 // Estratégia:
-//   • Agrupa por source node id (não por handle — garante separação mesmo
-//     quando múltiplos handles ficam muito próximos verticalmente)
-//   • Para N arestas no grupo, distribui offsets Y: -spread/2 … +spread/2
-//   • Somente ramal/cascade recebem fan-out; backbone não é tocado
+//   • Agrupa por source:sourceHandle (mesmo ponto de saída exato)
+//   • Para N > 1 arestas, distribui curvatura de 0.10 … 0.70
+//   • Backbone nunca é tocado; 1 aresta no grupo → curvatura padrão 0.25
 
 function fanOutEdges(edges) {
-  // Agrupa por nó de origem (apenas ramal/cascade)
-  const bySource = {}
+  const byHandle = {}
   for (const e of edges) {
     if (e._kind === 'backbone') continue
-    ;(bySource[e.source] = bySource[e.source] ?? []).push(e)
+    const key = `${e.source}::${e.sourceHandle ?? '_'}`
+    ;(byHandle[key] = byHandle[key] ?? []).push(e)
   }
 
   return edges.map(e => {
     if (e._kind === 'backbone') return e
 
-    const group = bySource[e.source]
+    const key   = `${e.source}::${e.sourceHandle ?? '_'}`
+    const group = byHandle[key]
     if (!group || group.length <= 1) return e
 
-    const n      = group.length
-    const spread = Math.min(n * 14, 84)          // máx 84 px de spread total
-    const step   = spread / (n - 1)
-    const idx    = group.findIndex(g => g.id === e.id)
-    const offset = idx < 0 ? 0 : Math.round(-spread / 2 + idx * step)
-
-    if (offset === 0) return e
+    const n   = group.length
+    const idx = group.findIndex(g => g.id === e.id)
+    // Distribui curvatura entre 0.10 (quase reta) e 0.65 (muito curvada)
+    const curvature = n > 1 ? 0.10 + (idx / (n - 1)) * 0.55 : 0.25
 
     return {
       ...e,
-      type: 'fan',
-      data: { ...(e.data ?? {}), fanOffset: offset },
+      type: 'default',
+      pathOptions: { ...(e.pathOptions ?? {}), curvature },
     }
   })
 }
@@ -2203,7 +2161,6 @@ function DiagramaFluxoInner({ projetoId }) {
       nodes={nodes}
       edges={edges}
       nodeTypes={NODE_TYPES}
-      edgeTypes={EDGE_TYPES}
       defaultEdgeOptions={{ type: 'default' }}
       fitView
       minZoom={0.08}
