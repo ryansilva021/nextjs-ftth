@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useTransition, useCallback } from 'react'
+import { useState, useEffect, useTransition, useCallback, useRef } from 'react'
 import {
   registrarEntrada,
   registrarPausaInicio,
@@ -64,16 +64,50 @@ const MARCACOES = [
   { icon: '🔴', label: 'Saída',         key: 'saida'       },
 ]
 
+// ─── Schedule de lembretes ────────────────────────────────────────────────────
+
+const SCHEDULE = [
+  { h: 8,  m: 0,  needStatus: 'none',        msg: '⏰ Hora de iniciar sua jornada!' },
+  { h: 12, m: 0,  needStatus: 'trabalhando', msg: '⏸ Hora de iniciar a pausa!' },
+  { h: 13, m: 0,  needStatus: 'em_pausa',    msg: '▶ Hora de voltar da pausa!' },
+  { h: 18, m: 0,  needStatus: 'trabalhando', msg: '🔴 Hora de encerrar sua jornada!' },
+]
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function BaterPontoTab({ record, setRecord, showToast }) {
   const [now,     setNow]     = useState(Date.now())
   const [pending, startTrans] = useTransition()
+  const recordRef  = useRef(record)
+  const notifiedRef = useRef(new Set())
+
+  useEffect(() => { recordRef.current = record }, [record])
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(id)
   }, [])
+
+  useEffect(() => {
+    function checkSchedule() {
+      const d = new Date()
+      const h = d.getHours(), m = d.getMinutes()
+      const rec = recordRef.current
+      const status = rec?.status ?? 'none'
+      for (const s of SCHEDULE) {
+        if (h !== s.h || m !== s.m) continue
+        const key = `${s.h}:${s.m}`
+        if (notifiedRef.current.has(key)) continue
+        if (status === s.needStatus) {
+          notifiedRef.current.add(key)
+          showToast(s.msg)
+        }
+      }
+    }
+    checkSchedule()
+    const id = setInterval(checkSchedule, 30_000)
+    return () => clearInterval(id)
+  }, [showToast])
 
   const run = useCallback(async (action, opts = {}) => {
     startTrans(async () => {

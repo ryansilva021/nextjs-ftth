@@ -57,7 +57,7 @@ function mkTheme() {
     //   backbone = tronco principal OLT→CDO  (laranja espesso)
     //   distrib  = distribuição CDO→Splitter  (roxo médio)
     //   ramal    = ramal Splitter→CTO         (verde fino, por fibra ABNT)
-    backbone: { stroke: '#D4622B', strokeWidth: 4 },
+    backbone: { stroke: '#D4622B', strokeWidth: 4, strokeDasharray: '12,6', animation: 'flow-backbone 1.2s linear infinite' },
     distrib:  { stroke: '#c084fc', strokeWidth: 2 },
     ramal:    { stroke: '#4ade80', strokeWidth: 1.5 },
     // compat aliases
@@ -72,23 +72,49 @@ const HANDLE_BASE = {
   width: 11, height: 11, borderRadius: '50%', border: '2px solid #fff4',
 }
 
-// Dimensões base para dagre (largura fixa; altura calculada dinamicamente)
-const NODE_W = { olt: 230, cdo: 310, splitter: 195, cto: 240 }
-const NODE_H = { olt: 150, cdo: 200, splitter: 140, cto: 128 }
+// Fator de escala para mobile (nós 38% maiores)
+const SCALE_M = 1.38
 
-function calcCDOHeight(bandejas) {
+// Dimensões base para dagre (largura fixa; altura calculada dinamicamente)
+const NODE_W_BASE = { olt: 230, cdo: 310, splitter: 195, cto: 240 }
+const NODE_H_BASE = { olt: 150, cdo: 200, splitter: 140, cto: 128 }
+// Aliases sem escala — compatibilidade com MapPanel e outros usos internos
+const NODE_W = NODE_W_BASE
+const NODE_H = NODE_H_BASE
+
+function nodeW(type, isMob = false) {
+  return Math.round((NODE_W_BASE[type] ?? 220) * (isMob ? SCALE_M : 1))
+}
+function nodeHBase(type, isMob = false) {
+  return Math.round((NODE_H_BASE[type] ?? 140) * (isMob ? SCALE_M : 1))
+}
+
+function calcCDOHeight(bandejas, isMob = false) {
   const total = bandejas.reduce((s, b) => s + (b.fusoes?.length ?? 0), 0)
-  return Math.max(160, 64 + bandejas.length * 28 + total * 24)
+  const base = Math.max(160, 64 + bandejas.length * 28 + total * 24)
+  return isMob ? Math.round(base * SCALE_M) : base
 }
 
 // Splitter layout constants (must match SplitterNode DOM structure)
+// Base values; use splH(isMob) for actual values
 const SPL_HEADER_H = 38  // header bar
 const SPL_ENTRY_H  = 32  // fiber entrance row
 const SPL_PAD_BOT  = 6
 const SPL_ROW_H    = 24  // each output row
 
-function calcSplitterHeight(saidas) {
-  return Math.max(120, SPL_HEADER_H + SPL_ENTRY_H + saidas.length * SPL_ROW_H + SPL_PAD_BOT)
+function splH(isMob = false) {
+  const s = isMob ? SCALE_M : 1
+  return {
+    header: Math.round(SPL_HEADER_H * s),
+    entry:  Math.round(SPL_ENTRY_H  * s),
+    row:    Math.round(SPL_ROW_H    * s),
+    pad:    SPL_PAD_BOT,
+  }
+}
+
+function calcSplitterHeight(saidas, isMob = false) {
+  const { header, entry, row, pad } = splH(isMob)
+  return Math.max(Math.round(120 * (isMob ? SCALE_M : 1)), header + entry + saidas.length * row + pad)
 }
 
 // ─── OLT Node ────────────────────────────────────────────────────────────────
@@ -110,25 +136,27 @@ function CollapseBtn({ collapsed, onToggle, color }) {
 }
 
 function OLTNode({ data }) {
-  const { T, nome, modelo, ip, capacidade, status, ponCount, collapsed, onToggleCollapse, nodeId } = data
+  const { T, nome, modelo, ip, capacidade, status, ponCount, collapsed, onToggleCollapse, nodeId, isMobile: mob } = data
   const online = status === 'ativo' || status === 'online'
+  const fs = mob ? { hdr: 17, body: 14, badge: 13, icon: 19 } : { hdr: 13, body: 11, badge: 10, icon: 15 }
+  const pad = mob ? '10px 16px' : '8px 12px'
 
   return (
     <div style={{
       background: T.oltBg, border: `2px solid ${T.oltBdr}`, borderRadius: 10,
-      minWidth: NODE_W.olt, boxShadow: T.shadow, overflow: 'visible', position: 'relative',
+      minWidth: nodeW('olt', mob), boxShadow: T.shadow, overflow: 'visible', position: 'relative',
       fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
     }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: '8px 12px', fontWeight: 700, fontSize: 13,
+        padding: pad, fontWeight: 700, fontSize: fs.hdr,
         borderRadius: collapsed ? 8 : '8px 8px 0 0', background: T.oltHdrBg, color: T.oltHdr,
       }}>
-        <span style={{ fontSize: 15 }}>⚡</span>
+        <span style={{ fontSize: fs.icon }}>⚡</span>
         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
         <span style={{
-          width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+          width: mob ? 10 : 8, height: mob ? 10 : 8, borderRadius: '50%', flexShrink: 0,
           background: online ? '#22c55e' : '#ef4444',
           boxShadow: online ? '0 0 6px #22c55e88' : 'none',
         }} />
@@ -138,13 +166,13 @@ function OLTNode({ data }) {
       </div>
       {/* Body */}
       {!collapsed && (
-        <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {modelo && <div style={{ color: T.muted, fontSize: 11 }}>{modelo}</div>}
-          {ip     && <div style={{ color: T.muted, fontSize: 11, fontFamily: 'monospace' }}>{ip}</div>}
+        <div style={{ padding: pad, display: 'flex', flexDirection: 'column', gap: mob ? 5 : 3 }}>
+          {modelo && <div style={{ color: T.muted, fontSize: fs.body }}>{modelo}</div>}
+          {ip     && <div style={{ color: T.muted, fontSize: fs.body, fontFamily: 'monospace' }}>{ip}</div>}
           <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
             {capacidade != null && (
               <span style={{
-                fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 700,
+                fontSize: fs.badge, padding: mob ? '3px 10px' : '2px 8px', borderRadius: 20, fontWeight: 700,
                 background: T.oltBdr + '22', border: `1px solid ${T.oltBdr}55`, color: T.oltHdr,
               }}>
                 {capacidade} PONs
@@ -152,7 +180,7 @@ function OLTNode({ data }) {
             )}
             {ponCount > 0 && (
               <span style={{
-                fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 700,
+                fontSize: fs.badge, padding: mob ? '3px 10px' : '2px 8px', borderRadius: 20, fontWeight: 700,
                 background: '#22c55e22', border: '1px solid #22c55e44', color: '#22c55e',
               }}>
                 {ponCount} CDO{ponCount !== 1 ? 's' : ''}
@@ -162,7 +190,7 @@ function OLTNode({ data }) {
         </div>
       )}
       <Handle type="source" position={Position.Right} id="out"
-        style={{ ...HANDLE_BASE, background: T.oltBdr, right: -6 }} />
+        style={{ ...HANDLE_BASE, width: mob ? 14 : 11, height: mob ? 14 : 11, background: T.oltBdr, right: -6 }} />
     </div>
   )
 }
@@ -170,42 +198,45 @@ function OLTNode({ data }) {
 // ─── CDO Node ─────────────────────────────────────────────────────────────────
 
 function CDONode({ data }) {
-  const { T, nome, tipo, entrada, bandejas = [], ponFusoes = [], collapsed, onToggleCollapse, nodeId } = data
+  const { T, nome, tipo, entrada, bandejas = [], ponFusoes = [], collapsed, onToggleCollapse, nodeId, isMobile: mob } = data
+  const fs  = mob ? { hdr: 17, body: 13, sm: 12, xs: 11, icon: 17 } : { hdr: 13, body: 11, sm: 10, xs: 9, icon: 14 }
+  const pad = mob ? '10px 14px' : '8px 12px'
+  const dot = mob ? 12 : 9
 
   return (
     <div style={{
       background: T.cdoBg, border: `2px solid ${T.cdoBdr}`, borderRadius: 10,
-      minWidth: NODE_W.cdo, boxShadow: T.shadow, overflow: 'visible', position: 'relative',
+      minWidth: nodeW('cdo', mob), boxShadow: T.shadow, overflow: 'visible', position: 'relative',
       fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
     }}>
       {/* Input handle */}
       <Handle type="target" position={Position.Left} id="in"
-        style={{ ...HANDLE_BASE, background: T.cdoBdr, left: -6 }} />
+        style={{ ...HANDLE_BASE, width: mob ? 14 : 11, height: mob ? 14 : 11, background: T.cdoBdr, left: -6 }} />
 
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: '8px 12px', fontWeight: 700, fontSize: 13,
+        padding: pad, fontWeight: 700, fontSize: fs.hdr,
         borderRadius: collapsed ? 8 : '8px 8px 0 0', background: T.cdoHdrBg, color: T.cdoHdr,
         justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14 }}>📦</span>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
+          <span style={{ fontSize: fs.icon }}>📦</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: mob ? 220 : 160 }}>
             {nome}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
           {tipo && (
             <span style={{
-              fontSize: 9, padding: '1px 6px', borderRadius: 4, fontWeight: 700,
+              fontSize: fs.xs, padding: mob ? '2px 8px' : '1px 6px', borderRadius: 4, fontWeight: 700,
               background: T.cdoBdr + '33', color: T.cdoHdr, border: `1px solid ${T.cdoBdr}55`,
             }}>
               {tipo}
             </span>
           )}
           {entrada?.pon != null && (
-            <span style={{ fontSize: 10, color: T.muted, fontFamily: 'monospace' }}>
+            <span style={{ fontSize: fs.sm, color: T.muted, fontFamily: 'monospace' }}>
               PON {entrada.pon}
             </span>
           )}
@@ -217,7 +248,7 @@ function CDONode({ data }) {
 
       {/* Bandejas com fusões */}
       {!collapsed && bandejas.length > 0 && (
-        <div style={{ padding: '5px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ padding: mob ? '6px 12px' : '5px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {bandejas.map(bdj => {
             const ponRows = (bdj.fusoes ?? []).filter(f => f.tipo === 'pon')
             return (
@@ -228,8 +259,8 @@ function CDONode({ data }) {
                 {/* Cabeçalho bandeja */}
                 <div style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '3px 8px', borderBottom: `1px solid ${T.border}`,
-                  fontSize: 9, fontWeight: 700, color: T.muted, textTransform: 'uppercase',
+                  padding: mob ? '4px 10px' : '3px 8px', borderBottom: `1px solid ${T.border}`,
+                  fontSize: fs.xs, fontWeight: 700, color: T.muted, textTransform: 'uppercase',
                   letterSpacing: '0.06em',
                 }}>
                   <span>{bdj.nome}</span>
@@ -242,33 +273,31 @@ function CDONode({ data }) {
                   const isPon  = f.tipo === 'pon'
                   return (
                     <div key={f.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 4,
-                      padding: '3px 8px', position: 'relative', overflow: 'visible',
-                      fontSize: 10,
+                      display: 'flex', alignItems: 'center', gap: mob ? 6 : 4,
+                      padding: mob ? '5px 10px' : '3px 8px', position: 'relative', overflow: 'visible',
+                      fontSize: fs.sm,
                       background: isPon && f.splitter_id ? T.cdoBdr + '08' : 'transparent',
                       borderBottom: `1px solid ${T.border}18`,
                     }}>
                       {/* Dot entrada */}
                       <span style={{
-                        width: 9, height: 9, borderRadius: '50%', background: entHex,
+                        width: dot, height: dot, borderRadius: '50%', background: entHex,
                         display: 'inline-block', flexShrink: 0,
-                        boxShadow: `0 0 4px ${entHex}77`,
-                        border: `1px solid ${T.border}`,
+                        boxShadow: `0 0 4px ${entHex}77`, border: `1px solid ${T.border}`,
                       }} />
-                      <span style={{ color: T.muted, fontSize: 9 }}>F{f.entrada?.fibra ?? '?'}</span>
-                      <span style={{ color: T.border, fontSize: 9 }}>→</span>
+                      <span style={{ color: T.muted, fontSize: fs.xs }}>F{f.entrada?.fibra ?? '?'}</span>
+                      <span style={{ color: T.border, fontSize: fs.xs }}>→</span>
                       {/* Dot saída */}
                       <span style={{
-                        width: 9, height: 9, borderRadius: '50%', background: saiHex,
+                        width: dot, height: dot, borderRadius: '50%', background: saiHex,
                         display: 'inline-block', flexShrink: 0,
-                        boxShadow: `0 0 4px ${saiHex}77`,
-                        border: `1px solid ${T.border}`,
+                        boxShadow: `0 0 4px ${saiHex}77`, border: `1px solid ${T.border}`,
                       }} />
-                      <span style={{ color: saiHex, fontSize: 9, fontWeight: 700 }}>
+                      <span style={{ color: saiHex, fontSize: fs.xs, fontWeight: 700 }}>
                         F{f.saida?.fibra ?? f.entrada?.fibra ?? '?'}
                       </span>
                       {isPon && (
-                        <span style={{ color: T.cdoBdr, fontSize: 9, marginLeft: 2 }}>
+                        <span style={{ color: T.cdoBdr, fontSize: fs.xs, marginLeft: 2 }}>
                           PON{f.pon_porta ? `/${f.pon_porta}` : ''}
                           {f.splitter_id ? ' →SPL' : ' ⚠'}
                         </span>
@@ -281,7 +310,7 @@ function CDONode({ data }) {
                           id={`spl-${f.splitter_id}`}
                           style={{
                             ...HANDLE_BASE,
-                            width: 12, height: 12,
+                            width: mob ? 15 : 12, height: mob ? 15 : 12,
                             position: 'absolute', right: -16, top: '50%',
                             transform: 'translateY(-50%)',
                             background: saiHex,
@@ -301,7 +330,7 @@ function CDONode({ data }) {
 
       {/* Sem bandejas: handle genérico */}
       {!collapsed && bandejas.length === 0 && (
-        <div style={{ padding: '8px 12px', color: T.muted, fontSize: 11 }}>
+        <div style={{ padding: pad, color: T.muted, fontSize: fs.body }}>
           Sem bandejas configuradas
         </div>
       )}
@@ -319,27 +348,31 @@ function CDONode({ data }) {
 // ─── Splitter Node ───────────────────────────────────────────────────────────
 
 function SplitterNode({ data }) {
-  const { T, nome, tipo, entrada, saidas = [], collapsed, onToggleCollapse, nodeId } = data
+  const { T, nome, tipo, entrada, saidas = [], collapsed, onToggleCollapse, nodeId, isMobile: mob } = data
   const ligadas = saidas.filter(s => s._ligada ?? !!s.cto_id?.trim()).length
+  const { header: hH, entry: eH, row: rH } = splH(mob)
+  const fs = mob ? { hdr: 17, body: 14, port: 12, icon: 17 } : { hdr: 13, body: 11, port: 9, icon: 13 }
+  const dot = mob ? { w: 10, h: 10 } : { w: 7, h: 7 }
+  const entDot = mob ? 12 : 9
 
   return (
     <div style={{
       background: T.splBg, border: `2px solid ${T.splBdr}`, borderRadius: 10,
-      minWidth: NODE_W.splitter, boxShadow: T.shadow, overflow: 'visible', position: 'relative',
+      minWidth: nodeW('splitter', mob), boxShadow: T.shadow, overflow: 'visible', position: 'relative',
       fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
     }}>
       <Handle type="target" position={Position.Left} id="in"
-        style={{ ...HANDLE_BASE, background: T.splBdr, left: -6 }} />
+        style={{ ...HANDLE_BASE, width: mob ? 14 : 11, height: mob ? 14 : 11, background: T.splBdr, left: -6 }} />
 
-      {/* Header — height = SPL_HEADER_H (38px) */}
+      {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 12px', fontWeight: 700, fontSize: 13, height: SPL_HEADER_H,
+        padding: '8px 12px', fontWeight: 700, fontSize: fs.hdr, height: hH,
         borderRadius: collapsed ? 8 : '8px 8px 0 0', background: T.splHdrBg, color: T.splHdr,
         boxSizing: 'border-box',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-          <span style={{ fontSize: 13, flexShrink: 0 }}>🔀</span>
+          <span style={{ fontSize: fs.icon, flexShrink: 0 }}>🔀</span>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {nome}
           </span>
@@ -347,7 +380,7 @@ function SplitterNode({ data }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
           {tipo && (
             <span style={{
-              fontSize: 10, padding: '1px 7px', borderRadius: 4, fontWeight: 700,
+              fontSize: mob ? 12 : 10, padding: mob ? '2px 8px' : '1px 7px', borderRadius: 4, fontWeight: 700,
               background: T.splBdr + '33', border: `1px solid ${T.splBdr}55`, color: T.splHdr,
             }}>
               {tipo}
@@ -362,27 +395,27 @@ function SplitterNode({ data }) {
       {/* Body (hidden when collapsed) */}
       {!collapsed && <>
 
-      {/* Fiber entrance row — height = SPL_ENTRY_H (32px) */}
+      {/* Fiber entrance row */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: '0 12px', height: SPL_ENTRY_H, boxSizing: 'border-box',
+        padding: '0 12px', height: eH, boxSizing: 'border-box',
         borderBottom: `1px solid ${T.border}40`,
       }}>
         {entrada?.fibra != null ? (
           <>
             <span style={{
-              width: 9, height: 9, borderRadius: '50%', background: abntHex(entrada.fibra),
+              width: entDot, height: entDot, borderRadius: '50%', background: abntHex(entrada.fibra),
               display: 'inline-block', boxShadow: `0 0 5px ${abntHex(entrada.fibra)}88`,
               border: `1px solid ${abntHex(entrada.fibra)}aa`, flexShrink: 0,
             }} />
-            <span style={{ color: T.muted, fontSize: 11 }}>Entrada F{entrada.fibra}</span>
+            <span style={{ color: T.muted, fontSize: fs.body }}>Entrada F{entrada.fibra}</span>
           </>
         ) : (
-          <span style={{ color: T.muted, fontSize: 11 }}>{saidas.length} portas · {ligadas} ligadas</span>
+          <span style={{ color: T.muted, fontSize: fs.body }}>{saidas.length} portas · {ligadas} ligadas</span>
         )}
         {entrada?.fibra != null && (
           <span style={{
-            marginLeft: 'auto', fontSize: 10, fontWeight: 700,
+            marginLeft: 'auto', fontSize: mob ? 13 : 10, fontWeight: 700,
             color: ligadas === saidas.length ? T.ctoBdr : ligadas > 0 ? '#D4622B' : T.muted,
           }}>
             {ligadas}/{saidas.length}
@@ -390,7 +423,7 @@ function SplitterNode({ data }) {
         )}
       </div>
 
-      {/* Output rows — each SPL_ROW_H (24px), handle inline per row */}
+      {/* Output rows — each rH px, handle inline per row */}
       {saidas.map((s, idx) => {
         const porta   = s.porta ?? s.num ?? (idx + 1)
         const hasLink = s._ligada ?? !!s.cto_id?.trim()
@@ -402,24 +435,24 @@ function SplitterNode({ data }) {
             title={`S${porta} (${ABNT[(porta - 1) % 12]?.nome ?? ''}) → ${label}`}
             style={{
               position: 'relative',
-              display: 'flex', alignItems: 'center', gap: 5,
-              height: SPL_ROW_H, padding: '0 14px 0 10px',
+              display: 'flex', alignItems: 'center', gap: mob ? 7 : 5,
+              height: rH, padding: mob ? '0 18px 0 12px' : '0 14px 0 10px',
               boxSizing: 'border-box',
               borderBottom: idx < saidas.length - 1 ? `1px solid ${T.border}20` : 'none',
               background: hasLink ? `${hex}08` : 'transparent',
             }}
           >
             <span style={{
-              width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+              width: dot.w, height: dot.h, borderRadius: '50%', flexShrink: 0,
               background: hasLink ? hex : 'transparent',
               border: `2px solid ${hex}`,
               boxShadow: hasLink ? `0 0 4px ${hex}66` : 'none',
             }} />
-            <span style={{ fontSize: 9, color: hex, fontWeight: 700, minWidth: 18, flexShrink: 0 }}>
+            <span style={{ fontSize: fs.port, color: hex, fontWeight: 700, minWidth: mob ? 24 : 18, flexShrink: 0 }}>
               S{porta}
             </span>
             <span style={{
-              fontSize: 9, color: hasLink ? T.text : T.muted,
+              fontSize: fs.port, color: hasLink ? T.text : T.muted,
               flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {label}
@@ -431,7 +464,7 @@ function SplitterNode({ data }) {
               id={`s-${porta}`}
               style={{
                 ...HANDLE_BASE,
-                width: 10, height: 10,
+                width: mob ? 13 : 10, height: mob ? 13 : 10,
                 position: 'absolute', right: -6, top: '50%',
                 transform: 'translateY(-50%)',
                 background: hex,
@@ -479,19 +512,21 @@ function PassagemNode({ data }) {
 
 function CTONode({ data }) {
   const { T, nome, cto_id, capacidade = 16, ocupacao = 0, fibraEntrada,
-          bandejas = [], splitters = [], collapsed, onToggleCollapse, nodeId } = data
+          bandejas = [], splitters = [], collapsed, onToggleCollapse, nodeId, isMobile: mob } = data
   const pct     = Math.min(1, ocupacao / Math.max(1, capacidade))
   const livres  = capacidade - ocupacao
   const cheio   = livres <= 0
   const alertC  = cheio ? '#ef4444' : pct > 0.8 ? '#D4622B' : T.ctoBdr
   const segs    = Math.min(capacidade, 16)
   const filled  = Math.round(pct * segs)
+  const fs = mob ? { hdr: 16, body: 13, sm: 12, xs: 11 } : { hdr: 12, body: 10, sm: 10, xs: 9 }
+  const pad = mob ? '10px 14px' : '8px 12px'
 
   return (
     <div style={{
       background: T.ctoBg, borderRadius: 10,
       border: `2px solid ${alertC}`,
-      minWidth: NODE_W.cto,
+      minWidth: nodeW('cto', mob),
       boxShadow: T.shadow,
       overflow: 'visible', position: 'relative',
       fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
@@ -505,18 +540,18 @@ function CTONode({ data }) {
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 12px', fontWeight: 700, fontSize: 12,
+        padding: pad, fontWeight: 700, fontSize: fs.hdr,
         borderRadius: collapsed ? 8 : '8px 8px 0 0', background: T.ctoHdrBg, color: alertC,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ fontSize: 13 }}>📡</span>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>
+          <span style={{ fontSize: mob ? 18 : 13 }}>📡</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: mob ? 160 : 100 }}>
             {nome}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
           {cto_id && (
-            <span style={{ fontSize: 9, color: T.muted, fontFamily: 'monospace' }}>
+            <span style={{ fontSize: fs.xs, color: T.muted, fontFamily: 'monospace' }}>
               {cto_id}
             </span>
           )}
@@ -527,12 +562,12 @@ function CTONode({ data }) {
       </div>
 
       {/* Body */}
-      {!collapsed && <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {!collapsed && <div style={{ padding: pad, display: 'flex', flexDirection: 'column', gap: mob ? 7 : 5 }}>
         {/* Badge fibra de entrada (identidade da FO) */}
         {fibraEntrada != null && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: fs.body }}>
             <span style={{
-              width: 9, height: 9, borderRadius: '50%', display: 'inline-block',
+              width: mob ? 12 : 9, height: mob ? 12 : 9, borderRadius: '50%', display: 'inline-block',
               background: abntHex(fibraEntrada),
               boxShadow: `0 0 4px ${abntHex(fibraEntrada)}88`,
               border: `1px solid ${abntHex(fibraEntrada)}aa`,
@@ -544,14 +579,14 @@ function CTONode({ data }) {
         <div style={{ display: 'flex', gap: 2 }}>
           {Array.from({ length: segs }).map((_, i) => (
             <div key={i} style={{
-              flex: 1, height: 6, borderRadius: 2,
+              flex: 1, height: mob ? 9 : 6, borderRadius: 2,
               background: i < filled ? alertC : T.border,
               boxShadow: i < filled && cheio ? `0 0 3px ${alertC}99` : 'none',
             }} />
           ))}
         </div>
         {/* Contador */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: fs.body }}>
           <span style={{ color: T.muted }}>{ocupacao}/{capacidade} portas</span>
           <span style={{ color: alertC, fontWeight: 700 }}>
             {cheio ? '🔴 CHEIO' : `${livres} livre${livres !== 1 ? 's' : ''}`}
@@ -568,7 +603,8 @@ function CTONode({ data }) {
             const ativas = fusoes.filter(f => f.tipo !== 'livre').length
             // Bandeja handle only shown when there's a cascata connection going out
             const hasCascataOut = fusoes.some(f => f.tipo === 'cascata')
-            const bdjHex = T.ctoBdr
+            const firstCascataFibra = fusoes.find(f => f.tipo === 'cascata')?.saida?.fibra ?? fusoes.find(f => f.tipo === 'cascata')?.cor ?? null
+            const bdjHex = firstCascataFibra ? abntHex(firstCascataFibra) : T.ctoBdr
             return (
               <div key={b.id} style={{ marginBottom: 5, position: 'relative', overflow: 'visible' }}>
                 {/* Handle de saída da bandeja — só renderiza se há fusão cascata */}
@@ -672,22 +708,25 @@ function CTONode({ data }) {
                         </span>
 
                         {/* Handle inline — cascata: aresta sai desta linha de fusão */}
-                        {isCascata && (
-                          <Handle
-                            type="source"
-                            position={Position.Right}
-                            id={`fus-${f.id}`}
-                            style={{
-                              ...HANDLE_BASE,
-                              width: 9, height: 9,
-                              position: 'absolute', right: -16, top: '50%',
-                              transform: 'translateY(-50%)',
-                              background: '#0891b2',
-                              boxShadow: '0 0 5px #0891b299',
-                              zIndex: 10,
-                            }}
-                          />
-                        )}
+                        {isCascata && (() => {
+                          const saiHex = abntHex(f.saida?.fibra ?? f.cor)
+                          return (
+                            <Handle
+                              type="source"
+                              position={Position.Right}
+                              id={`fus-${f.id}`}
+                              style={{
+                                ...HANDLE_BASE,
+                                width: 9, height: 9,
+                                position: 'absolute', right: -16, top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: saiHex,
+                                boxShadow: `0 0 5px ${saiHex}99`,
+                                zIndex: 10,
+                              }}
+                            />
+                          )
+                        })()}
                       </div>
                     )
                   })}
@@ -759,7 +798,7 @@ function buildGraph(topologia, T) {
     delete opts._kind
     const type = kind === 'backbone' ? 'smoothstep'
                : kind === 'distrib'  ? 'default'
-               : kind === 'cascade'  ? 'step'
+               : kind === 'cascade'  ? 'smoothstep'
                : 'smoothstep'   // ramal: ortogonal = sem cruzamentos
     edges.push({ id: `e${ei++}`, source: src, target: tgt, style, type, _kind: kind, ...opts })
   }
@@ -1313,82 +1352,70 @@ function buildGraph(topologia, T) {
 
 // ─── separateParallelEdges ────────────────────────────────────────────────────
 //
-// Runs AFTER dagreLayout when node positions are known.
-// Groups non-backbone edges by source node, sorts by target Y, assigns
-// smoothstep with varying `offset` so edges fan out at different horizontal
-// distances before turning — creating a clear staircase separation.
-//
-// Estratégia:
-//   • Agrupa por source node (não por handle individual)
-//   • Ordena pelo Y do nó destino (topo → baixo)
-//   • Atribui offset crescente: 20, 45, 70, … px (step≤25, max≈180)
-//   • Backbone nunca é tocado; grupos de 1 aresta → sem offset especial
+// Usa smoothstep com offset pequeno (permanece perto dos nós, sem grandes desvios).
+// A separação principal vem das posições Y diferentes de cada handle de saída.
+// Somente quando múltiplas arestas compartilham o MESMO handle (mesmo ponto de
+// saída exato) é que adicionamos um offset incremental mínimo para separá-las.
 
 function separateParallelEdges(nodes, edges) {
-  const nodePos = new Map(nodes.map(n => [n.id, n.position]))
-
-  // Group by source node
-  const bySource = new Map()
+  // Count how many edges share the same (source, sourceHandle) pair
+  const handleCount = new Map()
   for (const e of edges) {
     if (e._kind === 'backbone') continue
-    if (!bySource.has(e.source)) bySource.set(e.source, [])
-    bySource.get(e.source).push(e)
+    const key = `${e.source}|${e.sourceHandle ?? ''}`
+    handleCount.set(key, (handleCount.get(key) ?? 0) + 1)
   }
 
-  // Build offset map keyed by edge id
-  const offsetMap = new Map()
-  for (const [, group] of bySource) {
-    if (group.length <= 1) continue
-
-    // Sort by target node Y so top-most target gets shortest offset
-    const sorted = [...group].sort((a, b) => {
-      const ay = nodePos.get(a.target)?.y ?? 0
-      const by_ = nodePos.get(b.target)?.y ?? 0
-      return ay - by_
-    })
-
-    const step = Math.min(25, Math.floor(160 / Math.max(sorted.length - 1, 1)))
-    sorted.forEach((e, idx) => {
-      offsetMap.set(e.id, 20 + idx * step)
-    })
-  }
+  // Track per-handle index for incremental offset
+  const handleIdx = new Map()
 
   return edges.map(e => {
     if (e._kind === 'backbone') return e
-    const offset = offsetMap.get(e.id)
-    if (offset == null) return e
+
+    const key   = `${e.source}|${e.sourceHandle ?? ''}`
+    const count = handleCount.get(key) ?? 1
+    const idx   = handleIdx.get(key) ?? 0
+    handleIdx.set(key, idx + 1)
+
+    // If multiple edges leave the same handle, add small incremental offset
+    // to fan them apart. Otherwise keep offset=12 (stays close to the node).
+    const offset = count > 1 ? 12 + idx * 16 : 12
+
     return {
       ...e,
       type: 'smoothstep',
-      pathOptions: { borderRadius: 8, offset },
+      pathOptions: { borderRadius: 20, offset },
     }
   })
 }
 
 // ─── Layout Dagre ─────────────────────────────────────────────────────────────
 
-function calcCTOHeight(bandejas = [], splitters = []) {
-  if (!bandejas.length && !splitters.length) return NODE_H.cto
+function calcCTOHeight(bandejas = [], splitters = [], isMob = false) {
+  const base = nodeHBase('cto', isMob)
+  if (!bandejas.length && !splitters.length) return base
   // header(36) + body(fibra+bar+counter ≈ 74) + section-divider+padding(15) = 125px baseline
-  let h = 125
+  let h = isMob ? Math.round(125 * SCALE_M) : 125
+  const rowH = isMob ? Math.round(22 * SCALE_M) : 22
+  const hdrH = isMob ? Math.round(33 * SCALE_M) : 33
   for (const b of bandejas) {
     const n = Math.max(1, b.fusoes?.length ?? 0)
-    // marginBottom(5) + bandeja-header(24) + container-padding(4) + n*22px per fusão row
-    h += 33 + n * 22
+    h += hdrH + n * rowH
   }
   // Splitters section: 4px top + 20px per splitter
-  if (splitters.length > 0) h += 4 + splitters.length * 20
-  return Math.max(NODE_H.cto, h)
+  if (splitters.length > 0) h += 4 + splitters.length * (isMob ? Math.round(20 * SCALE_M) : 20)
+  return Math.max(base, h)
 }
 
 const COLLAPSED_H = 40
 
 function calcH(node) {
+  const isMob = node.data?.isMobile ?? false
   if (node.data?.collapsed) return COLLAPSED_H
-  if (node.type === 'cdo')      return calcCDOHeight(node.data?.bandejas ?? [])
-  if (node.type === 'splitter') return calcSplitterHeight(node.data?.saidas ?? [])
-  if (node.type === 'cto')      return calcCTOHeight(node.data?.bandejas ?? [], node.data?.splitters ?? [])
-  return NODE_H[node.type] ?? 140
+  if (node.type === 'cdo')      return calcCDOHeight(node.data?.bandejas ?? [], isMob)
+  if (node.type === 'splitter') return calcSplitterHeight(node.data?.saidas ?? [], isMob)
+  if (node.type === 'cto')      return calcCTOHeight(node.data?.bandejas ?? [], node.data?.splitters ?? [], isMob)
+  return nodeHBase(node.type, isMob)
 }
 
 // Agrupa nós pela coluna X (tolerância 80px — rank do Dagre LR)
@@ -1426,7 +1453,8 @@ function resolveColumnOverlaps(nodes, minGap = 40) {
 // Detecta e resolve sobreposições entre QUALQUER par de nós (cruzamento entre colunas).
 // Usa iteração com limite para convergência.
 function resolveAllOverlaps(nodes, minGap = 40, maxIter = 40) {
-  const nw = n => NODE_W[n.type] ?? 220
+  const isMob = nodes[0]?.data?.isMobile ?? false
+  const nw = n => nodeW(n.type, isMob)
   const nh = n => calcH(n)
 
   let changed = true
@@ -1473,14 +1501,15 @@ function resolveAllOverlaps(nodes, minGap = 40, maxIter = 40) {
 }
 
 function dagreLayout(nodes, edges) {
+  const isMob = nodes[0]?.data?.isMobile ?? false
   const g = new Dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
-  // ranksep calculado para garantir gap real de ≥ 30px entre colunas mais largas
-  // (splitter=195, cto=240 → ranksep mínimo = 30 + 97 + 120 = 247 → usamos 300)
-  g.setGraph({ rankdir: 'LR', nodesep: 120, ranksep: 380, edgesep: 50 })
+  const ranksep = isMob ? Math.round(380 * SCALE_M) : 380
+  const nodesep = isMob ? Math.round(120 * SCALE_M) : 120
+  g.setGraph({ rankdir: 'LR', nodesep, ranksep, edgesep: 50 })
 
   for (const n of nodes) {
-    g.setNode(n.id, { width: NODE_W[n.type] ?? 220, height: calcH(n) })
+    g.setNode(n.id, { width: nodeW(n.type, isMob), height: calcH(n) })
   }
   for (const e of edges) {
     g.setEdge(e.source, e.target)
@@ -1493,7 +1522,7 @@ function dagreLayout(nodes, edges) {
     return {
       ...n,
       position: {
-        x: pos.x - (NODE_W[n.type] ?? 220) / 2,
+        x: pos.x - nodeW(n.type, isMob) / 2,
         y: pos.y - calcH(n) / 2,
       },
     }
@@ -2013,9 +2042,9 @@ function DiagramaFluxoInner({ projetoId }) {
     })
   }, [])
 
-  // Inject callback + nodeId into node data
-  const injectMeta = useCallback((ns) =>
-    ns.map(n => ({ ...n, data: { ...n.data, nodeId: n.id, onToggleCollapse: toggleCollapse } }))
+  // Inject callback + nodeId + isMobile into node data
+  const injectMeta = useCallback((ns, mob = false) =>
+    ns.map(n => ({ ...n, data: { ...n.data, nodeId: n.id, onToggleCollapse: toggleCollapse, isMobile: mob } }))
   , [toggleCollapse])
 
   // Given collapsed set, compute visible nodes/edges (hide descendants of collapsed nodes)
@@ -2052,7 +2081,7 @@ function DiagramaFluxoInner({ projetoId }) {
     const laid = dagreLayout(visibleNs, visibleEs)
     setNodes(laid)
     setEdges(separateParallelEdges(laid, visibleEs))
-    setTimeout(() => fitView({ padding: 0.12, duration: 400 }), 60)
+    setTimeout(() => fitView({ padding: isMobile ? 0.06 : 0.12, duration: 400 }), 60)
   }, [fitView])
 
   const load = useCallback(() => {
@@ -2069,7 +2098,7 @@ function DiagramaFluxoInner({ projetoId }) {
           ctos:      ns.filter(n => n.type === 'cto').length,
         })
         // Store full graph and reset collapse
-        allNodesRef.current = injectMeta(ns)
+        allNodesRef.current = injectMeta(ns, isMobile)
         allEdgesRef.current = es
         const emptySet = new Set()
         setCollapsedNodes(emptySet)
@@ -2077,11 +2106,11 @@ function DiagramaFluxoInner({ projetoId }) {
         const laid = dagreLayout(allNodesRef.current, es)
         setNodes(laid)
         setEdges(separateParallelEdges(laid, es))
-        setTimeout(() => fitView({ padding: 0.12, duration: 500 }), 80)
+        setTimeout(() => fitView({ padding: isMobile ? 0.06 : 0.12, duration: 500 }), 80)
       })
       .catch(e => setError(e?.message ?? 'Erro ao carregar topologia'))
       .finally(() => setLoading(false))
-  }, [projetoId, T, injectMeta, fitView])
+  }, [projetoId, T, isMobile, injectMeta, fitView])
 
   useEffect(() => { load() }, [load])
 
@@ -2100,6 +2129,14 @@ function DiagramaFluxoInner({ projetoId }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [T])
 
+  // Re-layout when mobile breakpoint changes (nodes need different dimensions)
+  useEffect(() => {
+    if (allNodesRef.current.length === 0) return
+    allNodesRef.current = allNodesRef.current.map(n => ({ ...n, data: { ...n.data, isMobile } }))
+    applyCollapse(collapsedNodes)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobile])
+
   // Re-compute visible graph when collapse state changes
   useEffect(() => {
     applyCollapse(collapsedNodes)
@@ -2114,9 +2151,9 @@ function DiagramaFluxoInner({ projetoId }) {
     const laid = dagreLayout(nodes, rawEdges)
     setNodes(laid)
     setEdges(separateParallelEdges(laid, rawEdges))
-    setTimeout(() => fitView({ padding: 0.12, duration: 500 }), 80)
+    setTimeout(() => fitView({ padding: isMobile ? 0.06 : 0.12, duration: 500 }), 80)
   }, [nodes, fitView])
-  const handleFitView  = useCallback(() => fitView({ padding: 0.12, duration: 500 }), [fitView])
+  const handleFitView  = useCallback(() => fitView({ padding: isMobile ? 0.06 : 0.12, duration: 500 }), [fitView])
 
   const btnStyle = {
     padding: '7px 14px', borderRadius: 7, fontSize: 12, cursor: 'pointer',
@@ -2177,6 +2214,9 @@ function DiagramaFluxoInner({ projetoId }) {
         0%,100% { filter: drop-shadow(0 0 3px #ef444432); }
         50%      { filter: drop-shadow(0 0 10px #ef4444aa); }
       }
+      @keyframes flow-backbone {
+        to { stroke-dashoffset: -18; }
+      }
     `}</style>
     <ReactFlow
       nodes={nodes}
@@ -2184,7 +2224,8 @@ function DiagramaFluxoInner({ projetoId }) {
       nodeTypes={NODE_TYPES}
       defaultEdgeOptions={{ type: 'default' }}
       fitView
-      minZoom={0.08}
+      fitViewOptions={{ padding: isMobile ? 0.06 : 0.12 }}
+      minZoom={isMobile ? 0.25 : 0.08}
       maxZoom={2.5}
       style={{ background: T.canvas }}
       proOptions={{ hideAttribution: true }}
