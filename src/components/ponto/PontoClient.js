@@ -178,10 +178,10 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
             )}
           </div>
 
-          {/* Tab bar — scrollável */}
-          <div style={{
+          {/* Tab bar — scrollável mobile, wrap desktop */}
+          <div className="ponto-tabs" style={{
             display: 'flex', gap: 2,
-            overflowX: 'auto', paddingBottom: 0,
+            overflowX: 'auto', flexWrap: 'wrap', paddingBottom: 0,
             msOverflowStyle: 'none', scrollbarWidth: 'none',
           }}>
             {TABS.map(tab => {
