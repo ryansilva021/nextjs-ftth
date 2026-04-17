@@ -1,5 +1,10 @@
-import { NextResponse } from 'next/server'
-import { connectDB } from '@/lib/db'
+import { NextResponse }    from 'next/server'
+import { connectDB }       from '@/lib/db'
+import { TimeSettings }    from '@/models/TimeSettings'
+import { PushSubscription } from '@/models/PushSubscription'
+import { sendPushToUser }  from '@/lib/webpush'
+
+export const runtime = 'nodejs'
 
 const ALERTS = [
   { field: 'entrada',       alertToggle: 'alerta_entrada',       msg: '⏰ Hora de iniciar sua jornada!' },
@@ -21,11 +26,6 @@ export async function GET(req) {
 
   const now    = new Date()
   const padded = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-
-  // Lazy imports para evitar problemas com edge runtime
-  const { TimeSettings }     = await import('@/models/TimeSettings')
-  const { PushSubscription } = await import('@/models/PushSubscription')
-  const { sendPushToUser }   = await import('@/lib/webpush')
 
   const allSettings = await TimeSettings.find({}).lean()
   const sent = []
