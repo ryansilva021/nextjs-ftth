@@ -60,6 +60,23 @@ self.addEventListener('notificationclick', (event) => {
   )
 })
 
+// ── Mensagem da thread principal → mostra notificação nativa ─────────────────
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'SHOW_NOTIFICATION') return
+  const { title, body, icon, badge, tag, url, vibrate } = event.data
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon:     icon    ?? '/short-logo.svg',
+      badge:    badge   ?? '/short-logo.svg',
+      tag:      tag     ?? 'fiberops',
+      renotify: true,
+      vibrate:  vibrate ?? [150, 75, 150],
+      data:     { url: url ?? '/' },
+    })
+  )
+})
+
 // ── Instalação / ativação (sem cache offline por enquanto) ────────────────────
 self.addEventListener('install',  () => self.skipWaiting())
 self.addEventListener('activate', (e) => e.waitUntil(clients.claim()))

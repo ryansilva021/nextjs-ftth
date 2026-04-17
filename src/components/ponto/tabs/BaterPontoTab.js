@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useTransition, useCallback, useRef } from 'react'
+import { useState, useEffect, useTransition, useCallback } from 'react'
 import {
   registrarEntrada,
   registrarPausaInicio,
   registrarPausaFim,
   registrarSaida,
 } from '@/actions/time-record'
-import { T } from '../pontoTheme'
+import { T, ALARM_CFG } from '../pontoTheme'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,50 +64,16 @@ const MARCACOES = [
   { icon: '🔴', label: 'Saída',         key: 'saida'       },
 ]
 
-// ─── Schedule de lembretes ────────────────────────────────────────────────────
-
-const SCHEDULE = [
-  { h: 8,  m: 0,  needStatus: 'none',        msg: '⏰ Hora de iniciar sua jornada!' },
-  { h: 12, m: 0,  needStatus: 'trabalhando', msg: '⏸ Hora de iniciar a pausa!' },
-  { h: 13, m: 0,  needStatus: 'em_pausa',    msg: '▶ Hora de voltar da pausa!' },
-  { h: 18, m: 0,  needStatus: 'trabalhando', msg: '🔴 Hora de encerrar sua jornada!' },
-]
-
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function BaterPontoTab({ record, setRecord, showToast }) {
-  const [now,     setNow]     = useState(Date.now())
-  const [pending, startTrans] = useTransition()
-  const recordRef  = useRef(record)
-  const notifiedRef = useRef(new Set())
-
-  useEffect(() => { recordRef.current = record }, [record])
+export default function BaterPontoTab({ record, setRecord, showToast, alarms, setAlarms }) {
+  const [now,      setNow]     = useState(Date.now())
+  const [pending,  startTrans] = useTransition()
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(id)
   }, [])
-
-  useEffect(() => {
-    function checkSchedule() {
-      const d = new Date()
-      const h = d.getHours(), m = d.getMinutes()
-      const rec = recordRef.current
-      const status = rec?.status ?? 'none'
-      for (const s of SCHEDULE) {
-        if (h !== s.h || m !== s.m) continue
-        const key = `${s.h}:${s.m}`
-        if (notifiedRef.current.has(key)) continue
-        if (status === s.needStatus) {
-          notifiedRef.current.add(key)
-          showToast(s.msg)
-        }
-      }
-    }
-    checkSchedule()
-    const id = setInterval(checkSchedule, 30_000)
-    return () => clearInterval(id)
-  }, [showToast])
 
   const run = useCallback(async (action, opts = {}) => {
     startTrans(async () => {
@@ -223,6 +189,84 @@ export default function BaterPontoTab({ record, setRecord, showToast }) {
           </div>
         )}
       </div>
+
+      {/* ── Despertadores ──────────────────────────────────────────────────── */}
+      {alarms && (
+        <div style={{ marginTop: 32 }}>
+          <div style={{
+            fontSize: 11, fontWeight: 700, color: T.dim,
+            textTransform: 'uppercase', letterSpacing: '0.1em',
+            marginBottom: 10,
+          }}>
+            ⏰ Despertadores
+          </div>
+
+          <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden' }}>
+            {ALARM_CFG.map((cfg, i) => {
+              const alarm = alarms[cfg.key] ?? { enabled: false, time: cfg.defaultTime }
+              return (
+                <div key={cfg.key} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
+                  borderBottom: i < ALARM_CFG.length - 1 ? `1px solid ${T.border}` : 'none',
+                }}>
+                  {/* Toggle */}
+                  <button
+                    onClick={() => setAlarms(prev => ({
+                      ...prev,
+                      [cfg.key]: { ...prev[cfg.key], enabled: !prev[cfg.key]?.enabled },
+                    }))}
+                    aria-label={`${alarm.enabled ? 'Desativar' : 'Ativar'} despertador ${cfg.label}`}
+                    style={{
+                      flexShrink: 0, width: 40, height: 22, borderRadius: 11,
+                      background: alarm.enabled ? T.accent : T.border,
+                      border: 'none', cursor: 'pointer', position: 'relative',
+                      transition: 'background .2s',
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute', top: 3,
+                      left: alarm.enabled ? 20 : 3,
+                      width: 16, height: 16, borderRadius: '50%',
+                      background: '#fff', transition: 'left .2s',
+                      display: 'block',
+                    }} />
+                  </button>
+
+                  <span style={{ fontSize: 16, flexShrink: 0 }}>{cfg.icon}</span>
+                  <span style={{
+                    flex: 1, fontSize: 13, fontWeight: 600,
+                    color: alarm.enabled ? T.text : T.dim,
+                    transition: 'color .2s',
+                  }}>
+                    {cfg.label}
+                  </span>
+
+                  <input
+                    type="time"
+                    value={alarm.time}
+                    onChange={e => setAlarms(prev => ({
+                      ...prev,
+                      [cfg.key]: { ...prev[cfg.key], time: e.target.value },
+                    }))}
+                    style={{
+                      background: T.card2, border: `1px solid ${T.border}`,
+                      borderRadius: 8, color: alarm.enabled ? T.text : T.dim,
+                      fontSize: 14, fontWeight: 700, padding: '6px 10px',
+                      fontFamily: T.ff, outline: 'none', cursor: 'pointer',
+                      opacity: alarm.enabled ? 1 : 0.45,
+                      transition: 'opacity .2s',
+                    }}
+                  />
+                </div>
+              )
+            })}
+          </div>
+
+          <p style={{ fontSize: 11, color: T.dim, marginTop: 8, textAlign: 'center' }}>
+            O despertador toca no horário e permite bater o ponto diretamente.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

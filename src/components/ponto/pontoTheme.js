@@ -1,3 +1,15 @@
+// Configuração dos despertadores (compartilhado entre PontoClient e BaterPontoTab)
+export const ALARM_CFG = [
+  { key: 'entrada',       label: 'Entrada',       icon: '🟢', defaultTime: '08:00' },
+  { key: 'almoco_inicio', label: 'Almoço início', icon: '⏸️', defaultTime: '12:00' },
+  { key: 'almoco_fim',    label: 'Almoço fim',    icon: '▶️', defaultTime: '13:00' },
+  { key: 'saida',         label: 'Saída',         icon: '🔴', defaultTime: '18:00' },
+]
+
+export function defaultAlarms() {
+  return Object.fromEntries(ALARM_CFG.map(a => [a.key, { enabled: false, time: a.defaultTime }]))
+}
+
 // Tema compartilhado entre todos os componentes do módulo Ponto
 export const T = {
   canvas:  '#1a1510',

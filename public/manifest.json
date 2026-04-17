@@ -1,0 +1,12 @@
+{
+  "name": "FiberOps",
+  "short_name": "FiberOps",
+  "description": "Gestão de rede FTTH",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#ea580c",
+  "icons": [
+    { "src": "/short-logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

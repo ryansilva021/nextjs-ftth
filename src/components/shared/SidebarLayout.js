@@ -8,10 +8,38 @@ import { signOut } from "next-auth/react";
 import { hasPermission, PERM, ROLE_LABELS, ROLE_COLORS } from '@/lib/permissions'
 import { useOSNotification }    from '@/hooks/useOSNotification'
 import { playNotifSound }       from '@/lib/notifSound'
-import OSToast from '@/components/shared/OSToast'
+import OSToast    from '@/components/shared/OSToast'
+import PontoToast from '@/components/shared/PontoToast'
+import { getTimeSettings } from '@/actions/time-settings'
+import { showNativeNotif } from '@/lib/nativeNotif'
+
+// Rótulos legíveis por tipo de OS (para notificações nativas)
+const TIPO_LABEL = {
+  instalacao:   'Instalação',
+  manutencao:   'Manutenção',
+  suporte:      'Suporte',
+  cancelamento: 'Cancelamento',
+}
 
 // Roles que recebem notificações de OS
 const ROLES_COM_NOTIFICACAO = ['superadmin', 'admin', 'tecnico', 'recepcao', 'noc']
+
+// Roles que recebem lembretes de ponto
+const ROLES_COM_PONTO = ['admin', 'tecnico', 'recepcao', 'noc']
+
+function buildPontoSchedule(s) {
+  if (!s) return []
+  const parse = (hhmm) => {
+    const [h, m] = (hhmm ?? '').split(':').map(Number)
+    return isNaN(h) || isNaN(m) ? null : { h, m }
+  }
+  return [
+    s.alerta_entrada       && { ...parse(s.entrada),       msg: '⏰ Hora de iniciar sua jornada!' },
+    s.alerta_almoco_inicio && { ...parse(s.almoco_inicio),  msg: '🍽 Hora de ir para o almoço!' },
+    s.alerta_almoco_fim    && { ...parse(s.almoco_fim),     msg: '▶ Hora de retornar do almoço!' },
+    s.alerta_saida         && { ...parse(s.saida),          msg: '🔴 Hora de encerrar seu expediente!' },
+  ].filter(x => x && x.h != null)
+}
 
 // ── Grupos de separação visual ──────────────────────────────────────────────
 const GROUPS = { public: 0, staff: 1, admin: 2, superadmin: 3 }
@@ -28,8 +56,10 @@ const NAV_ITEMS = [
   { href: '/admin/calculos',  label: 'Cálc. Potência', icon: '⚡', perm: PERM.VIEW_CALCULATIONS, group: GROUPS.staff },
 
   // Ordens de Serviço (tecnico, noc, recepcao)
-  { href: '/admin/os',             label: 'Ordens de Serviço', icon: '📋', perm: PERM.VIEW_SERVICE_ORDERS,  group: GROUPS.staff },
-  { href: '/ponto',                label: 'Bater Ponto',        icon: '🕐', perm: PERM.PUNCH_CLOCK,          group: GROUPS.staff },
+  { href: '/admin/os',             label: 'Todas as OS',       icon: '📋', perm: PERM.VIEW_SERVICE_ORDERS,  group: GROUPS.staff },
+  { href: '/admin/os/minhas',      label: 'Minhas OS',         icon: '🗒️', perm: PERM.VIEW_SERVICE_ORDERS,  group: GROUPS.staff, indent: true },
+  { href: '/ponto',                label: 'Bater Ponto',       icon: '🕐', perm: PERM.PUNCH_CLOCK,          group: GROUPS.staff },
+  { href: '/configuracoes/ponto',  label: 'Config. Ponto',     icon: '⏰', perm: PERM.MANAGE_USERS,         group: GROUPS.staff, indent: true },
 
   // Admin
   { href: '/admin/usuarios',       label: 'Usuários',          icon: '👥', perm: PERM.MANAGE_USERS,         group: GROUPS.admin },
@@ -63,6 +93,13 @@ export default function SidebarLayout({ session, children }) {
 
   const itensVisiveis = NAV_ITEMS.filter(item => isItemVisible(item, role))
 
+  // ── Registro do service worker (garante SW ativo para notificações nativas) ─
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {})
+    }
+  }, [])
+
   // ── Online / Offline ─────────────────────────────────────────────────────
   const [isOnline, setIsOnline] = useState(true)
   useEffect(() => {
@@ -84,6 +121,12 @@ export default function SidebarLayout({ session, children }) {
       const soundOn = localStorage.getItem('pref_notif_sound')
       if (soundOn !== 'false') playNotifSound()
     } catch (_) {}
+    showNativeNotif({
+      title: 'Nova OS · FiberOps',
+      body:  `${TIPO_LABEL[event.tipo] ?? event.tipo ?? 'OS'} — ${event.cliente_nome ?? ''}`.trim(),
+      tag:   'fiberops-os',
+      url:   `/admin/os/${event.os_id}`,
+    })
   }, [])
 
   const removeToast = useCallback((id) => {
@@ -92,6 +135,62 @@ export default function SidebarLayout({ session, children }) {
 
   const notificacoesAtivas = ROLES_COM_NOTIFICACAO.includes(role)
   useOSNotification(notificacoesAtivas ? { onNova: handleNova } : {})
+
+  // ── Lembretes de ponto globais ───────────────────────────────────────────────
+  const [pontoToasts,   setPontoToasts]   = useState([])
+  const [pontoSchedule, setPontoSchedule] = useState([])
+  const pontoAtivo = ROLES_COM_PONTO.includes(role)
+
+  useEffect(() => {
+    if (!pontoAtivo) return
+    getTimeSettings()
+      .then(s => setPontoSchedule(buildPontoSchedule(s)))
+      .catch(() => {})
+  }, [pontoAtivo])
+
+  useEffect(() => {
+    if (!pontoAtivo || !pontoSchedule.length) return
+    function checkPonto() {
+      const d = new Date()
+      const today = d.toISOString().split('T')[0]
+      const storageKey = `ponto_notified_${today}`
+      let notified
+      try { notified = new Set(JSON.parse(localStorage.getItem(storageKey) ?? '[]')) }
+      catch (_) { notified = new Set() }
+
+      const h = d.getHours(), m = d.getMinutes()
+      let changed = false
+      for (const s of pontoSchedule) {
+        if (h !== s.h || m !== s.m) continue
+        const key = `${String(s.h).padStart(2, '0')}:${String(s.m).padStart(2, '0')}`
+        if (notified.has(key)) continue
+        notified.add(key)
+        changed = true
+        const id = `ponto-${key}-${Math.random()}`
+        setPontoToasts(prev => [...prev.slice(-3), { id, msg: s.msg, time: key }])
+        showNativeNotif({
+          title: 'Lembrete de Ponto · FiberOps',
+          body:  s.msg,
+          tag:   'fiberops-ponto',
+          url:   '/ponto',
+        })
+        try {
+          const soundOn = localStorage.getItem('pref_notif_sound')
+          if (soundOn !== 'false') playNotifSound()
+        } catch (_) {}
+      }
+      if (changed) {
+        try { localStorage.setItem(storageKey, JSON.stringify([...notified])) } catch (_) {}
+      }
+    }
+    checkPonto()
+    const id = setInterval(checkPonto, 30_000)
+    return () => clearInterval(id)
+  }, [pontoAtivo, pontoSchedule])
+
+  const removePontoToast = useCallback((id) => {
+    setPontoToasts(prev => prev.filter(t => t.id !== id))
+  }, [])
 
   const sidebarStyle = {
     backgroundColor: "var(--sidebar-bg)",
@@ -141,9 +240,9 @@ export default function SidebarLayout({ session, children }) {
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
           {itensVisiveis.map((item, idx, arr) => {
-            const ativa    = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+            const ativa    = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href) && item.href !== '/admin/os')
             const prevItem = arr[idx - 1]
-            const showSep  = idx > 0 && prevItem && item.group !== prevItem.group
+            const showSep  = idx > 0 && prevItem && item.group !== prevItem.group && !item.indent
 
             return (
               <div key={item.href}>
@@ -160,11 +259,12 @@ export default function SidebarLayout({ session, children }) {
                     backgroundColor: ativa ? "var(--card-bg-active)" : "transparent",
                     color:           ativa ? "#ea580c" : "var(--text-muted)",
                     border:          ativa ? "1px solid #f4b07a" : "1px solid transparent",
+                    marginLeft:      item.indent ? 16 : 0,
                   }}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-200/20 hover:text-current"
                 >
-                  <span>{item.icon}</span>
-                  {item.label}
+                  <span style={{ fontSize: item.indent ? 13 : undefined }}>{item.icon}</span>
+                  <span style={{ fontSize: item.indent ? 12 : undefined }}>{item.label}</span>
                 </Link>
               </div>
             )
@@ -291,6 +391,11 @@ export default function SidebarLayout({ session, children }) {
       {/* Notificações OS em tempo real */}
       {notificacoesAtivas && (
         <OSToast notifications={toasts} onRemove={removeToast} />
+      )}
+
+      {/* Lembretes de ponto */}
+      {pontoAtivo && (
+        <PontoToast notifications={pontoToasts} onRemove={removePontoToast} />
       )}
     </div>
   );
