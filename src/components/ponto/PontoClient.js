@@ -7,6 +7,7 @@ import AlarmaModal            from './AlarmaModal'
 import BaterPontoTab          from './tabs/BaterPontoTab'
 import IncluirPontoTab        from './tabs/IncluirPontoTab'
 import AjustarPontoTab        from './tabs/AjustarPontoTab'
+import DespertadoresTab       from './tabs/DespertadoresTab'
 import JustificarAusenciaTab  from './tabs/JustificarAusenciaTab'
 import MinhasSolicitacoesTab  from './tabs/MinhasSolicitacoesTab'
 import DadosCadastraisTab     from './tabs/DadosCadastraisTab'
@@ -16,8 +17,9 @@ import DadosCadastraisTab     from './tabs/DadosCadastraisTab'
 const TABS = [
   { id: 'bater',       label: 'Bater Ponto',   icon: '🕐' },
   { id: 'incluir',     label: 'Incluir Ponto',  icon: '➕' },
-  { id: 'ajustar',     label: 'Ajustar Ponto',  icon: '✏️' },
-  { id: 'ausencia',    label: 'Ausência',        icon: '📋' },
+  { id: 'ajustar',       label: 'Ajustar Ponto',  icon: '✏️' },
+  { id: 'despertadores', label: 'Despertadores',  icon: '⏰' },
+  { id: 'ausencia',      label: 'Ausência',        icon: '📋' },
   { id: 'solicitacoes',label: 'Solicitações',    icon: '📩' },
   { id: 'dados',       label: 'Meus Dados',      icon: '👤' },
 ]
@@ -225,8 +227,6 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
             record={record}
             setRecord={setRecord}
             showToast={showToast}
-            alarms={alarms}
-            setAlarms={setAlarms}
           />
         )}
         {activeTab === 'incluir' && (
@@ -240,6 +240,9 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
             showToast={showToast}
             onSuccess={req => { addRequest(req); setActiveTab('solicitacoes') }}
           />
+        )}
+        {activeTab === 'despertadores' && (
+          <DespertadoresTab alarms={alarms} setAlarms={setAlarms} />
         )}
         {activeTab === 'ausencia' && (
           <JustificarAusenciaTab
