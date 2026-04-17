@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { T } from './pontoTheme'
+import { useState, useEffect, useCallback, useTransition } from 'react'
+import { T, ALARM_CFG, defaultAlarms } from './pontoTheme'
+import { registrarEntrada, registrarPausaInicio, registrarPausaFim, registrarSaida } from '@/actions/time-record'
+import AlarmaModal            from './AlarmaModal'
 import BaterPontoTab          from './tabs/BaterPontoTab'
 import IncluirPontoTab        from './tabs/IncluirPontoTab'
 import AjustarPontoTab        from './tabs/AjustarPontoTab'
@@ -39,6 +41,19 @@ function Toast({ msg, type, onClose }) {
   )
 }
 
+// ─── Geolocalização ───────────────────────────────────────────────────────────
+
+function getLocation() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve(null)
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => resolve({ lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy }),
+      () => resolve(null),
+      { timeout: 6000, maximumAge: 60_000 }
+    )
+  })
+}
+
 // ─── Shell ────────────────────────────────────────────────────────────────────
 
 export default function PontoClient({ initialRecord, initialRequests, userName, userProfile }) {
@@ -50,6 +65,78 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
   const showToast = useCallback((msg, type = 'ok') => {
     setToast({ msg, type, id: Date.now() })
   }, [])
+
+  // ── Despertadores ──────────────────────────────────────────────────────────
+  const [alarms,      setAlarms]      = useState(null)   // null = ainda carregando
+  const [firedAlarm,  setFiredAlarm]  = useState(null)
+  const [alarmPending, startAlarmTrans] = useTransition()
+
+  // Carrega do localStorage no cliente
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('ponto_alarms')
+      setAlarms(stored ? JSON.parse(stored) : defaultAlarms())
+    } catch (_) {
+      setAlarms(defaultAlarms())
+    }
+  }, [])
+
+  // Persiste quando muda
+  useEffect(() => {
+    if (!alarms) return
+    try { localStorage.setItem('ponto_alarms', JSON.stringify(alarms)) } catch (_) {}
+  }, [alarms])
+
+  // Verifica despertadores a cada 30s
+  useEffect(() => {
+    if (!alarms) return
+    function checkAlarms() {
+      if (firedAlarm) return // já existe um alarme tocando
+      const d = new Date()
+      const today      = d.toISOString().split('T')[0]
+      const storageKey = `ponto_alarm_fired_${today}`
+      let fired
+      try { fired = new Set(JSON.parse(localStorage.getItem(storageKey) ?? '[]')) }
+      catch (_) { fired = new Set() }
+
+      const hhmm = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+      for (const cfg of ALARM_CFG) {
+        const alarm = alarms[cfg.key]
+        if (!alarm?.enabled)        continue
+        if (alarm.time !== hhmm)    continue
+        if (fired.has(cfg.key))     continue
+
+        fired.add(cfg.key)
+        try { localStorage.setItem(storageKey, JSON.stringify([...fired])) } catch (_) {}
+        setFiredAlarm({ ...cfg, time: hhmm })
+        return
+      }
+    }
+
+    checkAlarms()
+    const id = setInterval(checkAlarms, 30_000)
+    return () => clearInterval(id)
+  }, [alarms, firedAlarm])
+
+  // Bater ponto pelo despertador
+  const handleAlarmaBater = useCallback((alarmaKey) => {
+    startAlarmTrans(async () => {
+      const ACTION_MAP = {
+        entrada:       async () => registrarEntrada({ location: await getLocation() }),
+        almoco_inicio: ()       => registrarPausaInicio(),
+        almoco_fim:    ()       => registrarPausaFim(),
+        saida:         async () => registrarSaida({ location: await getLocation() }),
+      }
+      const result = await ACTION_MAP[alarmaKey]?.()
+      setFiredAlarm(null)
+      if (result?.ok) {
+        setRecord(result.record)
+        showToast('Ponto registrado com sucesso! ✅')
+      } else {
+        showToast(result?.error ?? 'Erro ao registrar ponto', 'error')
+      }
+    })
+  }, [showToast])
 
   const addRequest = useCallback((req) => {
     setRequests(prev => [req, ...prev])
@@ -138,6 +225,8 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
             record={record}
             setRecord={setRecord}
             showToast={showToast}
+            alarms={alarms}
+            setAlarms={setAlarms}
           />
         )}
         {activeTab === 'incluir' && (
@@ -169,6 +258,16 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
       {/* Toast global */}
       {toast && (
         <Toast key={toast.id} msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />
+      )}
+
+      {/* Despertador */}
+      {firedAlarm && (
+        <AlarmaModal
+          alarma={firedAlarm}
+          pending={alarmPending}
+          onBaterPonto={handleAlarmaBater}
+          onCancelar={() => setFiredAlarm(null)}
+        />
       )}
     </div>
   )

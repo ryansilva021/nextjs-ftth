@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext'
 export const metadata = {
   title: 'FiberOps FTTH',
   description: 'Gestão de rede FTTH',
+  manifest: '/manifest.json',
 }
 
 export default function RootLayout({ children }) {

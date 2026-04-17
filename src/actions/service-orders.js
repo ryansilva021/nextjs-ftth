@@ -708,3 +708,50 @@ export async function simularStatusConexao(osId) {
   revalidatePath('/admin/os')
   return { ...os, _id: os._id.toString() }
 }
+
+// ---------------------------------------------------------------------------
+// reagendarOS — técnico ou admin pode reagendar para data futura
+// ---------------------------------------------------------------------------
+
+const REAGENDAR_ROLES = ['superadmin', 'admin', 'tecnico', 'recepcao']
+
+export async function reagendarOS(osId, novaData) {
+  const session = await requireActiveEmpresa(REAGENDAR_ROLES)
+  const { projeto_id, role, username } = session.user
+
+  if (!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData)) {
+    return { error: 'Data inválida.' }
+  }
+
+  // Não permite datas passadas
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+  const nova = new Date(novaData + 'T00:00:00')
+  if (nova < hoje) return { error: 'Não é possível reagendar para uma data passada.' }
+
+  await connectDB()
+
+  const filter = { projeto_id, os_id: osId }
+  if (role === 'tecnico') filter.tecnico_id = username
+
+  const os = await ServiceOrder.findOneAndUpdate(
+    filter,
+    {
+      $set:  { data_agendamento: nova, status: 'agendada' },
+      $push: {
+        historico: {
+          usuario_id:   username,
+          usuario_nome: username,
+          acao:         `Reagendada para ${nova.toLocaleDateString('pt-BR')}`,
+          timestamp:    new Date(),
+        },
+      },
+    },
+    { new: true }
+  ).lean()
+
+  if (!os) return { error: 'OS não encontrada ou sem permissão.' }
+
+  revalidatePath('/admin/os')
+  revalidatePath('/admin/os/minhas')
+  return { ok: true, os: { ...os, _id: os._id.toString() } }
+}
