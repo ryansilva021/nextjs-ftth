@@ -25,5 +25,7 @@ export const config = {
    *   - Ícones (favicon.ico)
    *   - Imagens públicas
    */
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|images/).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon\\.ico|sw\\.js|manifest\\.json|icon-192\\.png|icon-512\\.png|short-logo\\.svg|long-logo\\.svg|images/|icons/|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|woff2?)$).*)',
+  ],
 }
