@@ -2,24 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { getDiagramaCaixa, saveDiagramaCaixa } from '@/actions/caixas'
-
-// ---------------------------------------------------------------------------
-// ABNT NBR 14721 — padrão de cores de fibra óptica
-// ---------------------------------------------------------------------------
-const ABNT_CORES = [
-  { idx: 1,  nome: 'Verde',   hex: '#16a34a' },
-  { idx: 2,  nome: 'Amarelo', hex: '#ca8a04' },
-  { idx: 3,  nome: 'Branco',  hex: '#e2e8f0' },
-  { idx: 4,  nome: 'Azul',    hex: '#2563eb' },
-  { idx: 5,  nome: 'Vermelho',hex: '#dc2626' },
-  { idx: 6,  nome: 'Violeta', hex: '#7c3aed' },
-  { idx: 7,  nome: 'Marrom',  hex: '#92400e' },
-  { idx: 8,  nome: 'Rosa',    hex: '#db2777' },
-  { idx: 9,  nome: 'Preto',   hex: '#1e293b' },
-  { idx: 10, nome: 'Cinza',   hex: '#64748b' },
-  { idx: 11, nome: 'Laranja', hex: '#ea580c' },
-  { idx: 12, nome: 'Ciano',   hex: '#0891b2' },
-]
+import { useFiberColors } from '@/contexts/FiberColorContext'
 
 const SPLITTER_TIPOS = ['1x2', '1x4', '1x8', '1x16', '1x32']
 
@@ -40,10 +23,11 @@ function uid() { return Math.random().toString(36).slice(2, 9) }
 // Seletor de cor ABNT
 // ---------------------------------------------------------------------------
 function ColorPicker({ value, onChange }) {
-  const cor = ABNT_CORES.find(c => c.idx === value)
+  const abntCores = useFiberColors()
+  const cor = abntCores.find(c => c.idx === value)
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-      {ABNT_CORES.map(c => (
+      {abntCores.map(c => (
         <button
           key={c.idx}
           title={`${c.idx} – ${c.nome}`}
@@ -203,7 +187,8 @@ function TabBandejas({ bandejas, onChange }) {
 
 // Ponto colorido que mostra a cor ABNT da fibra
 function FibraColorDot({ fibra }) {
-  const cor = ABNT_CORES.find(c => c.idx === fibra)
+  const abntCores = useFiberColors()
+  const cor = abntCores.find(c => c.idx === fibra)
   if (!cor) return null
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -376,7 +361,7 @@ function TabResumo({ caixaData, bandejas, splitters }) {
       <div style={card}>
         <p style={{ ...label, marginBottom: 10, color: 'rgba(255,255,255,0.5)' }}>Cores ABNT NBR 14721</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {ABNT_CORES.map(c => (
+          {abntCores.map(c => (
             <div key={c.idx} style={{ display: 'flex', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.03)', border: `1px solid ${c.hex}44`, borderRadius: 6, padding: '4px 8px' }}>
               <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: c.hex, display: 'inline-block', flexShrink: 0 }} />
               <span style={{ fontSize: 10, color: c.hex, fontWeight: 600 }}>{c.idx} – {c.nome}</span>
@@ -426,6 +411,7 @@ function Arrow({ small }) {
 const TABS = ['Bandejas', 'Splitters', 'Resumo']
 
 export default function ModalDiagramaCDO({ caixaData, projetoId, onClose, onSaved }) {
+  const abntCores = useFiberColors()
   const [tab, setTab] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

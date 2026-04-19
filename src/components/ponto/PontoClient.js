@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useTransition } from 'react'
 import { T, ALARM_CFG, defaultAlarms } from './pontoTheme'
+import { useLanguage } from '@/contexts/LanguageContext'
 import { registrarEntrada, registrarPausaInicio, registrarPausaFim, registrarSaida } from '@/actions/time-record'
 import AlarmaModal            from './AlarmaModal'
 import BaterPontoTab          from './tabs/BaterPontoTab'
@@ -15,13 +16,13 @@ import DadosCadastraisTab     from './tabs/DadosCadastraisTab'
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'bater',       label: 'Bater Ponto',   icon: '🕐' },
-  { id: 'incluir',     label: 'Incluir Ponto',  icon: '➕' },
-  { id: 'ajustar',       label: 'Ajustar Ponto',  icon: '✏️' },
-  { id: 'despertadores', label: 'Despertadores',  icon: '⏰' },
-  { id: 'ausencia',      label: 'Ausência',        icon: '📋' },
-  { id: 'solicitacoes',label: 'Solicitações',    icon: '📩' },
-  { id: 'dados',       label: 'Meus Dados',      icon: '👤' },
+  { id: 'bater',         labelKey: 'ponto.tab.bater',         icon: '🕐' },
+  { id: 'incluir',       labelKey: 'ponto.tab.incluir',       icon: '➕' },
+  { id: 'ajustar',       labelKey: 'ponto.tab.ajustar',       icon: '✏️' },
+  { id: 'despertadores', labelKey: 'ponto.tab.despertadores', icon: '⏰' },
+  { id: 'ausencia',      labelKey: 'ponto.tab.ausencia',      icon: '📋' },
+  { id: 'solicitacoes',  labelKey: 'ponto.tab.solicitacoes',  icon: '📩' },
+  { id: 'dados',         labelKey: 'ponto.tab.dados',         icon: '👤' },
 ]
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ function getLocation() {
 // ─── Shell ────────────────────────────────────────────────────────────────────
 
 export default function PontoClient({ initialRecord, initialRequests, userName, userProfile }) {
+  const { t } = useLanguage()
   const [activeTab,  setActiveTab]  = useState('bater')
   const [record,     setRecord]     = useState(initialRecord)
   const [requests,   setRequests]   = useState(initialRequests ?? [])
@@ -140,7 +142,7 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
       setFiredAlarm(null)
       if (result?.ok) {
         setRecord(result.record)
-        showToast('Ponto registrado com sucesso! ✅')
+        showToast(t('ponto.toast.success'))
       } else {
         showToast(result?.error ?? 'Erro ao registrar ponto', 'error')
       }
@@ -157,15 +159,30 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{
         background: T.card, borderBottom: `1px solid ${T.border}`,
-        padding: '18px 16px 0', flexShrink: 0,
+        padding: '16px 16px 0', flexShrink: 0,
       }}>
-        <div style={{ maxWidth: 480, margin: '0 auto' }}>
-          <div style={{ fontSize: 10, color: T.dim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>
-            Controle de Ponto
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 8, flexWrap: 'wrap' }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ maxWidth: 640, margin: '0 auto' }}>
+
+          {/* Topo: saudação + badge lado a lado */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 14,
+            flexWrap: 'nowrap',
+          }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{
+                fontSize: 10, color: T.dim,
+                textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3,
+              }}>
+                {t('ponto.header')}
+              </div>
+              <div style={{
+                fontSize: 17, fontWeight: 800, color: T.text,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
                 Olá, {userName} 👋
               </div>
               <div style={{ fontSize: 11, color: T.dim, marginTop: 2, textTransform: 'capitalize' }}>
@@ -173,14 +190,16 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
               </div>
             </div>
             {record && (
-              <StatusBadgeMini status={record.status} />
+              <div style={{ flexShrink: 0 }}>
+                <StatusBadgeMini status={record.status} />
+              </div>
             )}
           </div>
 
-          {/* Tab bar — scrollável mobile, wrap desktop */}
+          {/* Tab bar — scroll horizontal em telas pequenas */}
           <div className="ponto-tabs" style={{
-            display: 'flex', gap: 2,
-            overflowX: 'auto', flexWrap: 'wrap', paddingBottom: 0,
+            display: 'flex', gap: 0,
+            overflowX: 'auto', flexWrap: 'nowrap',
             msOverflowStyle: 'none', scrollbarWidth: 'none',
           }}>
             {TABS.map(tab => {
@@ -203,7 +222,7 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
                   }}
                 >
                   <span style={{ fontSize: 14 }}>{tab.icon}</span>
-                  {tab.label}
+                  {t(tab.labelKey)}
                   {/* Badge de contagem em Solicitações */}
                   {tab.id === 'solicitacoes' && requests.filter(r => r.status === 'pendente').length > 0 && (
                     <span style={{

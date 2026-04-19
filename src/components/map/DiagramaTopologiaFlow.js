@@ -28,25 +28,15 @@ import {
 import dagre from '@dagrejs/dagre'
 import { getTopologia } from '@/actions/olts'
 
-// ── Cores ABNT NBR 14721 (12 fibras por tubo) ──────────────────────────────
-const ABNT = [
-  { idx: 1,  nome: 'Verde',    hex: '#16a34a' },
-  { idx: 2,  nome: 'Amarelo',  hex: '#ca8a04' },
-  { idx: 3,  nome: 'Branco',   hex: '#94a3b8' },
-  { idx: 4,  nome: 'Azul',     hex: '#2563eb' },
-  { idx: 5,  nome: 'Vermelho', hex: '#dc2626' },
-  { idx: 6,  nome: 'Violeta',  hex: '#7c3aed' },
-  { idx: 7,  nome: 'Marrom',   hex: '#92400e' },
-  { idx: 8,  nome: 'Rosa',     hex: '#db2777' },
-  { idx: 9,  nome: 'Preto',    hex: '#1e293b' },
-  { idx: 10, nome: 'Cinza',    hex: '#6b7280' },
-  { idx: 11, nome: 'Laranja',  hex: '#ea580c' },
-  { idx: 12, nome: 'Aqua',     hex: '#0891b2' },
+// Cores fixas para visualização de topologia já criada — não mudam com config
+const ABNT_STATIC = [
+  '#16a34a','#ca8a04','#94a3b8','#2563eb','#dc2626',
+  '#7c3aed','#92400e','#db2777','#1e293b','#6b7280','#ea580c','#0891b2',
 ]
 
 function fiberColor(idx) {
   if (!idx || idx < 1) return '#475569'
-  return ABNT[((idx - 1) % 12)].hex
+  return ABNT_STATIC[((idx - 1) % 12 + 12) % 12]
 }
 
 function parseSplitterRatio(tipo) {

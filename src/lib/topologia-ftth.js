@@ -253,10 +253,14 @@ export function logTopoChange(tipo, dados = {}) {
 
 // ─── Helpers ABNT (NBR 14721) ─────────────────────────────────────────────────
 //
-// Sequência: Verde · Amarelo · Branco · Azul · Vermelho · Violeta ·
-//            Marrom · Rosa · Preto · Cinza · Laranja · Aqua
+// Sequência padrão: Verde · Amarelo · Branco · Azul · Vermelho · Violeta ·
+//                   Marrom · Rosa · Preto · Cinza · Laranja · Aqua
+//
+// Pode ser sobrescrito em runtime com setProjectAbntColors() — isso permite
+// que as configurações de fibra do projeto (salvas no banco) sejam refletidas
+// em todos os componentes sem reload.
 
-export const ABNT = [
+const ABNT_DEFAULT = [
   { idx: 1,  nome: 'Verde',    hex: '#16a34a' },
   { idx: 2,  nome: 'Amarelo',  hex: '#ca8a04' },
   { idx: 3,  nome: 'Branco',   hex: '#94a3b8' },
@@ -270,6 +274,43 @@ export const ABNT = [
   { idx: 11, nome: 'Laranja',  hex: '#ea580c' },
   { idx: 12, nome: 'Aqua',     hex: '#0891b2' },
 ]
+
+// Estado mutável por aba do browser — multi-tenant seguro no client.
+// No servidor (SSR/RSC) fica sempre com o default (sem dados de usuário).
+let _dynamicAbnt = null
+
+/**
+ * Sobrescreve as cores de fibra com as configurações do projeto.
+ * Aceita tanto { posicao } (formato SystemConfig) quanto { idx } (formato legado).
+ * @param {Array<{posicao?: number, idx?: number, nome: string, hex: string}>} colors
+ */
+export function setProjectAbntColors(colors) {
+  if (!Array.isArray(colors) || colors.length < 12) return
+  _dynamicAbnt = colors.map(c => ({
+    idx:  c.idx  ?? c.posicao,
+    nome: c.nome,
+    hex:  c.hex,
+  }))
+}
+
+/** Retorna o array ativo (projeto ou ABNT default). */
+export function getActiveAbnt() {
+  return _dynamicAbnt ?? ABNT_DEFAULT
+}
+
+// Proxy para manter compatibilidade com código que importa ABNT diretamente
+export const ABNT = new Proxy([], {
+  get(_, prop) {
+    const arr = _dynamicAbnt ?? ABNT_DEFAULT
+    if (prop === 'length') return arr.length
+    if (prop === 'map')    return arr.map.bind(arr)
+    if (prop === 'find')   return arr.find.bind(arr)
+    if (prop === 'filter') return arr.filter.bind(arr)
+    if (prop === 'forEach') return arr.forEach.bind(arr)
+    if (typeof prop === 'string' && !isNaN(prop)) return arr[Number(prop)]
+    return arr[prop]
+  },
+})
 
 /**
  * Padrão ABNT — sequência de cores configurada.
@@ -322,14 +363,16 @@ export function getFiberIndex(color, standard = 'ABNT') {
   return i === -1 ? -1 : i + 1
 }
 
-/** Retorna hex ABNT pelo índice de fibra (base-1, cíclico). */
+/** Retorna hex pelo índice de fibra (base-1, cíclico). Usa cores do projeto se configuradas. */
 export function abntHex(fibra) {
-  if (!fibra || fibra < 1) return ABNT[0].hex
-  return ABNT[(fibra - 1) % ABNT.length].hex
+  const arr = getActiveAbnt()
+  if (!fibra || fibra < 1) return arr[0]?.hex ?? '#16a34a'
+  return arr[((fibra - 1) % arr.length + arr.length) % arr.length]?.hex ?? '#16a34a'
 }
 
-/** Retorna objeto ABNT pelo índice de fibra (base-1, cíclico). */
+/** Retorna objeto {idx,nome,hex} pelo índice de fibra (base-1, cíclico). */
 export function abntFibra(fibra) {
-  if (!fibra || fibra < 1) return ABNT[0]
-  return ABNT[(fibra - 1) % ABNT.length]
+  const arr = getActiveAbnt()
+  if (!fibra || fibra < 1) return arr[0]
+  return arr[((fibra - 1) % arr.length + arr.length) % arr.length]
 }

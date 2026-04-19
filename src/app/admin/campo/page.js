@@ -5,6 +5,7 @@ import { getRotas }  from '@/actions/rotas'
 import { getPostes } from '@/actions/postes'
 import { getOLTs }   from '@/actions/olts'
 import CampoClient   from '@/components/admin/CampoClient'
+import PageHeading from '@/components/shared/PageHeading'
 
 export const metadata = {
   title: 'Campo | FiberOps',
@@ -31,10 +32,7 @@ export default async function CampoPage({ searchParams }) {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-slate-100">Gestão de Campo</h1>
-        <p className="text-sm text-slate-400 mt-0.5">
-          CTOs, caixas, rotas, postes e OLTs do projeto
-        </p>
+        <PageHeading titleKey="campo.title" subtitleKey="campo.subtitle" />
       </div>
 
       <CampoClient

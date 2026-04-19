@@ -3,23 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { reagendarOS } from '@/actions/service-orders'
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const STATUS_CFG = {
-  aberta:       { label: 'Aberta',       bg: 'rgba(59,130,246,0.15)',  color: '#60a5fa',  border: 'rgba(59,130,246,0.3)'  },
-  agendada:     { label: 'Agendada',     bg: 'rgba(245,158,11,0.15)',  color: '#fbbf24',  border: 'rgba(245,158,11,0.3)'  },
-  em_andamento: { label: 'Em andamento', bg: 'rgba(168,85,247,0.15)',  color: '#c084fc',  border: 'rgba(168,85,247,0.3)'  },
-  concluida:    { label: 'Concluída',    bg: 'rgba(34,197,94,0.15)',   color: '#4ade80',  border: 'rgba(34,197,94,0.3)'   },
-  cancelada:    { label: 'Cancelada',    bg: 'rgba(239,68,68,0.12)',   color: '#f87171',  border: 'rgba(239,68,68,0.3)'   },
-}
-
-const TIPO_CFG = {
-  instalacao:  { label: 'Instalação',  icon: '🔧' },
-  manutencao:  { label: 'Manutenção',  icon: '🔨' },
-  suporte:     { label: 'Suporte',     icon: '📞' },
-  cancelamento:{ label: 'Cancelamento',icon: '❌' },
-}
+import { getStatusCfg, getTipoCfg, OS_STATUS_FILTERS } from '@/lib/os-config'
 
 function fmtDate(val) {
   if (!val) return '—'
@@ -125,8 +109,8 @@ function ReagendarModal({ os, onClose, onSuccess }) {
 // ─── Card de OS ───────────────────────────────────────────────────────────────
 
 function OSCard({ os, userRole, onReagendar }) {
-  const sc   = STATUS_CFG[os.status]   ?? STATUS_CFG.aberta
-  const tc   = TIPO_CFG[os.tipo]       ?? { label: os.tipo, icon: '📋' }
+  const sc   = getStatusCfg(os.status)
+  const tc   = getTipoCfg(os.tipo)
   const podeConcluida = ['concluida', 'cancelada'].includes(os.status)
 
   return (
@@ -219,14 +203,6 @@ function OSCard({ os, userRole, onReagendar }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-const STATUS_FILTERS = [
-  { key: 'todas',       label: 'Todas' },
-  { key: 'aberta',      label: 'Abertas' },
-  { key: 'agendada',    label: 'Agendadas' },
-  { key: 'em_andamento',label: 'Em andamento' },
-  { key: 'concluida',   label: 'Concluídas' },
-]
-
 export default function MinhasOSClient({ initialItems, userRole, userId, pageTitle, erro }) {
   const [items,        setItems]        = useState(initialItems ?? [])
   const [filtro,       setFiltro]       = useState('todas')
@@ -270,7 +246,7 @@ export default function MinhasOSClient({ initialItems, userRole, userId, pageTit
 
           {/* Filtros */}
           <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 0, scrollbarWidth: 'none' }}>
-            {STATUS_FILTERS.map(f => {
+            {OS_STATUS_FILTERS.map(f => {
               const active = filtro === f.key
               return (
                 <button

@@ -1,6 +1,7 @@
 import './globals.css'
 import { SessionProvider } from 'next-auth/react'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { LanguageProvider } from '@/contexts/LanguageContext'
 import PWASetup from '@/components/shared/PWASetup'
 
 export const metadata = {
@@ -30,10 +31,12 @@ export default function RootLayout({ children }) {
       </head>
       <body style={{ fontFamily: 'system-ui, sans-serif' }}>
         <SessionProvider>
-          <ThemeProvider>
-            <PWASetup />
-            {children}
-          </ThemeProvider>
+          <LanguageProvider>
+            <ThemeProvider>
+              <PWASetup />
+              {children}
+            </ThemeProvider>
+          </LanguageProvider>
         </SessionProvider>
       </body>
     </html>

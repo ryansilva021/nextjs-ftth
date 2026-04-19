@@ -4,13 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { getMinhasOS } from '@/actions/service-orders'
-
-const ROLE_LABEL = {
-  superadmin: 'Super Administrador',
-  admin:      'Administrador',
-  tecnico:    'Técnico',
-  user:       'Usuário',
-}
+import { useLanguage } from '@/contexts/LanguageContext'
 
 const AVATAR_COLORS = [
   ['#0284c7', '#0ea5e9'], ['#7c3aed', '#a78bfa'],
@@ -25,22 +19,22 @@ function getAvatarColor(str = '') {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const TIPO_LABEL  = { instalacao: 'Instalação', manutencao: 'Manutenção', suporte: 'Suporte', cancelamento: 'Cancelamento' }
-const STATUS_META = {
-  aberta:       { label: 'Aberta',       bg: '#dbeafe', color: '#1d4ed8' },
-  agendada:     { label: 'Agendada',     bg: '#ede9fe', color: '#6d28d9' },
-  em_andamento: { label: 'Em andamento', bg: '#fef9c3', color: '#92400e' },
-  concluida:    { label: 'Concluída',    bg: '#dcfce7', color: '#15803d' },
-  cancelada:    { label: 'Cancelada',    bg: '#fee2e2', color: '#b91c1c' },
+const STATUS_BG_COLOR = {
+  aberta:       { bg: '#dbeafe', color: '#1d4ed8' },
+  agendada:     { bg: '#ede9fe', color: '#6d28d9' },
+  em_andamento: { bg: '#fef9c3', color: '#92400e' },
+  concluida:    { bg: '#dcfce7', color: '#15803d' },
+  cancelada:    { bg: '#fee2e2', color: '#b91c1c' },
 }
 const PRIO_COLOR = { urgente: '#ef4444', alta: '#f59e0b', normal: '#94a3b8', baixa: '#6b7280' }
 
 function MinhasOS({ S }) {
+  const { t } = useLanguage()
   const FILTROS = [
-    { key: 'todas',      label: 'Todas' },
-    { key: 'hoje',       label: 'Hoje' },
-    { key: 'atrasadas',  label: 'Atrasadas' },
-    { key: 'finalizadas',label: 'Finalizadas' },
+    { key: 'todas',      label: t('filter.all') },
+    { key: 'hoje',       label: t('filter.today') },
+    { key: 'atrasadas',  label: t('filter.overdue') },
+    { key: 'finalizadas',label: t('filter.done') },
   ]
 
   const [filtro, setFiltro]   = useState('todas')
@@ -55,7 +49,7 @@ function MinhasOS({ S }) {
       const data = await getMinhasOS({ filtro: f })
       setItems(data)
     } catch (e) {
-      setErro(e.message ?? 'Erro ao carregar')
+      setErro(e.message ?? t('common.error'))
     } finally {
       setLoading(false)
     }
@@ -78,13 +72,13 @@ function MinhasOS({ S }) {
     <div style={S.card}>
       {/* Cabeçalho */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-        <p style={{ ...S.title, margin: 0 }}>Minhas Ordens de Serviço</p>
+        <p style={{ ...S.title, margin: 0 }}>{t('perfil.section.my_os')}</p>
         <Link href="/admin/os" style={{
           fontSize: 12, color: '#ea580c', textDecoration: 'none',
           padding: '4px 10px', borderRadius: 6,
           background: '#ffedd5', border: '1px solid #f4b07a',
         }}>
-          Ver todas →
+          {t('perfil.see_all')}
         </Link>
       </div>
 
@@ -106,18 +100,18 @@ function MinhasOS({ S }) {
       {/* Conteúdo */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-          Carregando…
+          {t('common.loading')}
         </div>
       ) : erro ? (
         <div style={{ textAlign: 'center', padding: '20px 0', color: '#f85149', fontSize: 13 }}>{erro}</div>
       ) : items.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-          Nenhuma OS encontrada
+          {t('common.no_os')}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {items.map(os => {
-            const st   = STATUS_META[os.status] ?? { label: os.status, bg: '#f1f5f9', color: '#475569' }
+            const stColor = STATUS_BG_COLOR[os.status] ?? { bg: '#f1f5f9', color: '#475569' }
             const atrs = isAtrasada(os)
             return (
               <Link key={os._id} href={`/admin/os/${os.os_id}`} style={{ textDecoration: 'none' }}>
@@ -141,17 +135,17 @@ function MinhasOS({ S }) {
                         #{os.os_id}
                       </span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        {TIPO_LABEL[os.tipo] ?? os.tipo}
+                        {t(`tipo.${os.tipo}`) ?? os.tipo}
                       </span>
                       {atrs && (
                         <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', background: '#fee2e2', borderRadius: 4, padding: '1px 5px' }}>
-                          ATRASADA
+                          {t('common.overdue')}
                         </span>
                       )}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {os.cliente_nome}
-                      {os.tecnico_nome ? ` · Tec: ${os.tecnico_nome}` : ''}
+                      {os.tecnico_nome ? ` · ${t('common.tech_abbr')} ${os.tecnico_nome}` : ''}
                     </div>
                   </div>
 
@@ -159,9 +153,9 @@ function MinhasOS({ S }) {
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6,
-                      background: st.bg, color: st.color, display: 'block', marginBottom: 3,
+                      background: stColor.bg, color: stColor.color, display: 'block', marginBottom: 3,
                     }}>
-                      {st.label}
+                      {t(`status.${os.status}`) || os.status}
                     </span>
                     <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                       {fmt(os.data_abertura)}
@@ -179,6 +173,7 @@ function MinhasOS({ S }) {
 
 export default function PerfilPage() {
   const { data: session } = useSession()
+  const { t } = useLanguage()
 
   const [campoMode, setCampoMode] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -210,8 +205,8 @@ export default function PerfilPage() {
 
         {/* Cabeçalho */}
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--foreground)', margin: 0 }}>Perfil</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Gerencie suas informações e preferências</p>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--foreground)', margin: 0 }}>{t('perfil.title')}</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>{t('perfil.subtitle')}</p>
         </div>
 
         {/* Avatar + nome */}
@@ -242,64 +237,64 @@ export default function PerfilPage() {
               </Link>
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              Projeto: <span style={{ color: 'var(--foreground)', fontWeight: 600 }}>{user.projeto_nome ?? user.projeto_id ?? '—'}</span>
+              {t('perfil.project')}: <span style={{ color: 'var(--foreground)', fontWeight: 600 }}>{user.projeto_nome ?? user.projeto_id ?? '—'}</span>
             </p>
             <span style={{
               ...S.badge, marginTop: 8, display: 'inline-block',
               backgroundColor: '#ffedd5',
               color: '#ea580c', border: '1px solid #f4b07a',
             }}>
-              {ROLE_LABEL[user.role] ?? user.role ?? 'Usuário'}
+              {t(`perfil.role.${user.role}`) ?? user.role ?? t('perfil.role.user')}
             </span>
           </div>
         </div>
 
         {/* Informações da conta */}
         <div style={S.card}>
-          <p style={S.title}>Informações da Conta</p>
+          <p style={S.title}>{t('perfil.section.account')}</p>
           <div style={{ ...S.row }}>
-            <span style={S.label}>Usuário</span>
+            <span style={S.label}>{t('perfil.username')}</span>
             <span style={{ ...S.value, fontFamily: 'monospace', fontSize: 13 }}>{user.username ?? '—'}</span>
           </div>
           <div style={{ ...S.row }}>
-            <span style={S.label}>Função</span>
-            <span style={S.value}>{ROLE_LABEL[user.role] ?? user.role ?? '—'}</span>
+            <span style={S.label}>{t('perfil.role')}</span>
+            <span style={S.value}>{t(`perfil.role.${user.role}`) ?? user.role ?? '—'}</span>
           </div>
           <div style={{ ...S.row }}>
-            <span style={S.label}>Projeto</span>
+            <span style={S.label}>{t('perfil.project')}</span>
             <span style={S.value}>{user.projeto_nome ?? user.projeto_id ?? '—'}</span>
           </div>
           <div style={S.row}>
-            <span style={S.label}>Segurança</span>
+            <span style={S.label}>{t('perfil.security')}</span>
             <Link href="/perfil/senha" style={{
               fontSize: 13, fontWeight: 600, color: '#ea580c',
               textDecoration: 'none', padding: '6px 14px',
               background: '#ffedd5',
               borderRadius: 8, border: '1px solid #f4b07a',
             }}>
-              Alterar senha →
+              {t('perfil.change_password')}
             </Link>
           </div>
           <div style={{ ...S.row, borderBottom: 'none' }}>
-            <span style={S.label}>Preferências</span>
+            <span style={S.label}>{t('perfil.preferences')}</span>
             <Link href="/configuracoes" style={{
               fontSize: 13, fontWeight: 600, color: 'var(--foreground)',
               textDecoration: 'none', padding: '6px 14px',
               background: 'var(--card-bg-active)',
               borderRadius: 8, border: '1px solid var(--border-color)',
             }}>
-              Configurações →
+              {t('perfil.settings_link')}
             </Link>
           </div>
         </div>
 
         {/* Configurações Rápidas */}
         <div style={S.card}>
-          <p style={S.title}>Configurações Rápidas</p>
+          <p style={S.title}>{t('perfil.section.quick')}</p>
           <div style={{ ...S.row, borderBottom: 'none' }}>
             <div>
-              <span style={S.label}>Modo Campo</span>
-              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>Interface simplificada para campo</p>
+              <span style={S.label}>{t('perfil.campo_mode')}</span>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>{t('perfil.campo_desc')}</p>
             </div>
             <button
               onClick={() => toggleCampo(!campoMode)}
@@ -321,20 +316,20 @@ export default function PerfilPage() {
 
         {/* Sistema */}
         <div style={S.card}>
-          <p style={S.title}>Sistema</p>
+          <p style={S.title}>{t('perfil.section.system')}</p>
           <div style={{ ...S.row }}>
-            <span style={S.label}>Configurações completas</span>
+            <span style={S.label}>{t('perfil.full_settings')}</span>
             <Link href="/configuracoes" style={{
               fontSize: 13, fontWeight: 600, color: 'var(--foreground)',
               textDecoration: 'none', padding: '6px 14px',
               background: 'var(--card-bg-active)',
               borderRadius: 8, border: '1px solid var(--border-color)',
             }}>
-              Abrir ⚙️
+              {t('perfil.open_settings')}
             </Link>
           </div>
           <div style={{ ...S.row, borderBottom: 'none' }}>
-            <span style={S.label}>Sessão</span>
+            <span style={S.label}>{t('perfil.session')}</span>
             <button
               onClick={() => signOut({ callbackUrl: '/login' })}
               style={{
@@ -344,14 +339,14 @@ export default function PerfilPage() {
                 border: '1px solid rgba(239,68,68,0.3)',
               }}
             >
-              Sair →
+              {t('perfil.logout')}
             </button>
           </div>
         </div>
 
         {/* Avatar — em breve */}
         <div style={S.card}>
-          <p style={S.title}>Avatar</p>
+          <p style={S.title}>{t('perfil.section.avatar')}</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <div style={{
               width: 56, height: 56, borderRadius: '50%',
@@ -363,10 +358,10 @@ export default function PerfilPage() {
             </div>
             <div>
               <p style={{ fontSize: 13, color: 'var(--foreground)', fontWeight: 600, margin: 0 }}>
-                Avatar gerado automaticamente
+                {t('perfil.avatar_auto')}
               </p>
               <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                Upload de foto em breve
+                {t('perfil.avatar_soon')}
               </p>
             </div>
             <button disabled style={{
@@ -374,7 +369,7 @@ export default function PerfilPage() {
               background: 'var(--card-bg)', border: '1px solid var(--border-color)',
               color: 'var(--text-muted)', fontSize: 13, cursor: 'not-allowed', opacity: 0.6,
             }}>
-              Alterar foto
+              {t('perfil.change_avatar')}
             </button>
           </div>
         </div>
@@ -387,12 +382,12 @@ export default function PerfilPage() {
         {/* Assinatura — visível apenas para admin */}
         {(user.role === 'admin') && (
           <div style={{ ...S.card, background: '#fff9f5', borderColor: '#f4b07a' }}>
-            <p style={S.title}>Assinatura</p>
+            <p style={S.title}>{t('perfil.section.sub')}</p>
             <div style={S.row}>
               <div>
-                <span style={{ ...S.label, display: 'block' }}>Plano e cobrança</span>
+                <span style={{ ...S.label, display: 'block' }}>{t('perfil.plan')}</span>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  Faturas, método de pagamento e status da licença
+                  {t('perfil.plan_desc')}
                 </span>
               </div>
               <Link href="/admin/assinatura" style={{
@@ -402,7 +397,7 @@ export default function PerfilPage() {
                 borderRadius: 8, border: '1px solid #f4b07a',
                 whiteSpace: 'nowrap',
               }}>
-                Gerenciar 💳
+                {t('perfil.manage')}
               </Link>
             </div>
           </div>

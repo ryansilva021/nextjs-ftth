@@ -10,24 +10,26 @@
 import { useState, useEffect } from 'react'
 import { getDiagramaCTO, saveDiagramaCTO } from '@/actions/ctos'
 import { useTheme } from '@/contexts/ThemeContext'
+import { getActiveAbnt } from '@/lib/topologia-ftth'
+import { useFiberColors } from '@/contexts/FiberColorContext'
 
-// ─── ABNT NBR 14721 ───────────────────────────────────────────────────────────
-// Sequência: Verde · Amarelo · Branco · Azul · Vermelho · Violeta ·
-//            Marrom · Rosa · Preto · Cinza · Laranja · Aqua
-const ABNT = [
-  { idx: 1,  nome: 'Verde',    hex: '#16a34a', text: '#dcfce7' },
-  { idx: 2,  nome: 'Amarelo',  hex: '#ca8a04', text: '#fef9c3' },
-  { idx: 3,  nome: 'Branco',   hex: '#94a3b8', text: '#f1f5f9' },
-  { idx: 4,  nome: 'Azul',     hex: '#2563eb', text: '#dbeafe' },
-  { idx: 5,  nome: 'Vermelho', hex: '#dc2626', text: '#fee2e2' },
-  { idx: 6,  nome: 'Violeta',  hex: '#7c3aed', text: '#ede9fe' },
-  { idx: 7,  nome: 'Marrom',   hex: '#92400e', text: '#fef3c7' },
-  { idx: 8,  nome: 'Rosa',     hex: '#db2777', text: '#fce7f3' },
-  { idx: 9,  nome: 'Preto',    hex: '#1e293b', text: '#cbd5e1' },
-  { idx: 10, nome: 'Cinza',    hex: '#6b7280', text: '#f3f4f6' },
-  { idx: 11, nome: 'Laranja',  hex: '#ea580c', text: '#ffedd5' },
-  { idx: 12, nome: 'Aqua',     hex: '#0891b2', text: '#cffafe' },
-]
+// ─── Cores ABNT dinâmicas ─────────────────────────────────────────────────────
+function hexLum(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16)
+  return (0.299*r + 0.587*g + 0.114*b) / 255
+}
+function getAbnt() {
+  return getActiveAbnt().map(c => ({ ...c, text: hexLum(c.hex) > 0.45 ? '#1c1208' : '#f3f4f6' }))
+}
+const ABNT = new Proxy([], {
+  get(_, prop) {
+    const arr = getAbnt()
+    if (prop === 'length') return arr.length
+    if (['map','find','filter','forEach'].includes(prop)) return arr[prop].bind(arr)
+    if (typeof prop === 'string' && !isNaN(prop)) return arr[Number(prop)]
+    return arr[prop]
+  },
+})
 
 const SPLITTER_TIPOS = ['1x2', '1x4', '1x8', '1x16', '1x32']
 function uid() { return Math.random().toString(36).slice(2, 9) }
@@ -226,6 +228,7 @@ function buildBandejaPadrao(n = 1) {
 }
 
 export default function DiagramaCTOEditor({ ctoId, projetoId, capacidadePortas, initialDiagrama, caixas = [] }) {
+  useFiberColors() // subscreve ao contexto — re-renderiza ao mudar cores
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const S = getStyles(isDark)

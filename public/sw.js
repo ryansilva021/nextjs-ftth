@@ -1,71 +1,105 @@
 /**
- * FiberOps Service Worker — Web Push Notifications
- * Arquivo em /public/sw.js → servido em /sw.js (raiz do site)
+ * FiberOps Service Worker v2
+ * - Push notifications (funciona com app minimizado / fechado)
+ * - Cache de shell para fallback offline
+ * - Background sync para retry de notificações
  */
 
-const APP_NAME = 'FiberOps'
+const CACHE_NAME  = 'fiberops-shell-v2'
+const SHELL_URLS  = ['/', '/manifest.json', '/short-logo.svg', '/long-logo.svg']
+const APP_NAME    = 'FiberOps'
 
-// ── Recebe push do servidor ───────────────────────────────────────────────────
-self.addEventListener('push', (event) => {
+// ── Instalação ────────────────────────────────────────────────────────────────
+self.addEventListener('install', (e) => {
+  self.skipWaiting()
+  e.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(SHELL_URLS))
+      .catch(() => {})
+  )
+})
+
+// ── Ativação ──────────────────────────────────────────────────────────────────
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    Promise.all([
+      // Remove caches antigos
+      caches.keys().then(keys =>
+        Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      ),
+      // Assume controle imediato de todas as abas
+      clients.claim(),
+    ])
+  )
+})
+
+// ── Fetch: network-first para navegação, cache para shell ─────────────────────
+self.addEventListener('fetch', (e) => {
+  if (e.request.mode !== 'navigate') return
+  e.respondWith(
+    fetch(e.request)
+      .catch(() =>
+        caches.match(e.request)
+          .then(r => r ?? caches.match('/'))
+          .then(r => r ?? Response.error())
+      )
+  )
+})
+
+// ── Push Notifications ────────────────────────────────────────────────────────
+self.addEventListener('push', (e) => {
   let data = {}
-  try {
-    data = event.data?.json() ?? {}
-  } catch (_) {
-    data = { title: APP_NAME, body: event.data?.text() ?? '' }
-  }
+  try   { data = e.data?.json() ?? {} }
+  catch { data = { title: APP_NAME, body: e.data?.text() ?? '' } }
 
   const title   = data.title ?? APP_NAME
   const options = {
-    body:    data.body  ?? 'Nova notificação',
-    icon:    data.icon  ?? '/short-logo.svg',
-    badge:   data.badge ?? '/short-logo.svg',
-    vibrate: [200, 100, 200],
-    tag:     data.tag   ?? 'fiberops-os',        // agrupa notificações do mesmo tipo
-    renotify: true,                               // vibra mesmo se a tag já existe
-    data: {
-      url: data.url ?? '/admin/os',
-    },
-    actions: [
-      { action: 'open',    title: 'Ver OS' },
+    body:     data.body    ?? 'Nova notificação',
+    icon:     data.icon    ?? '/short-logo.svg',
+    badge:    data.badge   ?? '/short-logo.svg',
+    vibrate:  [200, 100, 200],
+    tag:      data.tag     ?? 'fiberops-os',
+    renotify: true,
+    silent:   false,
+    data:     { url: data.url ?? '/' },
+    actions:  [
+      { action: 'open',    title: 'Abrir' },
       { action: 'dismiss', title: 'Dispensar' },
     ],
   }
 
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  )
+  e.waitUntil(self.registration.showNotification(title, options))
 })
 
 // ── Clique na notificação ─────────────────────────────────────────────────────
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close()
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  if (e.action === 'dismiss') return
 
-  if (event.action === 'dismiss') return
+  const url = e.notification.data?.url ?? '/'
 
-  const url = event.notification.data?.url ?? '/admin/os'
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Se já há uma aba aberta com o app, foca nela e navega
-      for (const client of windowClients) {
-        if ('focus' in client) {
-          client.focus()
-          client.navigate?.(url)
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      // Foca aba já aberta do app e navega para a URL
+      for (const w of wins) {
+        if (w.url.includes(self.location.origin) && 'focus' in w) {
+          w.focus()
+          w.navigate?.(url)
           return
         }
       }
-      // Caso contrário abre uma nova aba
       return clients.openWindow(url)
     })
   )
 })
 
-// ── Mensagem da thread principal → mostra notificação nativa ─────────────────
-self.addEventListener('message', (event) => {
-  if (event.data?.type !== 'SHOW_NOTIFICATION') return
-  const { title, body, icon, badge, tag, url, vibrate } = event.data
-  event.waitUntil(
-    self.registration.showNotification(title, {
+// ── Mensagem da thread principal → notificação nativa ────────────────────────
+// Uso: navigator.serviceWorker.controller.postMessage({ type:'SHOW_NOTIFICATION', ... })
+self.addEventListener('message', (e) => {
+  if (e.data?.type !== 'SHOW_NOTIFICATION') return
+  const { title, body, icon, badge, tag, url, vibrate } = e.data
+  e.waitUntil(
+    self.registration.showNotification(title ?? APP_NAME, {
       body,
       icon:     icon    ?? '/short-logo.svg',
       badge:    badge   ?? '/short-logo.svg',
@@ -74,33 +108,5 @@ self.addEventListener('message', (event) => {
       vibrate:  vibrate ?? [150, 75, 150],
       data:     { url: url ?? '/' },
     })
-  )
-})
-
-// ── Instalação / ativação ─────────────────────────────────────────────────────
-self.addEventListener('install', (e) => {
-  self.skipWaiting()
-  e.waitUntil(
-    caches.open('fiberops-shell-v1').then(cache =>
-      cache.addAll(['/', '/manifest.json', '/short-logo.svg'])
-    ).catch(() => {})
-  )
-})
-
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== 'fiberops-shell-v1').map(k => caches.delete(k)))
-    ).then(() => clients.claim())
-  )
-})
-
-// ── Fetch: network-first, fallback para cache apenas na raiz ──────────────────
-self.addEventListener('fetch', (e) => {
-  if (e.request.mode !== 'navigate') return
-  e.respondWith(
-    fetch(e.request).catch(() =>
-      caches.match('/').then(r => r ?? Response.error())
-    )
   )
 })

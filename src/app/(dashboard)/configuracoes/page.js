@@ -4,9 +4,43 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getProjetoConfig, updateProjetoConfig } from '@/actions/projetos'
+import { updateFiberColors } from '@/actions/config'
 import { testPushNotification } from '@/actions/push'
 import { usePushNotification } from '@/hooks/usePushNotification'
 import { playNotifSound } from '@/lib/notifSound'
+import { useLanguage } from '@/contexts/LanguageContext'
+import { LANGUAGES } from '@/lib/i18n'
+
+const FIBER_STANDARDS = {
+  ABNT: [
+    { posicao: 1,  nome: 'Verde',    hex: '#16a34a' },
+    { posicao: 2,  nome: 'Amarelo',  hex: '#ca8a04' },
+    { posicao: 3,  nome: 'Branco',   hex: '#94a3b8' },
+    { posicao: 4,  nome: 'Azul',     hex: '#2563eb' },
+    { posicao: 5,  nome: 'Vermelho', hex: '#dc2626' },
+    { posicao: 6,  nome: 'Violeta',  hex: '#7c3aed' },
+    { posicao: 7,  nome: 'Marrom',   hex: '#92400e' },
+    { posicao: 8,  nome: 'Rosa',     hex: '#db2777' },
+    { posicao: 9,  nome: 'Preto',    hex: '#1e293b' },
+    { posicao: 10, nome: 'Cinza',    hex: '#6b7280' },
+    { posicao: 11, nome: 'Laranja',  hex: '#ea580c' },
+    { posicao: 12, nome: 'Aqua',     hex: '#0891b2' },
+  ],
+  EIA_598_A: [
+    { posicao: 1,  nome: 'Azul',     hex: '#2563eb' },
+    { posicao: 2,  nome: 'Laranja',  hex: '#ea580c' },
+    { posicao: 3,  nome: 'Verde',    hex: '#16a34a' },
+    { posicao: 4,  nome: 'Marrom',   hex: '#92400e' },
+    { posicao: 5,  nome: 'Cinza',    hex: '#6b7280' },
+    { posicao: 6,  nome: 'Branco',   hex: '#94a3b8' },
+    { posicao: 7,  nome: 'Vermelho', hex: '#dc2626' },
+    { posicao: 8,  nome: 'Preto',    hex: '#1e293b' },
+    { posicao: 9,  nome: 'Amarelo',  hex: '#ca8a04' },
+    { posicao: 10, nome: 'Violeta',  hex: '#7c3aed' },
+    { posicao: 11, nome: 'Rosa',     hex: '#db2777' },
+    { posicao: 12, nome: 'Aqua',     hex: '#0891b2' },
+  ],
+}
 
 // ---------------------------------------------------------------------------
 // Helpers de persistência (localStorage)
@@ -85,6 +119,7 @@ function Toggle({ value, onChange }) {
 // ---------------------------------------------------------------------------
 export default function ConfiguracoesPage() {
   const router = useRouter()
+  const { lang, setLang, t } = useLanguage()
 
   const [campoMode,    setCampoMode]    = useState(false)
   const [notifSound,   setNotifSound]   = useState(true)
@@ -100,10 +135,10 @@ export default function ConfiguracoesPage() {
     setPushTestMsg('')
     try {
       const data = await testPushNotification()
-      if (data.error) setPushTestMsg(`Erro: ${data.error}`)
-      else setPushTestMsg('Enviado! Verifique suas notificações.')
+      if (data.error) setPushTestMsg(`${t('config.push_error')} ${data.error}`)
+      else setPushTestMsg(t('config.push_sent'))
     } catch {
-      setPushTestMsg('Falha na requisição.')
+      setPushTestMsg(t('config.push_fail'))
     } finally {
       setPushTesting(false)
       setTimeout(() => setPushTestMsg(''), 6000)
@@ -144,11 +179,21 @@ export default function ConfiguracoesPage() {
     savePref('pref_fiber_standard', standard)
     setFiberSaving(true)
     setFiberMsg('')
+
+    const cores = FIBER_STANDARDS[standard] ?? FIBER_STANDARDS.ABNT
+    const padrao = standard === 'EIA_598_A' ? 'eua' : 'brasil'
+
+    // Apply immediately via context event (no page reload needed)
+    window.dispatchEvent(new CustomEvent('fibercolors:update', { detail: cores }))
+
     try {
-      await updateProjetoConfig({ fiberColorStandard: standard })
-      setFiberMsg('Salvo!')
+      await Promise.all([
+        updateProjetoConfig({ fiberColorStandard: standard }),
+        updateFiberColors({ padrao, cores }),
+      ])
+      setFiberMsg(t('config.fiber_saved'))
     } catch {
-      setFiberMsg('Salvo localmente.')
+      setFiberMsg(t('config.fiber_saved_local'))
     } finally {
       setFiberSaving(false)
       setTimeout(() => setFiberMsg(''), 3000)
@@ -161,10 +206,10 @@ export default function ConfiguracoesPage() {
         k.startsWith('pref_') || k.startsWith('ftth_cache_')
       )
       keys.forEach(k => localStorage.removeItem(k))
-      setCacheMsg(`${keys.length} preferências removidas. Recarregue para aplicar.`)
+      setCacheMsg(`${keys.length} ${t('config.clear_done')}`)
       setTimeout(() => setCacheMsg(''), 5000)
     } catch {
-      setCacheMsg('Erro ao limpar.')
+      setCacheMsg(t('config.clear_error'))
     }
   }
 
@@ -173,9 +218,9 @@ export default function ConfiguracoesPage() {
     setSyncMsg('')
     try {
       router.refresh()
-      setSyncMsg('Dados recarregados!')
+      setSyncMsg(t('config.synced'))
     } catch {
-      setSyncMsg('Erro ao sincronizar.')
+      setSyncMsg(t('config.sync_error'))
     } finally {
       setSyncing(false)
       setTimeout(() => setSyncMsg(''), 3000)
@@ -201,21 +246,56 @@ export default function ConfiguracoesPage() {
             border: '1px solid var(--border-color)',
             background: 'var(--card-bg)',
           }}>
-            ← Perfil
+            {t('config.back')}
           </Link>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--foreground)', margin: 0 }}>Configurações</h1>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>Preferências e comportamento do sistema</p>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--foreground)', margin: 0 }}>{t('config.title')}</h1>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{t('config.subtitle')}</p>
           </div>
+        </div>
+
+        {/* ── Idioma ── */}
+        <div style={card}>
+          <SectionTitle>{t('config.section.language')}</SectionTitle>
+          <SettingRow
+            label={t('config.language')}
+            description={t('config.language_desc')}
+            last
+          >
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {LANGUAGES.map(l => {
+                const active = lang === l.code
+                return (
+                  <button
+                    key={l.code}
+                    onClick={() => setLang(l.code)}
+                    title={l.nativeName}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+                      fontSize: 12, fontWeight: active ? 700 : 500,
+                      border: `1px solid ${active ? '#0284c7' : 'var(--border-color)'}`,
+                      background: active ? 'rgba(2,132,199,0.10)' : 'var(--card-bg-active)',
+                      color: active ? '#0284c7' : 'var(--text-muted)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <span style={{ fontSize: 15 }}>{l.flag}</span>
+                    <span>{l.nativeName}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </SettingRow>
         </div>
 
         {/* ── Preferências ── */}
         <div style={card}>
-          <SectionTitle>Preferências</SectionTitle>
+          <SectionTitle>{t('config.section.preferences')}</SectionTitle>
 
           <SettingRow
-            label="Modo Campo"
-            description="Interface simplificada para uso em campo com sol forte"
+            label={t('config.campo_mode')}
+            description={t('config.campo_mode_desc')}
             last
           >
             <Toggle
@@ -230,18 +310,17 @@ export default function ConfiguracoesPage() {
 
         {/* ── Notificações ── */}
         <div style={card}>
-          <SectionTitle>Notificações</SectionTitle>
+          <SectionTitle>{t('config.section.notifications')}</SectionTitle>
 
-          {/* Som */}
           <SettingRow
-            label="Som de notificação"
-            description="Toca um som quando uma nova OS for atribuída a você"
+            label={t('config.notif_sound')}
+            description={t('config.notif_sound_desc')}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {notifSound && (
                 <button
                   onClick={() => playNotifSound()}
-                  title="Testar som"
+                  title={t('config.push_test')}
                   style={{
                     background: 'none', border: '1px solid var(--border-color)',
                     borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
@@ -260,15 +339,15 @@ export default function ConfiguracoesPage() {
 
           {/* Push notifications */}
           <SettingRow
-            label="Notificações fora do app"
+            label={t('config.push')}
             description={
               pushStatus === 'unsupported'
-                ? 'Seu navegador não suporta notificações push'
+                ? t('config.push_desc.unsupported')
                 : pushStatus === 'denied'
-                  ? 'Permissão bloqueada — reative nas configurações do navegador'
+                  ? t('config.push_desc.denied')
                   : pushStatus === 'subscribed'
-                    ? 'Você receberá notificações mesmo com o app fechado'
-                    : 'Receba notificações mesmo com o app fechado ou minimizado'
+                    ? t('config.push_desc.subscribed')
+                    : t('config.push_desc.default')
             }
             last
           >
@@ -278,14 +357,14 @@ export default function ConfiguracoesPage() {
                 border: '1px solid var(--border-color)',
                 borderRadius: 8, padding: '6px 12px',
               }}>
-                {pushStatus === 'denied' ? '🔕 Bloqueado' : '—'}
+                {pushStatus === 'denied' ? t('config.push_blocked') : '—'}
               </span>
             ) : pushStatus === 'loading' ? (
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>...</span>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {pushTestMsg && (
-                  <span style={{ fontSize: 12, color: pushTestMsg.startsWith('Erro') ? '#f85149' : '#3fb950' }}>
+                  <span style={{ fontSize: 12, color: pushTestMsg.startsWith('Erro') || pushTestMsg.startsWith('Error') ? '#f85149' : '#3fb950' }}>
                     {pushTestMsg}
                   </span>
                 )}
@@ -293,7 +372,6 @@ export default function ConfiguracoesPage() {
                   <button
                     onClick={testPush}
                     disabled={pushTesting}
-                    title="Enviar push de teste agora"
                     style={{
                       padding: '7px 12px', borderRadius: 8, cursor: pushTesting ? 'not-allowed' : 'pointer',
                       fontSize: 13, border: '1px solid var(--border-color)',
@@ -301,7 +379,7 @@ export default function ConfiguracoesPage() {
                       opacity: pushTesting ? 0.6 : 1,
                     }}
                   >
-                    {pushTesting ? '...' : '▶ Testar'}
+                    {pushTesting ? '...' : t('config.push_test')}
                   </button>
                 )}
                 <button
@@ -315,7 +393,7 @@ export default function ConfiguracoesPage() {
                     transition: 'all 0.15s',
                   }}
                 >
-                  {pushStatus === 'subscribed' ? '🔔 Ativo — Desativar' : '🔔 Ativar'}
+                  {pushStatus === 'subscribed' ? t('config.push_active') : t('config.push_activate')}
                 </button>
               </div>
             )}
@@ -324,24 +402,24 @@ export default function ConfiguracoesPage() {
 
         {/* ── Fibras Ópticas ── */}
         <div style={card}>
-          <SectionTitle>Fibras Ópticas</SectionTitle>
+          <SectionTitle>{t('config.section.fiber')}</SectionTitle>
 
           {fiberLoadError && (
             <p style={{ fontSize: 12, color: '#f85149', marginBottom: 12 }}>{fiberLoadError}</p>
           )}
 
           <SettingRow
-            label="Padrão de cores"
-            description="Sequência de cores usada em bandejas, fusões e diagramas"
+            label={t('config.fiber_standard')}
+            description={t('config.fiber_standard_desc')}
             last
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {fiberMsg && (
-                <span style={{ fontSize: 12, color: fiberMsg.startsWith('Erro') ? '#f85149' : '#3fb950' }}>
+                <span style={{ fontSize: 12, color: fiberMsg.startsWith('Erro') || fiberMsg.startsWith('Error') ? '#f85149' : '#3fb950' }}>
                   {fiberMsg}
                 </span>
               )}
-              {fiberSaving && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Salvando…</span>}
+              {fiberSaving && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('config.fiber_saving')}</span>}
             </div>
           </SettingRow>
 
@@ -350,14 +428,14 @@ export default function ConfiguracoesPage() {
               {
                 value: 'ABNT',
                 label: 'ABNT NBR 14721',
-                desc: 'Padrão brasileiro',
+                descKey: 'config.fiber_abnt_desc',
                 colors: ['#16a34a','#ca8a04','#94a3b8','#2563eb','#dc2626','#7c3aed','#92400e','#db2777','#1e293b','#6b7280','#ea580c','#0891b2'],
                 names: ['Verde','Amarelo','Branco','Azul','Vermelho','Violeta','Marrom','Rosa','Preto','Cinza','Laranja','Aqua'],
               },
               {
                 value: 'EIA_598_A',
                 label: 'EIA-598-A',
-                desc: 'Padrão internacional',
+                descKey: 'config.fiber_eia_desc',
                 colors: ['#2563eb','#ea580c','#16a34a','#92400e','#6b7280','#94a3b8','#dc2626','#1e293b','#ca8a04','#7c3aed','#db2777','#0891b2'],
                 names: ['Azul','Laranja','Verde','Marrom','Cinza','Branco','Vermelho','Preto','Amarelo','Violeta','Rosa','Aqua'],
               },
@@ -384,14 +462,13 @@ export default function ConfiguracoesPage() {
                     {active && (
                       <span style={{
                         fontSize: 10, fontWeight: 700, color: '#ea580c',
-                        background: '#ffedd5',
-                        borderRadius: 4, padding: '1px 6px',
+                        background: '#ffedd5', borderRadius: 4, padding: '1px 6px',
                       }}>
-                        ATIVO
+                        {t('config.fiber_active')}
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 8px' }}>{opt.desc}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 8px' }}>{t(opt.descKey)}</p>
                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                     {opt.colors.map((hex, i) => (
                       <span
@@ -419,11 +496,11 @@ export default function ConfiguracoesPage() {
 
         {/* ── Sistema ── */}
         <div style={card}>
-          <SectionTitle>Sistema</SectionTitle>
+          <SectionTitle>{t('config.section.system')}</SectionTitle>
 
           <SettingRow
-            label="Limpar preferências"
-            description={cacheMsg || 'Remove todas as preferências salvas localmente no navegador'}
+            label={t('config.clear_prefs')}
+            description={cacheMsg || t('config.clear_prefs_desc')}
           >
             <button
               onClick={limparCache}
@@ -434,13 +511,13 @@ export default function ConfiguracoesPage() {
                 fontSize: 13, fontWeight: 600, color: 'var(--foreground)',
               }}
             >
-              Limpar
+              {t('config.clear_btn')}
             </button>
           </SettingRow>
 
           <SettingRow
-            label="Forçar sincronização"
-            description={syncMsg || 'Recarrega todos os dados do servidor imediatamente'}
+            label={t('config.sync')}
+            description={syncMsg || t('config.sync_desc')}
             last
           >
             <button
@@ -454,7 +531,7 @@ export default function ConfiguracoesPage() {
                 opacity: syncing ? 0.6 : 1,
               }}
             >
-              {syncing ? 'Sincronizando…' : 'Sincronizar'}
+              {syncing ? t('config.syncing') : t('config.sync_btn')}
             </button>
           </SettingRow>
         </div>

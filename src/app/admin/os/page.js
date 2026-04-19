@@ -4,6 +4,8 @@ import { listOS, getOSStats } from '@/actions/service-orders'
 import { getOLTs } from '@/actions/olts'
 import { getUsuarios } from '@/actions/usuarios'
 import ServiceOrdersClient from '@/components/admin/ServiceOrdersClient'
+import PageHeading from '@/components/shared/PageHeading'
+import OsBadge from '@/components/shared/OsBadge'
 
 export const metadata = { title: 'Ordens de Serviço | FiberOps' }
 
@@ -41,21 +43,12 @@ export default async function OSPage() {
   return (
     <div className="lg:p-6 p-3">
       <div className="hidden lg:flex" style={{ alignItems: 'center', gap: 12, marginBottom: 4, flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>
-          Ordens de Serviço
-        </h1>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '2px 10px', borderRadius: 99,
-          backgroundColor: '#1d4ed822', border: '1px solid #1d4ed855',
-          fontSize: 11, color: '#60a5fa', fontWeight: 600,
-        }}>
-          OS · Fluxo FTTH
-        </span>
+        <PageHeading
+          titleKey="os.title"
+          subtitle={`${session?.user?.projeto_nome ?? session?.user?.projeto_id ?? ''}`}
+        />
+        <OsBadge />
       </div>
-      <p className="hidden lg:block" style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
-        Instalações, manutenções e suporte técnico · {session?.user?.projeto_nome ?? session?.user?.projeto_id}
-      </p>
 
       {erro && (
         <div style={{

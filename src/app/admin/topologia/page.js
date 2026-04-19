@@ -5,6 +5,7 @@ import { getCTOs }    from '@/actions/ctos'
 import { getCaixas }  from '@/actions/caixas'
 import { getOLTs }    from '@/actions/olts'
 import DiagramasClient from '@/components/admin/DiagramasClient'
+import PageHeading from '@/components/shared/PageHeading'
 
 export const metadata = { title: 'Topologia | FiberOps' }
 
@@ -37,12 +38,10 @@ export default async function TopologiaPage({ searchParams }) {
   return (
     <div className="lg:p-6 p-4">
       <div className="hidden lg:flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>Topologia da Rede</h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            {olts.length} OLTs · {caixas.length} CE/CDOs · {ctos.length} CTOs
-          </p>
-        </div>
+        <PageHeading
+          titleKey="topologia.title"
+          subtitle={`${olts.length} OLTs · ${caixas.length} CE/CDOs · ${ctos.length} CTOs`}
+        />
       </div>
 
       {erroCarregamento && (

@@ -36,15 +36,9 @@ const GLOBAL_STYLES = `
 .os-material-row:hover { background: #ffffff08 !important; }
 `
 
-// ─── Constants ─────────────────────────────────────────────────────────────────
+import { getStatusCfg, getTipoCfg } from '@/lib/os-config'
 
-const STATUS_META = {
-  aberta:       { label: 'Aberta',       color: '#3b82f6', bg: '#1e3a5f22' },
-  agendada:     { label: 'Agendada',     color: '#a78bfa', bg: '#2e1b4e22' },
-  em_andamento: { label: 'Em andamento', color: '#f59e0b', bg: '#45190322' },
-  concluida:    { label: 'Concluída',    color: '#22c55e', bg: '#052e1622' },
-  cancelada:    { label: 'Cancelada',    color: '#ef4444', bg: '#450a0a22' },
-}
+// ─── Constants ─────────────────────────────────────────────────────────────────
 
 const TIPO_META = {
   instalacao:   { label: 'Instalação',   icon: '📶', color: '#22c55e' },
@@ -137,7 +131,7 @@ function Toast({ toast }) {
 // ─── Header ────────────────────────────────────────────────────────────────────
 
 function OSHeader({ os }) {
-  const sm = STATUS_META[os.status] ?? STATUS_META.aberta
+  const sm = { color: getStatusCfg(os.status).darkColor, bg: getStatusCfg(os.status).darkBg }
   const tm = TIPO_META[os.tipo] ?? TIPO_META.suporte
   const pm = PRIO_META[os.prioridade] ?? PRIO_META.normal
 
@@ -248,7 +242,7 @@ function StatusStepper({ currentStatus }) {
       overflowX: 'auto', gap: 0,
     }}>
       {STATUS_STEPS.map((step, idx) => {
-        const meta = STATUS_META[step]
+        const meta = { color: getStatusCfg(step).darkColor, bg: getStatusCfg(step).darkBg }
         const isDone = isCancelled ? false : idx < stepIdx
         const isCurrent = !isCancelled && idx === stepIdx
         const isFuture = isCancelled ? true : idx > stepIdx
@@ -290,7 +284,7 @@ function StatusStepper({ currentStatus }) {
             {idx < STATUS_STEPS.length - 1 && (
               <div style={{
                 height: 2, width: 40, marginBottom: 16,
-                backgroundColor: isDone ? STATUS_META[STATUS_STEPS[idx]].color : '#1e293b',
+                backgroundColor: isDone ? getStatusCfg(STATUS_STEPS[idx]).darkColor : '#1e293b',
                 transition: 'background-color 0.3s',
               }} />
             )}

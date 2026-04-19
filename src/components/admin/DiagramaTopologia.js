@@ -12,7 +12,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getTopologia } from '@/actions/olts'
 
-// ─── Tabela de cores ABNT NBR 14721 ─────────────────────────────────────────
+// Cores fixas para visualização de topologia já criada — não mudam com config
 const ABNT = [
   { idx: 1,  nome: 'Verde',    hex: '#15803d', text: '#dcfce7' },
   { idx: 2,  nome: 'Amarelo',  hex: '#a16207', text: '#fef9c3' },

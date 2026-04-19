@@ -12,6 +12,7 @@ import OSToast    from '@/components/shared/OSToast'
 import PontoToast from '@/components/shared/PontoToast'
 import { getTimeSettings } from '@/actions/time-settings'
 import { showNativeNotif } from '@/lib/nativeNotif'
+import { useLanguage } from '@/contexts/LanguageContext'
 
 // Rótulos legíveis por tipo de OS (para notificações nativas)
 const TIPO_LABEL = {
@@ -48,29 +49,28 @@ const GROUPS = { public: 0, staff: 1, admin: 2, superadmin: 3 }
 // perm:  permissão necessária (PERM.*)
 // group: para separador visual e controle de acesso por role
 const NAV_ITEMS = [
-  { href: '/',                     label: 'Mapa',              icon: '🗺️', group: GROUPS.public  },
+  { href: '/',                     labelKey: 'nav.map',          icon: '🗺️', group: GROUPS.public  },
 
   // Visão de rede
-  { href: '/admin/topologia', label: 'Topologia', icon: '🌐', perm: PERM.VIEW_TOPOLOGY, group: GROUPS.staff },
-  { href: '/admin/campo',     label: 'Campo',      icon: '📡', perm: PERM.VIEW_FIELD,   group: GROUPS.staff },
-  { href: '/admin/calculos',  label: 'Cálc. Potência', icon: '⚡', perm: PERM.VIEW_CALCULATIONS, group: GROUPS.staff },
+  { href: '/admin/topologia', labelKey: 'nav.topology',     icon: '🌐', perm: PERM.VIEW_TOPOLOGY,      group: GROUPS.staff },
+  { href: '/admin/campo',     labelKey: 'nav.field',        icon: '📡', perm: PERM.VIEW_FIELD,         group: GROUPS.staff },
+  { href: '/admin/calculos',  labelKey: 'nav.calculations', icon: '⚡', perm: PERM.VIEW_CALCULATIONS,  group: GROUPS.staff },
 
   // Ordens de Serviço (tecnico, noc, recepcao)
-  { href: '/admin/os',             label: 'Todas as OS',       icon: '📋', perm: PERM.VIEW_SERVICE_ORDERS,  group: GROUPS.staff },
-  { href: '/admin/os/minhas',      label: 'Minhas OS',         icon: '🗒️', perm: PERM.VIEW_SERVICE_ORDERS,  group: GROUPS.staff, indent: true },
-  { href: '/ponto',                label: 'Bater Ponto',       icon: '🕐', perm: PERM.PUNCH_CLOCK,          group: GROUPS.staff },
-  { href: '/configuracoes/ponto',  label: 'Config. Ponto',     icon: '⏰', perm: PERM.MANAGE_USERS,         group: GROUPS.staff, indent: true },
+  { href: '/admin/os',             labelKey: 'nav.all_os',       icon: '📋', perm: PERM.VIEW_SERVICE_ORDERS,  group: GROUPS.staff },
+  { href: '/admin/os/minhas',      labelKey: 'nav.my_os',        icon: '🗒️', perm: PERM.VIEW_SERVICE_ORDERS,  group: GROUPS.staff, indent: true },
+  { href: '/ponto',                labelKey: 'nav.ponto',        icon: '🕐', perm: PERM.PUNCH_CLOCK,          group: GROUPS.staff },
+  { href: '/configuracoes/ponto',  labelKey: 'nav.ponto_config', icon: '⏰', perm: PERM.MANAGE_USERS,         group: GROUPS.staff, indent: true },
 
   // Admin
-  { href: '/admin/usuarios',       label: 'Usuários',          icon: '👥', perm: PERM.MANAGE_USERS,         group: GROUPS.admin },
-  { href: '/admin/importar',       label: 'Imp/Exportar',      icon: '📦', perm: PERM.VIEW_IMPORT,          group: GROUPS.admin },
-  { href: '/admin/logs',           label: 'Log de Eventos',    icon: '📜', perm: PERM.VIEW_LOGS,            group: GROUPS.admin },
-  // Assinatura movida para /perfil (acessível pelo avatar no rodapé da sidebar)
+  { href: '/admin/usuarios',       labelKey: 'nav.users',    icon: '👥', perm: PERM.MANAGE_USERS,  group: GROUPS.admin },
+  { href: '/admin/importar',       labelKey: 'nav.import',   icon: '📦', perm: PERM.VIEW_IMPORT,   group: GROUPS.admin },
+  { href: '/admin/logs',           labelKey: 'nav.logs',     icon: '📜', perm: PERM.VIEW_LOGS,     group: GROUPS.admin },
 
   // Superadmin
-  { href: '/superadmin/projetos',  label: 'Projetos',          icon: '🏢', group: GROUPS.superadmin },
-  { href: '/superadmin/empresas',  label: 'Empresas',          icon: '🏬', group: GROUPS.superadmin },
-  { href: '/superadmin/registros', label: 'Registros',         icon: '📋', group: GROUPS.superadmin },
+  { href: '/superadmin/projetos',  labelKey: 'nav.projects',  icon: '🏢', group: GROUPS.superadmin },
+  { href: '/superadmin/empresas',  labelKey: 'nav.companies', icon: '🏬', group: GROUPS.superadmin },
+  { href: '/superadmin/registros', labelKey: 'nav.records',   icon: '📋', group: GROUPS.superadmin },
 ]
 
 function isItemVisible(item, role) {
@@ -90,6 +90,7 @@ export default function SidebarLayout({ session, children }) {
   const role = session?.user?.role ?? "user";
   const roleLabel = ROLE_LABELS[role] ?? role
   const roleColor = ROLE_COLORS[role] ?? ROLE_COLORS.user
+  const { t } = useLanguage()
 
   const itensVisiveis = NAV_ITEMS.filter(item => isItemVisible(item, role))
 
@@ -264,7 +265,7 @@ export default function SidebarLayout({ session, children }) {
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-200/20 hover:text-current"
                 >
                   <span style={{ fontSize: item.indent ? 13 : undefined }}>{item.icon}</span>
-                  <span style={{ fontSize: item.indent ? 12 : undefined }}>{item.label}</span>
+                  <span style={{ fontSize: item.indent ? 12 : undefined }}>{t(item.labelKey)}</span>
                 </Link>
               </div>
             )
@@ -326,7 +327,7 @@ export default function SidebarLayout({ session, children }) {
             style={{ border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
             className="w-full text-xs py-2 rounded-lg hover:bg-slate-200/20 transition-colors"
           >
-            Sair
+            {t('sidebar.logout')}
           </button>
         </div>
       </aside>
