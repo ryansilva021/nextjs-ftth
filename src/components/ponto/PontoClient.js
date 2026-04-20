@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useTransition } from 'react'
+import { useState, useEffect, useCallback, useTransition, useRef } from 'react'
 import { T, ALARM_CFG, defaultAlarms } from './pontoTheme'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { registrarEntrada, registrarPausaInicio, registrarPausaFim, registrarSaida } from '@/actions/time-record'
+import { getUserAlarms, saveUserAlarms } from '@/actions/alarm-settings'
 import AlarmaModal            from './AlarmaModal'
 import BaterPontoTab          from './tabs/BaterPontoTab'
 import IncluirPontoTab        from './tabs/IncluirPontoTab'
@@ -81,71 +82,97 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
   const [alarms,      setAlarms]      = useState(null)   // null = ainda carregando
   const [firedAlarm,  setFiredAlarm]  = useState(null)
   const [alarmPending, startAlarmTrans] = useTransition()
+  const saveAlarmTimer = useRef(null)
 
-  // Carrega do localStorage no cliente; usa horários do projeto como padrão
+  // Monta defaults a partir do projectSchedule — horários do projeto como base
+  const buildAlarmDefaults = useCallback(() => {
+    if (!projectSchedule) return defaultAlarms()
+    const map = {
+      entrada:       projectSchedule.entrada,
+      almoco_inicio: projectSchedule.almoco_inicio,
+      almoco_fim:    projectSchedule.almoco_fim,
+      saida:         projectSchedule.saida,
+    }
+    return Object.fromEntries(
+      ALARM_CFG.map(a => [a.key, { enabled: false, time: map[a.key] ?? a.defaultTime }])
+    )
+  }, [projectSchedule]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Carrega: backend (fonte primária) → localStorage (cache offline) → defaults
   useEffect(() => {
-    // Monta defaults a partir do projectSchedule (configurado pelo admin)
-    // para que todos os usuários já partam com os horários corretos do projeto.
-    function buildDefaults() {
-      if (!projectSchedule) return defaultAlarms()
+    const scheduleHash = projectSchedule
+      ? [projectSchedule.entrada, projectSchedule.almoco_inicio, projectSchedule.almoco_fim, projectSchedule.saida].join('|')
+      : null
+
+    // Aplica sincronização de horários do projeto: mantém enabled/disabled do usuário
+    // mas atualiza os tempos se o admin alterou o projeto
+    function syncSchedule(base) {
+      if (!scheduleHash) return base
+      const storedHash = localStorage.getItem('ponto_alarms_hash')
+      if (storedHash === scheduleHash) return base
       const map = {
         entrada:       projectSchedule.entrada,
         almoco_inicio: projectSchedule.almoco_inicio,
         almoco_fim:    projectSchedule.almoco_fim,
         saida:         projectSchedule.saida,
       }
-      return Object.fromEntries(
-        ALARM_CFG.map(a => [
-          a.key,
-          { enabled: false, time: map[a.key] ?? a.defaultTime },
-        ])
+      const synced = Object.fromEntries(
+        ALARM_CFG.map(a => [a.key, { ...base[a.key], time: map[a.key] ?? base[a.key]?.time ?? a.defaultTime }])
       )
+      localStorage.setItem('ponto_alarms_hash', scheduleHash)
+      return synced
     }
 
-    // Hash dos horários do projeto para detectar quando o admin alterou os tempos
-    const scheduleHash = projectSchedule
-      ? [projectSchedule.entrada, projectSchedule.almoco_inicio, projectSchedule.almoco_fim, projectSchedule.saida].join('|')
-      : null
-
-    try {
-      const stored      = localStorage.getItem('ponto_alarms')
-      const storedHash  = localStorage.getItem('ponto_alarms_hash')
-
-      if (!stored) {
-        // Primeira abertura: pré-popula com horários do projeto (todos desativados)
-        if (scheduleHash) localStorage.setItem('ponto_alarms_hash', scheduleHash)
-        setAlarms(buildDefaults())
-      } else if (scheduleHash && storedHash !== scheduleHash) {
-        // Admin alterou os horários do projeto: sincroniza os tempos
-        // mantendo as preferências de ativado/desativado do usuário
-        const parsed = JSON.parse(stored)
-        const map = {
-          entrada:       projectSchedule.entrada,
-          almoco_inicio: projectSchedule.almoco_inicio,
-          almoco_fim:    projectSchedule.almoco_fim,
-          saida:         projectSchedule.saida,
+    async function load() {
+      try {
+        // 1. Tenta carregar do backend (funciona em todos os dispositivos)
+        const backendAlarms = await getUserAlarms()
+        if (backendAlarms) {
+          const synced = syncSchedule(backendAlarms)
+          try { localStorage.setItem('ponto_alarms', JSON.stringify(synced)) } catch (_) {}
+          setAlarms(synced)
+          // Se sync atualizou os tempos, persiste no backend também
+          if (synced !== backendAlarms) saveUserAlarms(synced).catch(() => {})
+          return
         }
-        const merged = Object.fromEntries(
-          ALARM_CFG.map(a => [
-            a.key,
-            { ...parsed[a.key], time: map[a.key] ?? parsed[a.key]?.time ?? a.defaultTime },
-          ])
-        )
-        localStorage.setItem('ponto_alarms', JSON.stringify(merged))
-        localStorage.setItem('ponto_alarms_hash', scheduleHash)
-        setAlarms(merged)
-      } else {
-        setAlarms(JSON.parse(stored))
-      }
-    } catch (_) {
-      setAlarms(buildDefaults())
+      } catch (_) {}
+
+      // 2. Fallback: localStorage (offline ou backend falhou)
+      try {
+        const stored = localStorage.getItem('ponto_alarms')
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          const synced = syncSchedule(parsed)
+          if (synced !== parsed) {
+            localStorage.setItem('ponto_alarms', JSON.stringify(synced))
+            saveUserAlarms(synced).catch(() => {})
+          }
+          setAlarms(synced)
+          return
+        }
+      } catch (_) {}
+
+      // 3. Primeira abertura: defaults do projeto
+      const defaults = buildAlarmDefaults()
+      if (scheduleHash) localStorage.setItem('ponto_alarms_hash', scheduleHash)
+      try { localStorage.setItem('ponto_alarms', JSON.stringify(defaults)) } catch (_) {}
+      setAlarms(defaults)
     }
+
+    load()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persiste quando muda
+  // Persiste no localStorage + backend (debounce 800ms para não bater na API a cada tecla)
   useEffect(() => {
     if (!alarms) return
     try { localStorage.setItem('ponto_alarms', JSON.stringify(alarms)) } catch (_) {}
+
+    clearTimeout(saveAlarmTimer.current)
+    saveAlarmTimer.current = setTimeout(() => {
+      saveUserAlarms(alarms).catch(() => {})
+    }, 800)
+
+    return () => clearTimeout(saveAlarmTimer.current)
   }, [alarms])
 
   // Verifica despertadores a cada 30s

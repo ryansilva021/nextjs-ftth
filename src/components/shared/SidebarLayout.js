@@ -11,7 +11,6 @@ import { playNotifSound }       from '@/lib/notifSound'
 import OSToast    from '@/components/shared/OSToast'
 import PontoToast from '@/components/shared/PontoToast'
 import { getTimeSettings } from '@/actions/time-settings'
-import { showNativeNotif } from '@/lib/nativeNotif'
 import { useLanguage } from '@/contexts/LanguageContext'
 
 // Rótulos legíveis por tipo de OS (para notificações nativas)
@@ -179,12 +178,7 @@ export default function SidebarLayout({ session, children }) {
         changed = true
         const id = `ponto-${key}-${Math.random()}`
         setPontoToasts(prev => [...prev.slice(-3), { id, msg: s.msg, time: key }])
-        showNativeNotif({
-          title: 'Lembrete de Ponto · FiberOps',
-          body:  s.msg,
-          tag:   'fiberops-ponto',
-          url:   '/ponto',
-        })
+        // Notificação do sistema entregue pelo cron via push (evita duplicata)
         try {
           const soundOn = localStorage.getItem('pref_notif_sound')
           if (soundOn !== 'false') playNotifSound()
@@ -232,12 +226,7 @@ export default function SidebarLayout({ session, children }) {
         const label = ALARM_LABELS[key] ?? key
         const id    = `alarm-${key}-${Math.random()}`
         setPontoToasts(prev => [...prev.slice(-3), { id, msg: `⏰ Despertador: ${label} — hora de bater ponto!`, time: hhmm }])
-        showNativeNotif({
-          title: '⏰ Despertador FiberOps',
-          body:  `${label} — hora de bater ponto!`,
-          tag:   `fiberops-alarm-${key}`,
-          url:   '/ponto',
-        })
+        // Notificação do sistema entregue pelo cron via push (evita duplicata)
         try {
           const soundOn = localStorage.getItem('pref_notif_sound')
           if (soundOn !== 'false') playNotifSound()
