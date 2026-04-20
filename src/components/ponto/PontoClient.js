@@ -59,7 +59,7 @@ function getLocation() {
 
 // ─── Shell ────────────────────────────────────────────────────────────────────
 
-export default function PontoClient({ initialRecord, initialRequests, userName, userProfile }) {
+export default function PontoClient({ initialRecord, initialRequests, userName, userProfile, projectSchedule }) {
   const { t } = useLanguage()
   const [activeTab,  setActiveTab]  = useState('bater')
   const [record,     setRecord]     = useState(initialRecord)
@@ -82,15 +82,65 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
   const [firedAlarm,  setFiredAlarm]  = useState(null)
   const [alarmPending, startAlarmTrans] = useTransition()
 
-  // Carrega do localStorage no cliente
+  // Carrega do localStorage no cliente; usa horários do projeto como padrão
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('ponto_alarms')
-      setAlarms(stored ? JSON.parse(stored) : defaultAlarms())
-    } catch (_) {
-      setAlarms(defaultAlarms())
+    // Monta defaults a partir do projectSchedule (configurado pelo admin)
+    // para que todos os usuários já partam com os horários corretos do projeto.
+    function buildDefaults() {
+      if (!projectSchedule) return defaultAlarms()
+      const map = {
+        entrada:       projectSchedule.entrada,
+        almoco_inicio: projectSchedule.almoco_inicio,
+        almoco_fim:    projectSchedule.almoco_fim,
+        saida:         projectSchedule.saida,
+      }
+      return Object.fromEntries(
+        ALARM_CFG.map(a => [
+          a.key,
+          { enabled: false, time: map[a.key] ?? a.defaultTime },
+        ])
+      )
     }
-  }, [])
+
+    // Hash dos horários do projeto para detectar quando o admin alterou os tempos
+    const scheduleHash = projectSchedule
+      ? [projectSchedule.entrada, projectSchedule.almoco_inicio, projectSchedule.almoco_fim, projectSchedule.saida].join('|')
+      : null
+
+    try {
+      const stored      = localStorage.getItem('ponto_alarms')
+      const storedHash  = localStorage.getItem('ponto_alarms_hash')
+
+      if (!stored) {
+        // Primeira abertura: pré-popula com horários do projeto (todos desativados)
+        if (scheduleHash) localStorage.setItem('ponto_alarms_hash', scheduleHash)
+        setAlarms(buildDefaults())
+      } else if (scheduleHash && storedHash !== scheduleHash) {
+        // Admin alterou os horários do projeto: sincroniza os tempos
+        // mantendo as preferências de ativado/desativado do usuário
+        const parsed = JSON.parse(stored)
+        const map = {
+          entrada:       projectSchedule.entrada,
+          almoco_inicio: projectSchedule.almoco_inicio,
+          almoco_fim:    projectSchedule.almoco_fim,
+          saida:         projectSchedule.saida,
+        }
+        const merged = Object.fromEntries(
+          ALARM_CFG.map(a => [
+            a.key,
+            { ...parsed[a.key], time: map[a.key] ?? parsed[a.key]?.time ?? a.defaultTime },
+          ])
+        )
+        localStorage.setItem('ponto_alarms', JSON.stringify(merged))
+        localStorage.setItem('ponto_alarms_hash', scheduleHash)
+        setAlarms(merged)
+      } else {
+        setAlarms(JSON.parse(stored))
+      }
+    } catch (_) {
+      setAlarms(buildDefaults())
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persiste quando muda
   useEffect(() => {

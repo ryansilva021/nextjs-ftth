@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getPontoHoje } from '@/actions/time-record'
 import { getMinhasSolicitacoes } from '@/actions/time-request'
+import { getTimeSettings } from '@/actions/time-settings'
 import PontoClient from '@/components/ponto/PontoClient'
 
 export const metadata = { title: 'Bater Ponto · FiberOps' }
@@ -16,9 +17,10 @@ export default async function PontoPage() {
   if (!ALLOWED.includes(role)) redirect('/')
 
   // Carrega dados em paralelo — sem loading flash no cliente
-  const [initialRecord, initialRequests] = await Promise.all([
+  const [initialRecord, initialRequests, projectSchedule] = await Promise.all([
     getPontoHoje().catch(() => null),
     getMinhasSolicitacoes({ limit: 40 }).catch(() => []),
+    getTimeSettings().catch(() => null),
   ])
 
   // Passa o perfil diretamente da sessão (sem query extra ao banco)
@@ -41,6 +43,7 @@ export default async function PontoPage() {
       initialRequests={initialRequests}
       userName={displayName}
       userProfile={userProfile}
+      projectSchedule={projectSchedule}
     />
   )
 }
