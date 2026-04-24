@@ -197,12 +197,41 @@ export default function MapaFTTH({
   const TIPO_ICONE = { cto: '📦', caixa: '🔌', rota: '〰', poste: '🏗', olt: '🖥' }
   const TIPO_COR   = { cto: '#0284c7', caixa: '#7c3aed', rota: '#059669', poste: '#d97706', olt: '#0891b2' }
 
+  // Mapeamento tipo interno → tipo modelo (uppercase para o banco)
+  const SNAP_TIPO_MAP = { olt: 'OLT', cto: 'CTO', cdo: 'CDO', ce: 'CE' }
+
   // ---- Callback de clique em elemento (usado por useOLLayers) ----
   const handleElementClick = useCallback(({ type, data }) => {
-    if (addModeRef.current) return
     if (reposicionandoRef.current) return
+
+    // ── Modo adição de ROTA: captura clique em OLT/CTO/CDO como snap ──────────
+    if (addModeRef.current === 'rota' && !routeFinalizedRef.current) {
+      if (type !== 'olt' && type !== 'cto' && type !== 'caixa') return
+
+      const lat = data.lat
+      const lng = data.lng
+      if (lat == null || lng == null) return
+
+      const snapType = type === 'caixa'
+        ? (data.tipo?.toUpperCase() === 'CE' ? 'ce' : 'cdo')
+        : type
+      const snapId   = data.cto_id ?? data.id ?? data.ce_id ?? data.olt_id ?? ''
+      const snapNome = data.nome ?? snapId
+
+      const currentLen = addRoutePointsRef.current.length
+
+      setAddRouteLinks(prev => [
+        ...prev,
+        { pointIndex: currentLen, type: snapType, id: snapId, nome: snapNome },
+      ])
+      setAddRoutePoints(prev => [...prev, [lng, lat]])
+      return
+    }
+
+    if (addModeRef.current) return
     setSpreadPanel(null)
     setSelectedElement({ type, data })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ---- Layers do OpenLayers — callbacks de clique fluem para o BottomSheet ----
@@ -773,13 +802,27 @@ export default function MapaFTTH({
     setAddSaving(true)
     setAddErro(null)
 
-    const rotaSnapIds = addRouteLinks.map(l => `${l.type}:${l.id ?? l.nome}`)
-    const rotaLinks   = rotaSnapIds.length > 0 ? rotaSnapIds.join(', ') : null
+    const rotaSnapIds   = addRouteLinks.map(l => `${l.type}:${l.id ?? l.nome}`)
+    const rotaLinks     = rotaSnapIds.length > 0 ? rotaSnapIds.join(', ') : null
+    const origemLink  = addRouteLinks[0] ?? null
+    const destinoLink = addRouteLinks.length > 1 ? addRouteLinks[addRouteLinks.length - 1] : null
     const payloads = {
       cto:   { cto_id: addForm.id.trim(), projeto_id: projetoId, lat: addCoords?.lat, lng: addCoords?.lng, nome: addForm.nome || null, capacidade: addForm.capacidade || 16 },
       caixa: { ce_id: addForm.id.trim(), projeto_id: projetoId, lat: addCoords?.lat, lng: addCoords?.lng, nome: addForm.nome || null, tipo: addForm.tipo || 'CDO' },
       poste: { poste_id: addForm.id.trim(), projeto_id: projetoId, lat: addCoords?.lat, lng: addCoords?.lng, nome: addForm.nome || null, tipo: 'simples', status: 'ativo' },
-      rota:  { rota_id: addForm.id.trim(), projeto_id: projetoId, nome: addForm.nome || null, tipo: addForm.tipoRota || 'RAMAL', coordinates: addRoutePoints, obs: rotaLinks || addForm.obs || null, snap_ids: rotaSnapIds },
+      rota:  {
+        rota_id:     addForm.id.trim(),
+        projeto_id:  projetoId,
+        nome:        addForm.nome || null,
+        tipo:        addForm.tipoRota || 'RAMAL',
+        coordinates: addRoutePoints,
+        obs:         rotaLinks || addForm.obs || null,
+        snap_ids:    rotaSnapIds,
+        origemId:    origemLink?.id    ?? null,
+        origemTipo:  origemLink  ? (SNAP_TIPO_MAP[origemLink.type]  ?? null) : null,
+        destinoId:   destinoLink?.id   ?? null,
+        destinoTipo: destinoLink ? (SNAP_TIPO_MAP[destinoLink.type] ?? null) : null,
+      },
     }
 
     if (!isOnline) {
@@ -1470,10 +1513,24 @@ export default function MapaFTTH({
           {addMode === 'rota' && !routeFinalized
             ? <>
                 <span>〰️</span>
+                {/* Snap de origem */}
                 {addRouteLinks.length > 0 && (
-                  <span style={{ color: '#22c55e', fontSize: 10 }}>🔗 {addRouteLinks[addRouteLinks.length - 1].nome ?? addRouteLinks[addRouteLinks.length - 1].id}</span>
+                  <span style={{ color: '#22c55e', fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    🔗 {addRouteLinks[0].nome ?? addRouteLinks[0].id}
+                    {addRouteLinks.length > 1 && (
+                      <> → {addRouteLinks[addRouteLinks.length - 1].nome ?? addRouteLinks[addRouteLinks.length - 1].id}</>
+                    )}
+                  </span>
                 )}
-                <span>{addRoutePoints.length === 0 ? 'Clique no mapa para iniciar' : `${addRoutePoints.length} pontos`}</span>
+                <span>
+                  {addRoutePoints.length === 0
+                    ? 'Clique em OLT, CTO ou CDO para iniciar'
+                    : addRouteLinks.length === 0
+                      ? `${addRoutePoints.length} pts — clique em um elemento para conectar`
+                      : addRoutePoints.length === 1
+                        ? 'Clique no próximo elemento para criar a rota'
+                        : `${addRoutePoints.length} pts — clique no elemento de destino`}
+                </span>
                 {addRoutePoints.length >= 2 && (
                   <button
                     onClick={() => setRouteFinalized(true)}

@@ -180,7 +180,7 @@ export default function VisaoGeralPage() {
               </p>
             </div>
             <Link
-              href="/admin/topologia"
+              href="/mapa"
               style={{
                 background: FO.orange, color: 'white',
                 fontSize: 12, fontWeight: 700, padding: '9px 20px',
@@ -293,7 +293,7 @@ export default function VisaoGeralPage() {
                   </p>
                 )}
               </div>
-              <Link href="/" style={{
+              <Link href="/mapa" style={{
                 display: 'block', textAlign: 'center', marginTop: 14,
                 fontSize: 11, color: FO.orange, fontWeight: 600, textDecoration: 'none',
               }}>

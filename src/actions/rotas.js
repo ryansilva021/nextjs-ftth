@@ -45,12 +45,17 @@ export async function getRotas(projetoId) {
       coordinates: rota.geojson?.coordinates ?? [],
     },
     properties: {
-      rota_id:    rota.rota_id,
-      nome:       rota.nome,
-      tipo:       rota.tipo,
-      obs:        rota.obs,
-      projeto_id: rota.projeto_id,
-      _id:        rota._id.toString(),
+      rota_id:     rota.rota_id,
+      nome:        rota.nome,
+      tipo:        rota.tipo,
+      obs:         rota.obs,
+      snap_ids:    rota.snap_ids ?? [],
+      origemId:    rota.origemId    ?? null,
+      origemTipo:  rota.origemTipo  ?? null,
+      destinoId:   rota.destinoId   ?? null,
+      destinoTipo: rota.destinoTipo ?? null,
+      projeto_id:  rota.projeto_id,
+      _id:         rota._id.toString(),
     },
   }))
 
@@ -79,7 +84,8 @@ export async function upsertRota(data) {
   const session = await requireActiveEmpresa(WRITE_ROLES)
   const { role, projeto_id: userProjeto } = session.user
 
-  const { rota_id, projeto_id, coordinates, geometry_type, nome, tipo, obs, snap_ids } = data ?? {}
+  const { rota_id, projeto_id, coordinates, geometry_type, nome, tipo, obs, snap_ids,
+          origemId, origemTipo, destinoId, destinoTipo } = data ?? {}
 
   if (!rota_id?.trim())           throw new Error('rota_id é obrigatório')
   if (!Array.isArray(coordinates) || coordinates.length < 2)
@@ -91,15 +97,18 @@ export async function upsertRota(data) {
   await connectDB()
 
   const update = {
-    // Armazenado no sub-schema geojson conforme o modelo Rota
     geojson: {
       type:        geometry_type ?? 'LineString',
       coordinates,
     },
-    nome:     nome?.trim() ?? null,
-    tipo:     tipo?.trim() ?? null,
-    obs:      obs?.trim()  ?? null,
-    snap_ids: Array.isArray(snap_ids) ? snap_ids.filter(Boolean) : [],
+    nome:        nome?.trim()       ?? null,
+    tipo:        tipo?.trim()       ?? null,
+    obs:         obs?.trim()        ?? null,
+    snap_ids:    Array.isArray(snap_ids) ? snap_ids.filter(Boolean) : [],
+    origemId:    origemId           ?? null,
+    origemTipo:  origemTipo         ?? null,
+    destinoId:   destinoId          ?? null,
+    destinoTipo: destinoTipo        ?? null,
   }
 
   const rota = await Rota.findOneAndUpdate(

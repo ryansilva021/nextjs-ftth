@@ -139,32 +139,6 @@ function LogoLockup({ markSize = 36, textSize = 28, dark = true }) {
   )
 }
 
-// ───────────────────────── TitleBar ─────────────────────────
-function TitleBar() {
-  return (
-    <div style={{
-      height: 36, background: FO.orange,
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 14px',
-      fontFamily: '"Inter", system-ui, sans-serif',
-      fontSize: 12, color: FO.cream, letterSpacing: '0.02em',
-      borderBottom: '1px solid rgba(0,0,0,0.15)',
-      userSelect: 'none',
-      flexShrink: 0,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: 0.85 }}>
-        <LogoMark size={18} bg="transparent" f={FO.cream} stripes={FO.espresso} radius={4}/>
-        <span className="fo-titlebar-text">FiberOps · ISP Operations</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(247,240,226,0.85)' }}>
-        <div style={{ padding: '6px 8px', display: 'flex', alignItems: 'center' }}>{Icon.minimize(FO.cream)}</div>
-        <div style={{ padding: '6px 8px', display: 'flex', alignItems: 'center' }}>{Icon.maximize(FO.cream)}</div>
-        <div style={{ padding: '6px 8px', display: 'flex', alignItems: 'center' }}>{Icon.close(FO.cream)}</div>
-      </div>
-    </div>
-  )
-}
-
 // ───────────────────────── Left Panel ─────────────────────────
 function LeftPanel() {
   const features = [
@@ -525,6 +499,11 @@ function LoginForm() {
       </svg>
 
       <form onSubmit={handleSubmit} className="fo-form" style={{ width: '100%', maxWidth: 380, position: 'relative' }}>
+        {/* Mobile-only logo */}
+        <div className="fo-mobile-logo">
+          <LogoLockup markSize={36} textSize={28} dark={false}/>
+        </div>
+
         {/* Ornamental divider */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginBottom: 22 }}>
           <span style={{ width: 28, height: 1, background: FO.line }}/>
@@ -803,7 +782,7 @@ export default function LoginPage() {
           .fo-left  { padding: 36px 48px 28px; }
           .fo-right { padding: 40px 56px; }
           .fo-title { font-size: 44px; line-height: 1.1; }
-          .fo-titlebar-text { display: inline; }
+          .fo-mobile-logo { display: none; }
 
           @media (max-width: 1024px) {
             .fo-shell  { grid-template-columns: 1fr 1fr; }
@@ -815,28 +794,15 @@ export default function LoginPage() {
           }
 
           @media (max-width: 768px) {
-            .fo-shell   { grid-template-columns: 1fr; grid-template-rows: auto 1fr; overflow: auto; }
-            .fo-left    { padding: 24px 22px 28px; min-height: auto; }
-            .fo-right   { padding: 28px 22px 40px; }
-            .fo-title   { font-size: 30px; }
-            .fo-intro-p { font-size: 13px; max-width: 100%; }
-            .fo-rotator, .fo-quote, .fo-integrations { display: none !important; }
-            .fo-stats   { grid-template-columns: repeat(4,1fr) !important; gap: 6px !important; max-width: 100% !important; margin-top: 18px !important; }
-            .fo-stats .fo-stat-card { flex-direction: column; align-items: flex-start; padding: 10px !important; gap: 6px !important; }
-            .fo-stats .fo-stat-icon { width: 28px !important; height: 28px !important; }
-            .fo-stats .fo-stat-v { font-size: 18px !important; }
-            .fo-stats .fo-stat-t { font-size: 10px !important; }
-            .fo-left-footer { display: none !important; }
-            .fo-pill { font-size: 10px !important; }
-            .fo-form { max-width: 100% !important; }
-            .fo-titlebar-text { display: none; }
+            .fo-left        { display: none !important; }
+            .fo-shell       { grid-template-columns: 1fr; overflow: auto; }
+            .fo-right       { padding: 40px 28px 56px; min-height: 100dvh; justify-content: flex-start !important; padding-top: 48px; }
+            .fo-mobile-logo { display: flex !important; justify-content: center; margin-bottom: 32px; }
+            .fo-form        { max-width: 100% !important; }
           }
 
           @media (max-width: 420px) {
-            .fo-title { font-size: 26px; }
-            .fo-left  { padding: 20px 18px 20px; }
-            .fo-right { padding: 24px 18px 40px; }
-            .fo-stats { grid-template-columns: 1fr 1fr !important; }
+            .fo-right { padding: 32px 20px 48px; }
           }
 
           @media (max-height: 640px) and (min-width: 769px) {
@@ -846,9 +812,7 @@ export default function LoginPage() {
           }
         `}</style>
 
-        <TitleBar/>
-
-        <div className="fo-shell" style={{ flex: 1 }}>
+        <div className="fo-shell" style={{ flex: 1, minHeight: 0 }}>
           <LeftPanel/>
           <LoginForm/>
         </div>

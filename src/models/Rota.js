@@ -109,10 +109,29 @@ const RotaSchema = new Schema(
     },
 
     // IDs dos itens snappados nas extremidades da rota (ex: ["cdo:CDO-001", "cto:CTO-001"])
-    // Permite matching confiável de rota por topologia sem depender do texto de obs
     snap_ids: {
       type:    [String],
       default: [],
+    },
+
+    // Vínculo estruturado: elemento de origem e destino da rota
+    origemId: {
+      type:    String,
+      default: null,
+    },
+    origemTipo: {
+      type:    String,
+      enum:    ['OLT', 'CDO', 'CE', 'CTO', null],
+      default: null,
+    },
+    destinoId: {
+      type:    String,
+      default: null,
+    },
+    destinoTipo: {
+      type:    String,
+      enum:    ['OLT', 'CDO', 'CE', 'CTO', null],
+      default: null,
     },
   },
   {

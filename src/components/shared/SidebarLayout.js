@@ -60,7 +60,7 @@ const GROUPS = { public: 0, staff: 1, admin: 2, superadmin: 3 }
 // ── Definição de itens do menu ──────────────────────────────────────────────
 const NAV_ITEMS = [
   { href: '/visao-geral',      labelKey: 'nav.overview', icon: '◈', section: 'PAINEL',         group: GROUPS.public  },
-  { href: '/',                 labelKey: 'nav.map',      icon: '◉',                             group: GROUPS.public  },
+  { href: '/mapa',             labelKey: 'nav.map',      icon: '◉',                             group: GROUPS.public  },
 
   { href: '/admin/topologia',      labelKey: 'nav.topology',     icon: '⬡', section: 'OPERAÇÃO', perm: PERM.VIEW_TOPOLOGY,     group: GROUPS.staff },
   { href: '/admin/campo',          labelKey: 'nav.field',        icon: '◎', perm: PERM.VIEW_FIELD,        group: GROUPS.staff },
