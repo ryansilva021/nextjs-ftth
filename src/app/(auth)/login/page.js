@@ -1,196 +1,472 @@
 'use client'
 
-import { Suspense, useState } from 'react'
-import Image from 'next/image'
+import { Suspense, useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
-
-function IconUser() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-    </svg>
-  )
+// ───────────────────────── Brand palette ─────────────────────────
+const FO = {
+  orange:      '#C45A2C',
+  orangeDeep:  '#8E3B1A',
+  orangeSoft:  '#E88A5A',
+  orangeGlow:  '#F4A771',
+  beige:       '#EDE3D2',
+  beigeDeep:   '#D9CBB4',
+  cream:       '#F7F0E2',
+  espresso:    '#1A120D',
+  espressoUp:  '#2A1F17',
+  ink:         '#2A1F18',
+  line:        'rgba(30,22,18,0.12)',
+  lineDark:    'rgba(237,227,210,0.12)',
+  muted:       'rgba(237,227,210,0.6)',
 }
 
-function IconLock() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+// ───────────────────────── Icons ─────────────────────────
+const Icon = {
+  check: (c = FO.orange) => (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <circle cx="7" cy="7" r="6.5" fill={c} fillOpacity="0.12" stroke={c} strokeWidth="1"/>
+      <path d="M4 7.2 L6 9.2 L10 4.8" stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
-  )
+  ),
+  user: (c) => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="5.5" r="2.8" stroke={c} strokeWidth="1.4"/>
+      <path d="M2.5 13.5c0-2.8 2.4-4.5 5.5-4.5s5.5 1.7 5.5 4.5" stroke={c} strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  ),
+  lock: (c) => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="3" y="7" width="10" height="7" rx="1.2" stroke={c} strokeWidth="1.4"/>
+      <path d="M5 7V5a3 3 0 0 1 6 0v2" stroke={c} strokeWidth="1.4"/>
+      <circle cx="8" cy="10.5" r="1" fill={c}/>
+    </svg>
+  ),
+  eye: (c) => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" stroke={c} strokeWidth="1.4"/>
+      <circle cx="8" cy="8" r="2" stroke={c} strokeWidth="1.4"/>
+    </svg>
+  ),
+  eyeOff: (c) => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M2 2l12 12M6 6.2A2 2 0 0 0 8 10a2 2 0 0 0 1.8-1.1" stroke={c} strokeWidth="1.4" strokeLinecap="round"/>
+      <path d="M3 9.5C2 8.7 1.5 8 1.5 8S4 3.5 8 3.5c1 0 1.9.2 2.7.5M13.2 6c.8.9 1.3 2 1.3 2s-2.5 4.5-6.5 4.5c-.6 0-1.2-.1-1.7-.2" stroke={c} strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  ),
+  arrow: (c) => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M3 8h10M9 4l4 4-4 4" stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  shield: (c) => (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M7 1.5 2 3.2v3.3c0 3 2.3 5.5 5 6 2.7-.5 5-3 5-6V3.2L7 1.5Z" stroke={c} strokeWidth="1.3"/>
+    </svg>
+  ),
+  fiber: (c) => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path d="M2 16c4-6 8-6 12-12M2 10c4-2 8-2 12-8M2 18c5-8 10-8 15-16" stroke={c} strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  ),
+  radar: (c) => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <circle cx="10" cy="10" r="7" stroke={c} strokeWidth="1.3" strokeOpacity="0.4"/>
+      <circle cx="10" cy="10" r="4" stroke={c} strokeWidth="1.3" strokeOpacity="0.7"/>
+      <circle cx="10" cy="10" r="1.4" fill={c}/>
+      <path d="M10 10 L16 6" stroke={c} strokeWidth="1.3"/>
+    </svg>
+  ),
+  pulse: (c) => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path d="M2 10h3l2-5 3 10 2-5 2 3 3-3h1" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  clock: (c) => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <circle cx="10" cy="10" r="7.5" stroke={c} strokeWidth="1.4"/>
+      <path d="M10 5.5V10l3 2" stroke={c} strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  ),
+  minimize: (c) => <svg width="12" height="12"><path d="M2 6h8" stroke={c} strokeWidth="1.3"/></svg>,
+  maximize: (c) => <svg width="12" height="12" fill="none"><rect x="2" y="2" width="8" height="8" stroke={c} strokeWidth="1.3"/></svg>,
+  close: (c) => <svg width="12" height="12"><path d="M2 2l8 8M10 2l-8 8" stroke={c} strokeWidth="1.3" strokeLinecap="round"/></svg>,
 }
 
-function IconEye({ open }) {
-  return open ? (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-    </svg>
-  ) : (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-      <line x1="1" y1="1" x2="23" y2="23"/>
-    </svg>
-  )
-}
-
-function IconCheck() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12"/>
-    </svg>
-  )
-}
-
-function IconWifi() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/>
-    </svg>
-  )
-}
-
-function IconActivity() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-    </svg>
-  )
-}
-
-function IconUsers() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-    </svg>
-  )
-}
-
-function IconShield() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-    </svg>
-  )
-}
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-
-function StatCard({ icon, value, label, accent }) {
+// ───────────────────────── Logo ─────────────────────────
+function LogoMark({ size = 32, bg = FO.orange, f = FO.espresso, stripes = null, radius }) {
+  const r = radius ?? size * 0.22
+  const stripeColor = stripes ?? (bg === FO.orange ? FO.espresso : FO.orange)
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: 14,
-      padding: '18px 20px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 14,
-      backdropFilter: 'blur(8px)',
+      width: size, height: size, background: bg, borderRadius: r,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: bg === FO.orange
+        ? '0 1px 0 rgba(255,255,255,0.2) inset, 0 4px 10px rgba(196,90,44,0.25)'
+        : '0 1px 0 rgba(255,255,255,0.06) inset',
+      flexShrink: 0,
     }}>
-      <div style={{
-        width: 42, height: 42, borderRadius: 11,
-        background: accent,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#fff', flexShrink: 0,
-      }}>
-        {icon}
+      <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 72 72" fill="none">
+        <g transform="translate(18,13)">
+          <path d="M4 2 L4 46 Q4 48 6 48 L10 48 Q12 48 12 46 L12 30 L26 30 Q28 30 28 28 L28 24 Q28 22 26 22 L12 22 L12 10 L30 10 L30 14 Q30 16 32 16 L34 16 Q36 16 36 14 L36 4 Q36 2 34 2 Z" fill={f}/>
+          <rect x="4" y="2" width="1.8" height="46" fill={stripeColor} opacity="0.9"/>
+          <rect x="10.2" y="2" width="1.8" height="46" fill={stripeColor} opacity="0.9"/>
+        </g>
+      </svg>
+    </div>
+  )
+}
+
+function Wordmark({ size = 28, color = FO.cream, accent = FO.orangeGlow }) {
+  return (
+    <span style={{
+      fontFamily: '"Instrument Serif", "Newsreader", Georgia, serif',
+      fontSize: size, fontWeight: 400, letterSpacing: '-0.02em',
+      color, lineHeight: 1, display: 'inline-flex',
+    }}>
+      Fiber<span style={{ fontStyle: 'italic', color: accent }}>Ops</span>
+    </span>
+  )
+}
+
+function LogoLockup({ markSize = 36, textSize = 28, dark = true }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <LogoMark size={markSize} bg={FO.orange} f={FO.espresso} stripes={FO.espresso}/>
+      <Wordmark size={textSize} color={dark ? FO.cream : FO.espresso} accent={dark ? FO.orangeGlow : FO.orange}/>
+    </div>
+  )
+}
+
+// ───────────────────────── TitleBar ─────────────────────────
+function TitleBar() {
+  return (
+    <div style={{
+      height: 36, background: FO.orange,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '0 14px',
+      fontFamily: '"Inter", system-ui, sans-serif',
+      fontSize: 12, color: FO.cream, letterSpacing: '0.02em',
+      borderBottom: '1px solid rgba(0,0,0,0.15)',
+      userSelect: 'none',
+      flexShrink: 0,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: 0.85 }}>
+        <LogoMark size={18} bg="transparent" f={FO.cream} stripes={FO.espresso} radius={4}/>
+        <span className="fo-titlebar-text">FiberOps · ISP Operations</span>
       </div>
-      <div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1 }}>
-          {value}
-        </div>
-        <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.7)', marginTop: 3, lineHeight: 1 }}>
-          {label}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(247,240,226,0.85)' }}>
+        <div style={{ padding: '6px 8px', display: 'flex', alignItems: 'center' }}>{Icon.minimize(FO.cream)}</div>
+        <div style={{ padding: '6px 8px', display: 'flex', alignItems: 'center' }}>{Icon.maximize(FO.cream)}</div>
+        <div style={{ padding: '6px 8px', display: 'flex', alignItems: 'center' }}>{Icon.close(FO.cream)}</div>
       </div>
     </div>
   )
 }
 
-// ─── Feature Row ──────────────────────────────────────────────────────────────
+// ───────────────────────── Left Panel ─────────────────────────
+function LeftPanel() {
+  const features = [
+    'Gestão completa da rede FTTH e FTTX',
+    'Monitoramento de OLTs e ONUs em tempo real',
+    'Controle de provisionamento e desativação',
+    'Notificações por SLA sem abrir o sistema',
+    'Relatórios e dashboards operacionais',
+  ]
 
-function Feature({ text }) {
+  const stats = [
+    { v: '120+',  t: 'Provedores',       icon: Icon.fiber(FO.orangeGlow),  tone: FO.orange },
+    { v: '50k+',  t: 'ONUs monitoradas', icon: Icon.radar(FO.orangeGlow),  tone: FO.orangeDeep },
+    { v: '99,9%', t: 'Uptime garantido', icon: Icon.pulse(FO.orangeGlow),  tone: FO.orangeDeep },
+    { v: '24/7',  t: 'Suporte técnico',  icon: Icon.clock(FO.orangeGlow),  tone: FO.orange },
+  ]
+
+  const modules = [
+    {
+      tag: 'NOC · tempo real',
+      title: 'Alertas antes do cliente ligar',
+      body: 'Detecção automática de queda de sinal óptico, reboots de ONU e degradação de PON — com triagem por impacto no SLA.',
+    },
+    {
+      tag: 'Provisionamento',
+      title: 'Autorização de ONU em 8 segundos',
+      body: 'Fluxo unificado Huawei, ZTE, Datacom, Parks e Furukawa. Menos chamado em campo, mais SLA cumprido.',
+    },
+    {
+      tag: 'Financeiro integrado',
+      title: 'Cobrança + rede na mesma tela',
+      body: 'Bloqueio automático por inadimplência, PIX com baixa em tempo real e réguas de cobrança por WhatsApp.',
+    },
+    {
+      tag: 'LGPD · Anatel',
+      title: 'Relatórios regulatórios automáticos',
+      body: 'SGMU, ICC e Anatel gerados com 1 clique. Trilha de auditoria e retenção de logs conformes.',
+    },
+  ]
+
+  const integrations = ['Huawei', 'ZTE', 'Datacom', 'Mikrotik', 'Parks', 'Furukawa']
+
+  const [modIdx, setModIdx] = useState(0)
+  useEffect(() => {
+    setModIdx(Math.floor(Math.random() * modules.length))
+  }, [])
+  useEffect(() => {
+    const t = setInterval(() => setModIdx((i) => (i + 1) % modules.length), 6000)
+    return () => clearInterval(t)
+  }, [])
+  const mod = modules[modIdx]
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{
-        width: 20, height: 20, borderRadius: 6,
-        background: 'rgba(234,88,12,0.2)',
-        border: '1px solid rgba(234,88,12,0.35)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#fb923c', flexShrink: 0,
-      }}>
-        <IconCheck />
+    <div className="fo-left" style={{
+      position: 'relative',
+      height: '100%',
+      background: `radial-gradient(120% 80% at 10% 0%, ${FO.espressoUp} 0%, ${FO.espresso} 60%)`,
+      color: FO.cream,
+      display: 'flex', flexDirection: 'column',
+      overflow: 'auto',
+      fontFamily: '"Inter", system-ui, sans-serif',
+    }}>
+      {/* fiber lines */}
+      <svg width="100%" height="100%" viewBox="0 0 600 900" preserveAspectRatio="none"
+        style={{ position: 'absolute', inset: 0, opacity: 0.08, pointerEvents: 'none' }}>
+        <defs>
+          <linearGradient id="fl" x1="0" x2="1">
+            <stop offset="0" stopColor={FO.orangeGlow} stopOpacity="0"/>
+            <stop offset="0.5" stopColor={FO.orangeGlow} stopOpacity="1"/>
+            <stop offset="1" stopColor={FO.orangeGlow} stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        {[0.1,0.22,0.35,0.5,0.62,0.78,0.9].map((y, i) => (
+          <path key={i} d={`M-50 ${y*900} Q300 ${y*900 - 80*(i%2?1:-1)} 650 ${y*900 + 40}`} stroke="url(#fl)" strokeWidth="1" fill="none"/>
+        ))}
+      </svg>
+
+      <div style={{ position: 'relative', zIndex: 2 }}>
+        <LogoLockup markSize={40} textSize={32} dark/>
       </div>
-      <span style={{ fontSize: 13.5, color: 'rgba(203,213,225,0.85)', lineHeight: 1.4 }}>{text}</span>
-    </div>
-  )
-}
 
-// ─── Input Field ──────────────────────────────────────────────────────────────
-
-function Field({ label, icon, right, error, ...props }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label style={{
-        fontSize: 12, fontWeight: 600, letterSpacing: '0.05em',
-        textTransform: 'uppercase', color: '#64748b',
-      }}>
-        {label}
-      </label>
-      <div style={{ position: 'relative' }}>
-        <span style={{
-          position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)',
-          color: error ? '#f87171' : '#94a3b8', pointerEvents: 'none',
-          display: 'flex', alignItems: 'center',
+      <div style={{ position: 'relative', zIndex: 2, marginTop: 40 }}>
+        <div className="fo-pill" style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '6px 12px 6px 10px',
+          border: `1px solid ${FO.lineDark}`,
+          borderRadius: 999,
+          fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase',
+          color: FO.orangeGlow,
+          fontFamily: '"JetBrains Mono", monospace',
         }}>
-          {icon}
-        </span>
-        <input
-          {...props}
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            background: '#f8fafc',
-            border: `1.5px solid ${error ? '#fca5a5' : '#e2e8f0'}`,
-            borderRadius: 10,
-            padding: `11px ${right ? '42px' : '13px'} 11px 38px`,
-            fontSize: 14, color: '#0f172a',
-            outline: 'none',
-            transition: 'border-color .15s, box-shadow .15s',
-            fontFamily: 'inherit',
-          }}
-          onFocus={e => {
-            e.target.style.borderColor = '#ea580c'
-            e.target.style.boxShadow = '0 0 0 3px rgba(234,88,12,0.1)'
-            e.target.style.background = '#fff'
-          }}
-          onBlur={e => {
-            e.target.style.borderColor = error ? '#fca5a5' : '#e2e8f0'
-            e.target.style.boxShadow = 'none'
-            e.target.style.background = '#f8fafc'
-          }}
-        />
-        {right && (
-          <span style={{
-            position: 'absolute', right: 0, top: 0, bottom: 0,
-            display: 'flex', alignItems: 'center', paddingRight: 13,
+          <span style={{ width: 6, height: 6, borderRadius: 3, background: FO.orangeGlow, boxShadow: `0 0 8px ${FO.orangeGlow}` }}/>
+          Cloud · FTTH · FTTX
+        </div>
+
+        <h1 className="fo-title" style={{
+          margin: '18px 0 0',
+          fontFamily: '"Instrument Serif", "Newsreader", Georgia, serif',
+          fontWeight: 400, letterSpacing: '-0.02em',
+          color: FO.cream, textWrap: 'balance',
+        }}>
+          Gestão completa para o{' '}
+          <span style={{ fontStyle: 'italic', color: FO.orangeGlow, whiteSpace: 'nowrap' }}>seu ISP.</span>
+        </h1>
+
+        <p className="fo-intro-p" style={{
+          margin: '18px 0 0', maxWidth: 440,
+          fontSize: 14.5, lineHeight: 1.6,
+          color: FO.muted,
+        }}>
+          Uma plataforma única para provisionamento, monitoramento em tempo real
+          e operação da sua rede óptica — do NOC à última milha.
+        </p>
+
+        <ul className="fo-features" style={{ margin: '24px 0 0', padding: 0, listStyle: 'none', display: 'grid', gap: 10 }}>
+          {features.map((f, i) => (
+            <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: 'rgba(237,227,210,0.86)' }}>
+              {Icon.check(FO.orangeGlow)}
+              <span>{f}</span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="fo-stats" style={{
+          marginTop: 28,
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
+          maxWidth: 440,
+        }}>
+          {stats.map((s, i) => (
+            <div key={i} className="fo-stat-card" style={{
+              border: `1px solid ${FO.lineDark}`,
+              borderRadius: 8,
+              padding: '14px',
+              background: 'rgba(237,227,210,0.02)',
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <div className="fo-stat-icon" style={{
+                width: 36, height: 36, borderRadius: 8,
+                background: `linear-gradient(135deg, ${s.tone}, ${FO.orangeDeep})`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: `0 6px 14px ${s.tone}40`,
+                flexShrink: 0,
+              }}>{s.icon}</div>
+              <div>
+                <div className="fo-stat-v" style={{
+                  fontFamily: '"Instrument Serif", serif',
+                  fontSize: 22, lineHeight: 1, color: FO.cream, letterSpacing: '-0.01em',
+                }}>{s.v}</div>
+                <div className="fo-stat-t" style={{ fontSize: 11, color: FO.muted, marginTop: 3 }}>{s.t}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Rotating module */}
+        <div className="fo-rotator" style={{
+          marginTop: 22, maxWidth: 440,
+          padding: '16px 18px',
+          borderRadius: 10,
+          background: 'linear-gradient(135deg, rgba(196,90,44,0.14), rgba(237,227,210,0.02))',
+          border: `1px solid ${FO.lineDark}`,
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontSize: 10, letterSpacing: '0.22em', textTransform: 'uppercase',
+            color: FO.orangeGlow, fontFamily: '"JetBrains Mono", monospace',
+            marginBottom: 8,
           }}>
-            {right}
-          </span>
-        )}
+            <span style={{ width: 5, height: 5, borderRadius: 3, background: FO.orangeGlow }}/>
+            {mod.tag}
+          </div>
+          <div key={modIdx} style={{ animation: 'fo-fade .55s ease' }}>
+            <div style={{
+              fontFamily: '"Instrument Serif", serif',
+              fontSize: 20, lineHeight: 1.2, color: FO.cream, letterSpacing: '-0.01em',
+            }}>{mod.title}</div>
+            <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.55, color: FO.muted }}>{mod.body}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 5, marginTop: 12 }}>
+            {modules.map((_, i) => (
+              <button key={i} onClick={() => setModIdx(i)} aria-label={`Módulo ${i+1}`}
+                style={{
+                  width: i === modIdx ? 18 : 5, height: 5, borderRadius: 3,
+                  border: 'none', cursor: 'pointer', padding: 0,
+                  background: i === modIdx ? FO.orangeGlow : 'rgba(237,227,210,0.25)',
+                  transition: 'width .3s, background .3s',
+                }}/>
+            ))}
+          </div>
+        </div>
+
+        {/* Quote */}
+        <div className="fo-quote" style={{
+          marginTop: 18, maxWidth: 440,
+          padding: '14px 18px 14px 20px',
+          borderLeft: `2px solid ${FO.orange}`,
+          fontFamily: '"Instrument Serif", serif',
+          fontSize: 16, lineHeight: 1.45, fontStyle: 'italic',
+          color: 'rgba(237,227,210,0.88)',
+        }}>
+          "Reduzimos 62% dos chamados em campo no primeiro trimestre."
+          <div style={{
+            marginTop: 8, fontSize: 11, fontStyle: 'normal',
+            fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.08em',
+            color: 'rgba(237,227,210,0.5)', textTransform: 'uppercase',
+          }}>
+            Renata A. · NOC Manager · Provedor parceiro
+          </div>
+        </div>
+
+        {/* Integrations */}
+        <div className="fo-integrations" style={{ marginTop: 22, maxWidth: 440 }}>
+          <div style={{
+            fontSize: 10, letterSpacing: '0.28em', textTransform: 'uppercase',
+            color: 'rgba(237,227,210,0.45)', fontFamily: '"JetBrains Mono", monospace',
+            marginBottom: 10,
+          }}>Integrações nativas</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {integrations.map((x) => (
+              <span key={x} style={{
+                padding: '5px 10px', borderRadius: 999,
+                border: `1px solid ${FO.lineDark}`,
+                fontSize: 11, color: 'rgba(237,227,210,0.75)',
+                fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.03em',
+              }}>{x}</span>
+            ))}
+          </div>
+        </div>
       </div>
-      {error && (
-        <span style={{ fontSize: 12, color: '#ef4444', marginTop: 2 }}>{error}</span>
-      )}
+
+      {/* Footer */}
+      <div className="fo-left-footer" style={{
+        position: 'relative', zIndex: 2, marginTop: 'auto', paddingTop: 24,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        fontSize: 11, color: 'rgba(237,227,210,0.45)',
+        fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 6, height: 6, borderRadius: 3, background: '#4ade80', boxShadow: '0 0 6px #4ade80' }}/>
+          Plataforma operacional · online
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span>LGPD</span><span style={{ opacity: 0.4 }}>·</span>
+          <span>ISO 27001</span><span style={{ opacity: 0.4 }}>·</span>
+          <span>Anatel</span>
+        </span>
+        <span>© 2026 FiberOps</span>
+      </div>
     </div>
   )
 }
 
-// ─── Form ─────────────────────────────────────────────────────────────────────
+// ───────────────────────── Form Field ─────────────────────────
+function FieldLabel({ label, children }) {
+  return (
+    <div style={{ display: 'block', marginBottom: 14 }}>
+      <div style={{
+        fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase',
+        color: 'rgba(30,22,18,0.55)', marginBottom: 8,
+        fontFamily: '"JetBrains Mono", monospace', fontWeight: 500,
+      }}>{label}</div>
+      {children}
+    </div>
+  )
+}
 
+function TextInput({ icon, right, type = 'text', placeholder, value, onChange, autoComplete, hasError }) {
+  const [focus, setFocus] = useState(false)
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center',
+      height: 48,
+      borderRadius: 6,
+      border: `1px solid ${hasError ? '#C45A2C' : focus ? FO.orange : FO.line}`,
+      background: '#fff',
+      boxShadow: focus ? `0 0 0 3px ${FO.orange}20` : hasError ? `0 0 0 3px ${FO.orange}15` : 'none',
+      transition: 'all .15s',
+      overflow: 'hidden',
+    }}>
+      {icon && (
+        <div style={{ paddingLeft: 14, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          {icon(focus ? FO.orange : hasError ? FO.orange : 'rgba(30,22,18,0.45)')}
+        </div>
+      )}
+      <input
+        type={type} placeholder={placeholder} value={value}
+        onChange={(e) => onChange && onChange(e.target.value)}
+        onFocus={() => setFocus(true)}
+        onBlur={() => setFocus(false)}
+        autoComplete={autoComplete}
+        style={{
+          flex: 1, border: 'none', outline: 'none', background: 'transparent',
+          padding: '0 14px', fontSize: 14, color: FO.espresso,
+          fontFamily: 'inherit',
+        }}
+      />
+      {right && <div style={{ paddingRight: 10, display: 'flex', alignItems: 'center', flexShrink: 0 }}>{right}</div>}
+    </div>
+  )
+}
+
+// ───────────────────────── Login Form (auth) ─────────────────────────
 function LoginForm() {
   const router       = useRouter()
   const searchParams = useSearchParams()
@@ -199,9 +475,18 @@ function LoginForm() {
   const [username,   setUsername]   = useState('')
   const [password,   setPassword]   = useState('')
   const [showPass,   setShowPass]   = useState(false)
+  const [remember,   setRemember]   = useState(true)
   const [erro,       setErro]       = useState(null)
   const [carregando, setCarregando] = useState(false)
   const [success,    setSuccess]    = useState(false)
+
+  const greeting = (() => {
+    const h = new Date().getHours()
+    if (h < 6)  return 'Boa madrugada · NOC 24h'
+    if (h < 12) return 'Bom dia · Operação'
+    if (h < 18) return 'Boa tarde · Operação'
+    return 'Boa noite · NOC 24h'
+  })()
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -226,104 +511,149 @@ function LoginForm() {
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: 380 }}>
+    <div className="fo-right" style={{
+      height: '100%',
+      background: `linear-gradient(180deg, ${FO.cream} 0%, ${FO.beige} 100%)`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: '"Inter", system-ui, sans-serif',
+      position: 'relative',
+    }}>
+      {/* paper grain */}
+      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.5, pointerEvents: 'none' }}>
+        <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2"/></filter>
+        <rect width="100%" height="100%" filter="url(#n)" opacity="0.06"/>
+      </svg>
 
-      {/* Logo mobile — SVG usa cores claras (design para fundo escuro), usar texto no fundo branco */}
-      <div className="mobile-logo" style={{ textAlign: 'center', marginBottom: 32 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-          <span style={{
-            fontSize: 28, fontWeight: 800, letterSpacing: '-0.04em',
-            color: '#000000',
-            fontFamily: 'inherit',
-            lineHeight: 1,
-          }}>
-            Fiber
-          </span>
-          <span style={{
-            fontSize: 28, fontWeight: 800, letterSpacing: '-0.04em',
-            color: '#ea580c',
-            fontFamily: 'inherit',
-            lineHeight: 1,
-          }}>
-            Ops
-          </span>
+      <form onSubmit={handleSubmit} className="fo-form" style={{ width: '100%', maxWidth: 380, position: 'relative' }}>
+        {/* Ornamental divider */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginBottom: 22 }}>
+          <span style={{ width: 28, height: 1, background: FO.line }}/>
+          <svg width="18" height="18" viewBox="0 0 72 72" fill="none">
+            <g transform="translate(18,13)">
+              <path d="M4 2 L4 46 Q4 48 6 48 L10 48 Q12 48 12 46 L12 30 L26 30 Q28 30 28 28 L28 24 Q28 22 26 22 L12 22 L12 10 L30 10 L30 14 Q30 16 32 16 L34 16 Q36 16 36 14 L36 4 Q36 2 34 2 Z" fill={FO.orange} opacity="0.85"/>
+            </g>
+          </svg>
+          <span style={{ width: 28, height: 1, background: FO.line }}/>
         </div>
-      </div>
 
-      {/* Heading */}
-      <div style={{ marginBottom: 30 }}>
-        <h1 style={{
-          fontSize: 26, fontWeight: 700, color: '#0f172a',
-          margin: '0 0 8px', letterSpacing: '-0.03em',
+        {/* Greeting */}
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <div style={{
+            fontSize: 10.5, letterSpacing: '0.3em', textTransform: 'uppercase',
+            color: 'rgba(30,22,18,0.5)',
+            fontFamily: '"JetBrains Mono", monospace', fontWeight: 500,
+          }}>{greeting}</div>
+          <h2 style={{
+            margin: '10px 0 0',
+            fontFamily: '"Instrument Serif", serif', fontWeight: 400,
+            fontSize: 30, color: FO.espresso, letterSpacing: '-0.02em', lineHeight: 1.1,
+          }}>
+            Entre na <span style={{ fontStyle: 'italic', color: FO.orange }}>plataforma</span>
+          </h2>
+          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(30,22,18,0.6)' }}>
+            Sem acesso?{' '}
+            <Link href="/cadastro" style={{ color: FO.orange, fontWeight: 500, textDecoration: 'none', borderBottom: `1px solid ${FO.orange}50` }}>
+              Fale com nossa equipe
+            </Link>
+          </p>
+        </div>
+
+        {/* Error banner */}
+        {erro && (
+          <div style={{
+            marginBottom: 16, padding: '10px 14px', borderRadius: 6,
+            background: 'rgba(196,90,44,0.08)', border: `1px solid ${FO.orange}40`,
+            fontSize: 13, color: FO.orangeDeep, lineHeight: 1.4,
+          }}>{erro}</div>
+        )}
+
+        <FieldLabel label="Usuário">
+          <TextInput
+            icon={Icon.user}
+            placeholder="usuario@provedor.com.br"
+            value={username}
+            onChange={setUsername}
+            autoComplete="username"
+            hasError={!!erro}
+          />
+        </FieldLabel>
+
+        <FieldLabel label="Senha">
+          <TextInput
+            icon={Icon.lock}
+            type={showPass ? 'text' : 'password'}
+            placeholder="••••••••••"
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+            hasError={!!erro}
+            right={
+              <button type="button" onClick={() => setShowPass(v => !v)}
+                style={{
+                  border: 'none', background: 'transparent', cursor: 'pointer',
+                  padding: 8, borderRadius: 4, display: 'flex', alignItems: 'center',
+                  color: 'rgba(30,22,18,0.5)',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(30,22,18,0.05)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'}
+              >
+                {showPass ? Icon.eyeOff('currentColor') : Icon.eye('currentColor')}
+              </button>
+            }
+          />
+        </FieldLabel>
+
+        {/* Remember + Forgot */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          margin: '4px 0 18px',
         }}>
-          Acesse sua conta
-        </h1>
-        <p style={{ fontSize: 14, color: '#64748b', margin: 0, lineHeight: 1.5 }}>
-          Novo por aqui? <Link href="/cadastro" style={{ color: '#ea580c', fontWeight: 600, textDecoration: 'none' }}>Solicite seu acesso</Link> e comece agora.
-        </p>
-      </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'rgba(30,22,18,0.7)' }}>
+            <span
+              onClick={() => setRemember(r => !r)}
+              style={{
+                width: 16, height: 16, borderRadius: 4,
+                border: `1.5px solid ${remember ? FO.orange : 'rgba(30,22,18,0.3)'}`,
+                background: remember ? FO.orange : 'transparent',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all .15s', flexShrink: 0,
+              }}>
+              {remember && (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 5.2L4 7.2L8 2.8" stroke={FO.cream} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </span>
+            Lembrar de mim
+          </label>
+          <a href="#" style={{ fontSize: 13, color: 'rgba(30,22,18,0.65)', textDecoration: 'none' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = FO.orange}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(30,22,18,0.65)'}>
+            Esqueci minha senha
+          </a>
+        </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <Field
-          label="Usuário"
-          icon={<IconUser />}
-          type="text"
-          autoComplete="username"
-          required
-          value={username}
-          onChange={e => setUsername(e.target.value)}
-          placeholder="seu.usuario"
-          error={erro && ' '}
-        />
-
-        <Field
-          label="Senha"
-          icon={<IconLock />}
-          type={showPass ? 'text' : 'password'}
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          placeholder="••••••••"
-          error={erro}
-          right={
-            <button type="button" onClick={() => setShowPass(v => !v)} style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: '#94a3b8', padding: 0, display: 'flex', alignItems: 'center',
-            }}>
-              <IconEye open={showPass} />
-            </button>
-          }
-        />
-
-        {/* Button */}
-        <button
-          type="submit"
-          disabled={carregando || success}
+        {/* Submit */}
+        <button type="submit" disabled={carregando || success}
           style={{
-            marginTop: 4,
-            background: success
-              ? 'linear-gradient(135deg,#16a34a,#22c55e)'
-              : carregando
-                ? '#cbd5e1'
-                : 'linear-gradient(135deg,#c2410c 0%,#ea580c 60%,#f97316 100%)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 11,
-            padding: '13px 20px',
-            fontSize: 14,
-            fontWeight: 700,
+            width: '100%', height: 50, border: 'none',
             cursor: carregando || success ? 'not-allowed' : 'pointer',
-            transition: 'all .2s',
-            boxShadow: success
-              ? '0 4px 16px rgba(34,197,94,0.3)'
+            borderRadius: 6,
+            background: success
+              ? 'linear-gradient(180deg, #22c55e, #16a34a)'
               : carregando
-                ? 'none'
-                : '0 4px 20px rgba(234,88,12,0.3), 0 1px 0 rgba(255,255,255,0.15) inset',
-            letterSpacing: '0.01em',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                ? FO.orangeDeep
+                : `linear-gradient(180deg, ${FO.orangeSoft} 0%, ${FO.orange} 45%, ${FO.orangeDeep} 100%)`,
+            color: FO.cream,
+            fontSize: 15, fontWeight: 500, letterSpacing: '0.01em',
+            fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            boxShadow: '0 1px 0 rgba(255,255,255,0.25) inset, 0 8px 20px rgba(196,90,44,0.3)',
+            transition: 'transform .08s, box-shadow .2s',
           }}
+          onMouseDown={(e) => { if (!carregando && !success) e.currentTarget.style.transform = 'translateY(1px)' }}
+          onMouseUp={(e) => { e.currentTarget.style.transform = 'translateY(0)' }}
         >
           {success ? (
             <>
@@ -334,205 +664,197 @@ function LoginForm() {
             </>
           ) : carregando ? (
             <>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: 'spin .8s linear infinite' }}>
-                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-              </svg>
-              Verificando…
+              <span style={{
+                width: 14, height: 14, borderRadius: 7,
+                border: `2px solid ${FO.cream}60`, borderTopColor: FO.cream,
+                display: 'inline-block',
+                animation: 'fo-spin 0.7s linear infinite',
+              }}/>
+              Autenticando…
             </>
-          ) : 'Entrar na plataforma →'}
+          ) : (
+            <>Entrar na plataforma {Icon.arrow(FO.cream)}</>
+          )}
         </button>
+
+        {/* Divider */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14,
+          margin: '22px 0 14px',
+          color: 'rgba(30,22,18,0.4)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.3em',
+          fontFamily: '"JetBrains Mono", monospace',
+        }}>
+          <div style={{ flex: 1, height: 1, background: FO.line }}/>
+          ou
+          <div style={{ flex: 1, height: 1, background: FO.line }}/>
+        </div>
+
+        {/* Secondary action */}
+        <Link href="/cadastro"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: '100%', height: 48, cursor: 'pointer',
+            borderRadius: 6,
+            border: `1px solid ${FO.espresso}`,
+            background: 'transparent',
+            color: FO.espresso,
+            fontSize: 14, fontWeight: 500,
+            fontFamily: 'inherit',
+            textDecoration: 'none',
+            transition: 'all .15s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = FO.espresso; e.currentTarget.style.color = FO.cream }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = FO.espresso }}
+        >
+          Solicitar acesso
+        </Link>
+
+        {/* Security footer */}
+        <div style={{
+          marginTop: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          fontSize: 11, color: 'rgba(30,22,18,0.5)',
+          fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.05em',
+        }}>
+          {Icon.shield('currentColor')}
+          Conexão criptografada · LGPD · ISO 27001
+        </div>
       </form>
-
-      {/* Divider */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, margin: '22px 0',
-      }}>
-        <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-        <span style={{ fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap' }}>Não tem acesso?</span>
-        <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-      </div>
-
-      {/* Signup */}
-      <Link href="/cadastro" style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '11px 20px', borderRadius: 11,
-        border: '1.5px solid #e2e8f0', background: '#fff',
-        fontSize: 14, fontWeight: 600, color: '#334155',
-        textDecoration: 'none',
-        transition: 'border-color .15s, background .15s',
-      }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor = '#ea580c'; e.currentTarget.style.color = '#ea580c' }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#334155' }}
-      >
-        Solicitar acesso
-      </Link>
-
-      {/* Security */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 5, marginTop: 24, color: '#94a3b8', fontSize: 11,
-      }}>
-        <IconShield />
-        Conexão segura · criptografada com TLS
-      </div>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes fadeRight { from { opacity:0;transform:translateX(20px) } to { opacity:1;transform:translateX(0) } }
-        input::placeholder { color: #cbd5e1 }
-        .mobile-logo { display: none; }
-        @media (max-width: 768px) {
-          .mobile-logo { display: block !important; }
-        }
-      `}</style>
     </div>
   )
 }
 
-// ─── Left Panel ───────────────────────────────────────────────────────────────
-
-function LeftPanel() {
+// ───────────────────────── WhatsApp FAB ─────────────────────────
+function WhatsAppButton() {
+  const [hover, setHover] = useState(false)
+  const wa = '#25D366'
   return (
     <div style={{
-      flex: 1,
-      background: 'linear-gradient(145deg, #0a1628 0%, #0f1f3d 40%, #0d1a30 100%)',
-      display: 'flex', flexDirection: 'column',
-      padding: '48px 52px',
-      position: 'relative', overflow: 'hidden',
-      minHeight: '100dvh',
+      position: 'fixed', bottom: 24, right: 24, zIndex: 50,
+      display: 'flex', alignItems: 'center', gap: 10,
+      fontFamily: '"Inter", system-ui, sans-serif',
     }}>
-      {/* Background decorations */}
       <div style={{
-        position: 'absolute', top: '-15%', right: '-15%',
-        width: '55vw', height: '55vw', maxWidth: 500, maxHeight: 500,
-        background: 'radial-gradient(circle, rgba(234,88,12,0.1) 0%, transparent 60%)',
+        background: FO.espresso, color: FO.cream,
+        padding: '8px 14px', borderRadius: 999,
+        fontSize: 12.5, letterSpacing: '0.01em',
+        boxShadow: '0 6px 18px rgba(0,0,0,0.25)',
+        opacity: hover ? 1 : 0,
+        transform: hover ? 'translateX(0)' : 'translateX(8px)',
+        transition: 'all .18s',
         pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', bottom: '-10%', left: '-10%',
-        width: '45vw', height: '45vw', maxWidth: 400, maxHeight: 400,
-        background: 'radial-gradient(circle, rgba(59,130,246,0.07) 0%, transparent 60%)',
-        pointerEvents: 'none',
-      }} />
-      {/* Grid */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        backgroundImage: `linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px)`,
-        backgroundSize: '44px 44px', pointerEvents: 'none',
-      }} />
-
-      {/* Logo */}
-      <div style={{ position: 'relative', zIndex: 1, marginBottom: 'auto' }}>
-        <Image src="/long-logo.svg" alt="FiberOps" width={140} height={35} priority />
-      </div>
-
-      {/* Center content */}
-      <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 36, paddingTop: 48 }}>
-
-        {/* Headline */}
-        <div>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: 'rgba(234,88,12,0.12)', border: '1px solid rgba(234,88,12,0.25)',
-            borderRadius: 20, padding: '5px 12px', marginBottom: 16,
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fb923c', animation: 'pulse 2s infinite' }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#fb923c', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              Plataforma FTTH
-            </span>
-          </div>
-          <h2 style={{
-            fontSize: 34, fontWeight: 800, color: '#fff',
-            margin: '0 0 14px', lineHeight: 1.2, letterSpacing: '-0.03em',
-          }}>
-            Gestão completa<br />
-            <span style={{ color: '#fb923c' }}>para o seu ISP</span>
-          </h2>
-          <p style={{ fontSize: 15, color: 'rgba(148,163,184,0.8)', margin: 0, lineHeight: 1.65, maxWidth: 380 }}>
-            Centralize ordens de serviço, monitoramento de rede, clientes e equipe em uma única plataforma.
-          </p>
-        </div>
-
-        {/* Features */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-          {[
-            'Ordens de serviço com status em tempo real',
-            'Monitoramento de OLTs e ativos de rede',
-            'Controle de ponto e equipes técnicas',
-            'Notificações push para técnicos em campo',
-            'Relatórios e dashboards operacionais',
-          ].map(f => <Feature key={f} text={f} />)}
-        </div>
-
-        {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <StatCard icon={<IconUsers />} value="120+" label="ISPs ativos" accent="rgba(234,88,12,0.7)" />
-          <StatCard icon={<IconActivity />} value="50k+" label="OS gerenciadas" accent="rgba(59,130,246,0.6)" />
-          <StatCard icon={<IconWifi />} value="99.9%" label="Uptime garantido" accent="rgba(16,185,129,0.6)" />
-          <StatCard icon={<IconActivity />} value="24/7" label="Suporte técnico" accent="rgba(139,92,246,0.6)" />
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div style={{ position: 'relative', zIndex: 1, marginTop: 'auto', paddingTop: 32 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(100,116,139,0.6)', fontSize: 12 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} />
-          Todos os sistemas operacionais
-          <span style={{ marginLeft: 'auto' }}>© 2025 FiberOps</span>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-      `}</style>
+        whiteSpace: 'nowrap',
+      }}>Fale com o suporte</div>
+      <a href="https://wa.me/" target="_blank" rel="noreferrer"
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{
+          position: 'relative',
+          width: 56, height: 56, borderRadius: 28,
+          background: wa,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 10px 24px rgba(37,211,102,0.45), 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.25)',
+          textDecoration: 'none', cursor: 'pointer',
+          transform: hover ? 'scale(1.06)' : 'scale(1)',
+          transition: 'transform .15s',
+        }}
+        aria-label="Suporte via WhatsApp"
+      >
+        <span style={{
+          position: 'absolute', width: 56, height: 56, borderRadius: 28,
+          border: `2px solid ${wa}`, opacity: 0.6,
+          animation: 'fo-wa-pulse 2s ease-out infinite',
+          pointerEvents: 'none',
+        }}/>
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="#fff">
+          <path d="M16.003 3C8.82 3 3 8.82 3 16.003c0 2.29.6 4.523 1.74 6.49L3 29l6.69-1.74A12.92 12.92 0 0 0 16.003 29C23.186 29 29 23.186 29 16.003 29 8.82 23.186 3 16.003 3Zm7.49 18.09c-.32.89-1.87 1.74-2.6 1.84-.66.09-1.48.13-2.39-.15-.55-.17-1.26-.41-2.17-.8-3.82-1.65-6.32-5.5-6.51-5.75-.19-.26-1.55-2.06-1.55-3.94 0-1.87.98-2.79 1.33-3.17.35-.38.76-.48 1.02-.48s.51 0 .73.01c.23.01.54-.09.85.65.32.76 1.08 2.63 1.17 2.82.09.19.15.41.03.67-.12.26-.18.41-.35.63-.18.22-.38.5-.54.67-.18.18-.37.38-.16.74.21.36.93 1.54 2 2.49 1.37 1.22 2.53 1.6 2.9 1.78.36.19.58.15.79-.09.22-.26.91-1.06 1.16-1.42.25-.37.5-.3.84-.19.35.11 2.21 1.04 2.59 1.23.38.19.63.28.72.44.09.16.09.92-.23 1.81Z"/>
+        </svg>
+      </a>
     </div>
   )
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
+// ───────────────────────── Page ─────────────────────────
 export default function LoginPage() {
   return (
     <Suspense>
       <div style={{
-        minHeight: '100dvh',
-        display: 'flex',
-        fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+        width: '100vw', minHeight: '100dvh',
+        display: 'flex', flexDirection: 'column',
+        background: FO.espresso,
       }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap');
 
-        {/* Left — branding panel */}
-        <div className="left-panel" style={{ flex: '0 0 52%', maxWidth: 680 }}>
-          <LeftPanel />
+          @keyframes fo-spin { to { transform: rotate(360deg); } }
+          @keyframes fo-fade {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes fo-wa-pulse {
+            0%       { transform: scale(1); opacity: 0.5; }
+            80%, 100%{ transform: scale(1.6); opacity: 0; }
+          }
+          * { box-sizing: border-box; }
+          body { margin: 0; }
+          input::placeholder { color: rgba(30,22,18,0.35); }
+          ::selection { background: ${FO.orange}; color: ${FO.cream}; }
+
+          .fo-shell { display: grid; grid-template-columns: 1.05fr 1fr; flex: 1; min-height: 0; overflow: hidden; }
+          .fo-left  { padding: 36px 48px 28px; }
+          .fo-right { padding: 40px 56px; }
+          .fo-title { font-size: 44px; line-height: 1.1; }
+          .fo-titlebar-text { display: inline; }
+
+          @media (max-width: 1024px) {
+            .fo-shell  { grid-template-columns: 1fr 1fr; }
+            .fo-left   { padding: 28px 32px 20px; }
+            .fo-right  { padding: 32px 32px; }
+            .fo-title  { font-size: 36px; }
+            .fo-intro-p { font-size: 13.5px; }
+            .fo-features li { font-size: 12.5px !important; }
+          }
+
+          @media (max-width: 768px) {
+            .fo-shell   { grid-template-columns: 1fr; grid-template-rows: auto 1fr; overflow: auto; }
+            .fo-left    { padding: 24px 22px 28px; min-height: auto; }
+            .fo-right   { padding: 28px 22px 40px; }
+            .fo-title   { font-size: 30px; }
+            .fo-intro-p { font-size: 13px; max-width: 100%; }
+            .fo-rotator, .fo-quote, .fo-integrations { display: none !important; }
+            .fo-stats   { grid-template-columns: repeat(4,1fr) !important; gap: 6px !important; max-width: 100% !important; margin-top: 18px !important; }
+            .fo-stats .fo-stat-card { flex-direction: column; align-items: flex-start; padding: 10px !important; gap: 6px !important; }
+            .fo-stats .fo-stat-icon { width: 28px !important; height: 28px !important; }
+            .fo-stats .fo-stat-v { font-size: 18px !important; }
+            .fo-stats .fo-stat-t { font-size: 10px !important; }
+            .fo-left-footer { display: none !important; }
+            .fo-pill { font-size: 10px !important; }
+            .fo-form { max-width: 100% !important; }
+            .fo-titlebar-text { display: none; }
+          }
+
+          @media (max-width: 420px) {
+            .fo-title { font-size: 26px; }
+            .fo-left  { padding: 20px 18px 20px; }
+            .fo-right { padding: 24px 18px 40px; }
+            .fo-stats { grid-template-columns: 1fr 1fr !important; }
+          }
+
+          @media (max-height: 640px) and (min-width: 769px) {
+            .fo-title { font-size: 32px; }
+            .fo-features li:nth-child(n+4) { display: none; }
+            .fo-left { padding-top: 22px; padding-bottom: 18px; }
+          }
+        `}</style>
+
+        <TitleBar/>
+
+        <div className="fo-shell" style={{ flex: 1 }}>
+          <LeftPanel/>
+          <LoginForm/>
         </div>
 
-        {/* Right — form panel */}
-        <div style={{
-          flex: 1,
-          background: '#f8fafc',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '40px 32px',
-          minHeight: '100dvh',
-          position: 'relative',
-        }}>
-          {/* Subtle top accent */}
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0,
-            height: 3,
-            background: 'linear-gradient(90deg, #c2410c, #ea580c, #f97316)',
-          }} />
-
-          <div style={{ width: '100%', maxWidth: 380, animation: 'fadeRight .4s ease' }}>
-            <LoginForm />
-          </div>
-        </div>
-
+        <WhatsAppButton/>
       </div>
-
-      <style>{`
-        @media (max-width: 768px) {
-          .left-panel { display: none !important; }
-        }
-      `}</style>
     </Suspense>
   )
 }

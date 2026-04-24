@@ -2,20 +2,20 @@
 @import "@xyflow/react/dist/style.css";
 
 :root {
-  --background: #c4b098;
-  --foreground: #0f0701;
-  --sidebar-bg: #9e8a6e;
-  --sidebar-border: #8e7254;
-  --card-bg: #d0bfa8;
-  --card-bg-active: #c8b094;
-  --border-color: #8e7254;
-  --border-color-strong: #c47a28;
-  --text-muted: #3d1f04;
-  --text-secondary: #271204;
-  --inp-bg: #c4b098;
-  --accent: #D4622B;
-  --accent-dark: #b8501f;
-  --accent-light: #fde5d4;
+  --background: #EDE3D2;
+  --foreground: #1A120D;
+  --sidebar-bg: #1A120D;
+  --sidebar-border: #2D1F16;
+  --card-bg: #F7F0E2;
+  --card-bg-active: rgba(196,90,44,0.10);
+  --border-color: #C8B89A;
+  --border-color-strong: #C45A2C;
+  --text-muted: #7A5C46;
+  --text-secondary: #5A3E2E;
+  --inp-bg: #F7F0E2;
+  --accent: #C45A2C;
+  --accent-dark: #9D4423;
+  --accent-light: #F4A771;
 }
 
 @theme inline {

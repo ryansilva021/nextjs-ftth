@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -41,35 +40,43 @@ function buildPontoSchedule(s) {
   ].filter(x => x && x.h != null)
 }
 
+// ── FiberOps brand colors (sidebar uses these directly) ─────────────────────
+const FO = {
+  bg:           '#1A120D',
+  bgLight:      '#261812',
+  border:       'rgba(255,255,255,0.07)',
+  text:         'rgba(255,255,255,0.88)',
+  textMuted:    'rgba(255,255,255,0.42)',
+  textSection:  'rgba(255,255,255,0.28)',
+  orange:       '#C45A2C',
+  orangeText:   '#F4A771',
+  orangeBg:     'rgba(196,90,44,0.14)',
+  orangeBorder: 'rgba(196,90,44,0.30)',
+}
+
 // ── Grupos de separação visual ──────────────────────────────────────────────
 const GROUPS = { public: 0, staff: 1, admin: 2, superadmin: 3 }
 
 // ── Definição de itens do menu ──────────────────────────────────────────────
-// perm:  permissão necessária (PERM.*)
-// group: para separador visual e controle de acesso por role
 const NAV_ITEMS = [
-  { href: '/',                     labelKey: 'nav.map',          icon: '🗺️', group: GROUPS.public  },
+  { href: '/visao-geral',      labelKey: 'nav.overview', icon: '◈', section: 'PAINEL',         group: GROUPS.public  },
+  { href: '/',                 labelKey: 'nav.map',      icon: '◉',                             group: GROUPS.public  },
 
-  // Visão de rede
-  { href: '/admin/topologia', labelKey: 'nav.topology',     icon: '🌐', perm: PERM.VIEW_TOPOLOGY,      group: GROUPS.staff },
-  { href: '/admin/campo',     labelKey: 'nav.field',        icon: '📡', perm: PERM.VIEW_FIELD,         group: GROUPS.staff },
-  { href: '/admin/calculos',  labelKey: 'nav.calculations', icon: '⚡', perm: PERM.VIEW_CALCULATIONS,  group: GROUPS.staff },
+  { href: '/admin/topologia',      labelKey: 'nav.topology',     icon: '⬡', section: 'OPERAÇÃO', perm: PERM.VIEW_TOPOLOGY,     group: GROUPS.staff },
+  { href: '/admin/campo',          labelKey: 'nav.field',        icon: '◎', perm: PERM.VIEW_FIELD,        group: GROUPS.staff },
+  { href: '/admin/calculos',       labelKey: 'nav.calculations', icon: '◈', perm: PERM.VIEW_CALCULATIONS, group: GROUPS.staff },
+  { href: '/admin/os',             labelKey: 'nav.all_os',       icon: '▣', perm: PERM.VIEW_SERVICE_ORDERS, group: GROUPS.staff },
+  { href: '/admin/os/minhas',      labelKey: 'nav.my_os',        icon: '▤', perm: PERM.VIEW_SERVICE_ORDERS, group: GROUPS.staff, indent: true, noTecnico: true },
+  { href: '/ponto',                labelKey: 'nav.ponto',        icon: '◷', perm: PERM.PUNCH_CLOCK,         group: GROUPS.staff },
+  { href: '/configuracoes/ponto',  labelKey: 'nav.ponto_config', icon: '◔', perm: PERM.MANAGE_USERS,        group: GROUPS.staff, indent: true },
 
-  // Ordens de Serviço (tecnico, noc, recepcao)
-  { href: '/admin/os',        labelKey: 'nav.all_os', icon: '📋', perm: PERM.VIEW_SERVICE_ORDERS, group: GROUPS.staff },
-  { href: '/admin/os/minhas', labelKey: 'nav.my_os',  icon: '🗒️', perm: PERM.VIEW_SERVICE_ORDERS, group: GROUPS.staff, indent: true, noTecnico: true },
-  { href: '/ponto',                labelKey: 'nav.ponto',        icon: '🕐', perm: PERM.PUNCH_CLOCK,          group: GROUPS.staff },
-  { href: '/configuracoes/ponto',  labelKey: 'nav.ponto_config', icon: '⏰', perm: PERM.MANAGE_USERS,         group: GROUPS.staff, indent: true },
+  { href: '/admin/usuarios', labelKey: 'nav.users',  icon: '◉', section: 'ADMINISTRAÇÃO', perm: PERM.MANAGE_USERS, group: GROUPS.admin },
+  { href: '/admin/importar', labelKey: 'nav.import', icon: '◈', perm: PERM.VIEW_IMPORT,   group: GROUPS.admin },
+  { href: '/admin/logs',     labelKey: 'nav.logs',   icon: '▤', perm: PERM.VIEW_LOGS,     group: GROUPS.admin },
 
-  // Admin
-  { href: '/admin/usuarios',       labelKey: 'nav.users',    icon: '👥', perm: PERM.MANAGE_USERS,  group: GROUPS.admin },
-  { href: '/admin/importar',       labelKey: 'nav.import',   icon: '📦', perm: PERM.VIEW_IMPORT,   group: GROUPS.admin },
-  { href: '/admin/logs',           labelKey: 'nav.logs',     icon: '📜', perm: PERM.VIEW_LOGS,     group: GROUPS.admin },
-
-  // Superadmin
-  { href: '/superadmin/projetos',  labelKey: 'nav.projects',  icon: '🏢', group: GROUPS.superadmin },
-  { href: '/superadmin/empresas',  labelKey: 'nav.companies', icon: '🏬', group: GROUPS.superadmin },
-  { href: '/superadmin/registros', labelKey: 'nav.records',   icon: '📋', group: GROUPS.superadmin },
+  { href: '/superadmin/projetos',  labelKey: 'nav.projects',  icon: '⬡', section: 'SISTEMA', group: GROUPS.superadmin },
+  { href: '/superadmin/empresas',  labelKey: 'nav.companies', icon: '◉',                    group: GROUPS.superadmin },
+  { href: '/superadmin/registros', labelKey: 'nav.records',   icon: '▤',                    group: GROUPS.superadmin },
 ]
 
 function isItemVisible(item, role) {
@@ -242,13 +249,6 @@ export default function SidebarLayout({ session, children }) {
     return () => clearInterval(id)
   }, [pontoAtivo])
 
-  const sidebarStyle = {
-    backgroundColor: "var(--sidebar-bg)",
-    borderRight: "1px solid var(--sidebar-border)",
-    width: "240px",
-    minWidth: "240px",
-  };
-
   return (
     <div
       style={{ backgroundColor: "var(--background)" }}
@@ -258,14 +258,19 @@ export default function SidebarLayout({ session, children }) {
       {aberta && (
         <div
           className="fixed inset-0 z-20 lg:hidden"
-          style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+          style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
           onClick={() => setAberta(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        style={{ ...sidebarStyle, height: 'calc(100dvh - 52px)' }}
+        style={{
+          backgroundColor: FO.bg,
+          borderRight: `1px solid ${FO.border}`,
+          width: 240, minWidth: 240,
+          height: 'calc(100dvh - 52px)',
+        }}
         className={`
           fixed top-[52px] left-0 z-30 flex flex-col
           transform transition-transform duration-200
@@ -275,46 +280,65 @@ export default function SidebarLayout({ session, children }) {
       >
         {/* Logo */}
         <div
-          style={{ borderBottom: "1px solid var(--sidebar-border)" }}
-          className="flex items-center gap-3 px-5 py-4"
+          style={{ borderBottom: `1px solid ${FO.border}`, padding: '16px 20px' }}
+          className="flex items-center gap-3"
         >
-          <Image src="/short-logo.svg" alt="FiberOps" width={32} height={32} priority />
+          {/* LogoMark */}
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" style={{ flexShrink: 0 }}>
+            <rect width="30" height="30" rx="6" fill="#C45A2C"/>
+            <text x="6" y="22" fontFamily="Georgia,serif" fontSize="20" fontWeight="700" fill="white">F</text>
+            <rect x="18" y="8"  width="7" height="2" rx="1" fill="rgba(255,255,255,0.6)"/>
+            <rect x="18" y="12" width="7" height="2" rx="1" fill="rgba(255,255,255,0.6)"/>
+            <rect x="18" y="16" width="5" height="2" rx="1" fill="rgba(255,255,255,0.6)"/>
+          </svg>
           <div className="flex-1 min-w-0">
-            <p style={{ color: "var(--foreground)" }} className="text-sm font-bold">FiberOps</p>
-            <p style={{ color: 'var(--text-muted)' }} className="text-xs truncate max-w-[120px]">
-              {session?.user?.projeto_nome ?? session?.user?.projeto_id}
+            <p style={{ color: FO.text, fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em' }}>
+              FiberOps
+            </p>
+            <p style={{ color: FO.textMuted, fontSize: 11 }} className="truncate">
+              {session?.user?.projeto_nome ?? session?.user?.projeto_id ?? 'Painel'}
             </p>
           </div>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
-          {itensVisiveis.map((item, idx, arr) => {
-            const ativa    = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href) && item.href !== '/admin/os')
-            const prevItem = arr[idx - 1]
-            const showSep  = idx > 0 && prevItem && item.group !== prevItem.group && !item.indent
+        <nav className="flex-1 overflow-y-auto" style={{ padding: '12px 10px' }}>
+          {itensVisiveis.map((item) => {
+            const ativa = pathname === item.href ||
+              (item.href !== '/' && pathname.startsWith(item.href) && item.href !== '/admin/os')
 
             return (
               <div key={item.href}>
-                {showSep && (
-                  <div
-                    className="my-2 mx-1 h-px"
-                    style={{ backgroundColor: 'var(--border-color)' }}
-                  />
+                {item.section && !item.indent && (
+                  <p style={{
+                    color: FO.textSection,
+                    fontSize: 10, fontWeight: 700, letterSpacing: '0.09em',
+                    padding: '14px 10px 6px',
+                    marginTop: 0,
+                  }}>
+                    {item.section}
+                  </p>
                 )}
                 <Link
                   href={item.href}
                   onClick={() => setAberta(false)}
                   style={{
-                    backgroundColor: ativa ? "var(--card-bg-active)" : "transparent",
-                    color:           ativa ? "#ea580c" : "var(--text-muted)",
-                    border:          ativa ? "1px solid #f4b07a" : "1px solid transparent",
-                    marginLeft:      item.indent ? 16 : 0,
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: item.indent ? '7px 10px 7px 26px' : '8px 10px',
+                    borderRadius: 8, marginBottom: 2,
+                    fontSize: item.indent ? 12 : 13,
+                    fontWeight: ativa ? 600 : 400,
+                    backgroundColor: ativa ? FO.orangeBg : 'transparent',
+                    color:           ativa ? FO.orangeText : FO.textMuted,
+                    border:          ativa ? `1px solid ${FO.orangeBorder}` : '1px solid transparent',
+                    transition: 'all 0.15s',
+                    textDecoration: 'none',
                   }}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-200/20 hover:text-current"
+                  onMouseEnter={e => { if (!ativa) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = FO.text } }}
+                  onMouseLeave={e => { if (!ativa) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = FO.textMuted } }}
                 >
-                  <span style={{ fontSize: item.indent ? 13 : undefined }}>{item.icon}</span>
-                  <span style={{ fontSize: item.indent ? 12 : undefined }}>{t(item.labelKey)}</span>
+                  <span style={{ fontSize: 11, opacity: ativa ? 1 : 0.7, flexShrink: 0 }}>{item.icon}</span>
+                  <span>{t(item.labelKey)}</span>
                 </Link>
               </div>
             )
@@ -322,29 +346,32 @@ export default function SidebarLayout({ session, children }) {
         </nav>
 
         {/* Footer */}
-        <div style={{ borderTop: "1px solid var(--border-color)", marginTop: 'auto' }} className="px-4 py-4">
+        <div style={{ borderTop: `1px solid ${FO.border}`, padding: '14px 12px' }}>
           <div className="flex items-center gap-2 mb-3">
             <Link
               href="/perfil"
               onClick={() => setAberta(false)}
-              className="flex items-center gap-3 flex-1 min-w-0 rounded-lg px-1 py-1 transition-colors hover:bg-slate-200/20"
+              className="flex items-center gap-2 flex-1 min-w-0 rounded-lg px-2 py-1.5 transition-colors"
               style={{ textDecoration: 'none' }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             >
-              <div
-                style={{ backgroundColor: "var(--card-bg-active)" }}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-sky-400 text-xs font-bold uppercase flex-shrink-0"
-              >
-                {session?.user?.username?.[0] ?? "?"}
+              <div style={{
+                width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                backgroundColor: FO.orange,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'white', fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
+              }}>
+                {session?.user?.username?.[0] ?? '?'}
               </div>
               <div className="flex-1 min-w-0">
-                <p style={{ color: 'var(--foreground)' }} className="text-xs font-medium truncate">
+                <p style={{ color: FO.text, fontSize: 12, fontWeight: 500 }} className="truncate">
                   {session?.user?.username}
                 </p>
-                {/* Badge de role com cor dinâmica */}
                 <span style={{
                   display: 'inline-block', marginTop: 2,
-                  fontSize: 10, fontWeight: 600,
-                  padding: '1px 7px', borderRadius: 99,
+                  fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
+                  padding: '1px 6px', borderRadius: 99,
                   color: roleColor.color,
                   backgroundColor: roleColor.bg,
                   border: `1px solid ${roleColor.border}`,
@@ -358,23 +385,28 @@ export default function SidebarLayout({ session, children }) {
               onClick={() => setAberta(false)}
               title="Configurações"
               style={{
-                flexShrink: 0, fontSize: 15, textDecoration: 'none',
+                flexShrink: 0, textDecoration: 'none',
                 width: 30, height: 30,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                borderRadius: 8, border: '1px solid var(--border-color)',
-                background: 'var(--card-bg-active)', color: 'var(--text-muted)',
+                borderRadius: 8, border: `1px solid ${FO.border}`,
+                background: 'rgba(255,255,255,0.05)', color: FO.textMuted,
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
               </svg>
             </Link>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            style={{ border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
-            className="w-full text-xs py-2 rounded-lg hover:bg-slate-200/20 transition-colors"
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            style={{
+              width: '100%', fontSize: 11, padding: '8px 0', borderRadius: 8, cursor: 'pointer',
+              border: `1px solid ${FO.border}`, background: 'transparent', color: FO.textMuted,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = FO.text }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = FO.textMuted }}
           >
             {t('sidebar.logout')}
           </button>
@@ -386,16 +418,15 @@ export default function SidebarLayout({ session, children }) {
         {/* Header mobile */}
         <header
           style={{
-            backgroundColor: "var(--sidebar-bg)",
-            borderBottom: "1px solid var(--sidebar-border)",
+            backgroundColor: FO.bg,
+            borderBottom: `1px solid ${FO.border}`,
             flexShrink: 0,
           }}
           className="sticky top-0 z-[60] flex items-center px-4 py-3 lg:hidden relative"
         >
-          {/* Esquerda: hambúrguer */}
           <button
             onClick={() => setAberta(prev => !prev)}
-            className="text-slate-400 hover:text-white p-1 z-10"
+            style={{ color: FO.textMuted, padding: 4 }}
             aria-label={aberta ? 'Fechar menu' : 'Abrir menu'}
           >
             {aberta ? (
@@ -409,12 +440,10 @@ export default function SidebarLayout({ session, children }) {
             )}
           </button>
 
-          {/* Centro: apenas FiberOps centralizado */}
-          <span className="absolute left-1/2 -translate-x-1/2 text-sm font-bold" style={{ color: 'var(--foreground)' }}>
+          <span className="absolute left-1/2 -translate-x-1/2 text-sm font-bold" style={{ color: FO.text }}>
             FiberOps
           </span>
 
-          {/* Direita: badge online/offline */}
           <div className="ml-auto flex items-center">
             <div style={{
               display: 'flex', alignItems: 'center', gap: 4,

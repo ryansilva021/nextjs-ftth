@@ -15,7 +15,10 @@
       "TaskUpdate",
       "TaskGet",
       "TaskList",
-      "MCP"
+      "MCP",
+      "Bash(cp \"/home/ryans/.claude/projects/-home-ryans-Projects-nextjs-ftth/ef9764b6-eaf5-43db-9a2a-04dab9c02dcc/tool-results/webfetch-1776991770289-8v2l13.bin\" /tmp/design.gz)",
+      "Bash(gunzip -f /tmp/design.gz)",
+      "Read(//tmp/**)"
     ],
     "deny": [],
     "ask": []

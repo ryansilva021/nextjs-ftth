@@ -35,9 +35,11 @@ import { Zoom, ScaleLine }  from 'ol/control'
 import { defaults as defaultControls } from 'ol/control/defaults'
 import { fromLonLat } from 'ol/proj'
 import XYZ      from 'ol/source/XYZ'
-import Draw     from 'ol/interaction/Draw'
-import DragBox  from 'ol/interaction/DragBox'
-import Polygon  from 'ol/geom/Polygon'
+import Draw       from 'ol/interaction/Draw'
+import DragBox    from 'ol/interaction/DragBox'
+import DragRotate from 'ol/interaction/DragRotate'
+import Polygon    from 'ol/geom/Polygon'
+import { platformModifierKeyOnly } from 'ol/events/condition'
 
 // ─── Singleton do mapa ──────────────────────────────────────────────────────
 let _map          = null  // ol/Map
@@ -468,6 +470,17 @@ function _createPopupEl() {
  * @param {number}       [opts.zoom=13]
  * @returns {{ map: ol/Map, nodeSource, linkSource }}
  */
+// OL usa getImageData repetidamente para hit-detection sem declarar willReadFrequently.
+// Este patch aplica o atributo em todos os canvas 2d, eliminando o aviso de performance.
+if (typeof window !== 'undefined' && !window.__olCanvasPatched) {
+  const _orig = HTMLCanvasElement.prototype.getContext
+  HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+    if (type === '2d') attrs = { willReadFrequently: true, ...attrs }
+    return _orig.call(this, type, attrs)
+  }
+  window.__olCanvasPatched = true
+}
+
 export function initMap(container, opts = {}) {
   if (_map) return { map: _map, nodeSource: _nodeSource, linkSource: _linkSource }
   if (!container) {
@@ -543,6 +556,9 @@ export function initMap(container, opts = {}) {
       new ScaleLine({ units: 'metric' }),
     ]),
   })
+
+  // ── Rotação com CTRL + arrastar ──────────────────────────────────────────
+  _map.addInteraction(new DragRotate({ condition: platformModifierKeyOnly }))
 
   // ── Hover: highlight + cursor ────────────────────────────────────────────
   let _hoveredFeature = null
@@ -638,6 +654,22 @@ export function initMap(container, opts = {}) {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('olmap:feature-click', {
         detail: { feature, properties: feature.getProperties(), coordinate: e.coordinate },
+      }))
+    }
+  })
+
+  // ── Context menu (right-click): Street View ─────────────────────────────
+  _map.getViewport().addEventListener('contextmenu', (e) => {
+    e.preventDefault()
+    const pixel  = _map.getEventPixel(e)
+    const coord  = _map.getCoordinateFromPixel(pixel)
+    const lonLat = _toLonLat(coord)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('olmap:contextmenu', {
+        detail: {
+          lngLat: { lng: lonLat[0], lat: lonLat[1] },
+          pixel:  [e.clientX, e.clientY],
+        },
       }))
     }
   })

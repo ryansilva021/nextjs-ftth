@@ -10,6 +10,7 @@ export const LANGUAGES = [
 const translations = {
   pt: {
     // ── Sidebar nav ──────────────────────────────────────────────────────────
+    'nav.overview':     'Visão geral',
     'nav.map':          'Mapa',
     'nav.topology':     'Topologia',
     'nav.field':        'Campo',
@@ -146,6 +147,7 @@ const translations = {
   },
 
   en: {
+    'nav.overview':     'Overview',
     'nav.map':          'Map',
     'nav.topology':     'Topology',
     'nav.field':        'Field',
@@ -276,6 +278,7 @@ const translations = {
   },
 
   zh: {
+    'nav.overview':     '概览',
     'nav.map':          '地图',
     'nav.topology':     '拓扑',
     'nav.field':        '现场',
@@ -406,6 +409,7 @@ const translations = {
   },
 
   hi: {
+    'nav.overview':     'अवलोकन',
     'nav.map':          'मानचित्र',
     'nav.topology':     'टोपोलॉजी',
     'nav.field':        'फील्ड',
@@ -536,6 +540,7 @@ const translations = {
   },
 
   es: {
+    'nav.overview':     'Vista general',
     'nav.map':          'Mapa',
     'nav.topology':     'Topología',
     'nav.field':        'Campo',
@@ -666,6 +671,7 @@ const translations = {
   },
 
   fr: {
+    'nav.overview':     'Aperçu',
     'nav.map':          'Carte',
     'nav.topology':     'Topologie',
     'nav.field':        'Terrain',
