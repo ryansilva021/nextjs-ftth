@@ -8,9 +8,26 @@ import {
   updateConexao, updatePlano, addFoto, removeFoto,
 } from '@/actions/service-orders'
 
+// ─── FiberOps brand palette ────────────────────────────────────────────────────
+
+const FO = {
+  orange:     '#C45A2C',
+  orangeDeep: '#8E3B1A',
+  orangeSoft: '#E88A5A',
+  orangeGlow: '#F4A771',
+  beige:      '#EDE3D2',
+  beigeDeep:  '#D9CBB4',
+  cream:      '#F7F0E2',
+  espresso:   '#1A120D',
+  espressoUp: '#2A1F17',
+  line:       'rgba(196,140,100,0.18)',
+  muted:      '#7A5C46',
+}
+
 // ─── Keyframe animations injected once ────────────────────────────────────────
 
 const GLOBAL_STYLES = `
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap');
 @keyframes pulse-red  { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
 @keyframes pulse-dot  { 0%,100% { opacity:1; transform:scale(1) } 50% { opacity:0.5; transform:scale(0.7) } }
 @keyframes spin       { to { transform: rotate(360deg) } }
@@ -18,7 +35,7 @@ const GLOBAL_STYLES = `
 @keyframes fadeInUp   { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:translateY(0) } }
 .os-table-wrap { display:block }
 .os-cards-wrap { display:none }
-.os-copy-btn:hover   { background:#1d4ed855 !important; color:#93c5fd !important; }
+.os-copy-btn:hover   { background:rgba(196,90,44,0.15) !important; color:#C45A2C !important; }
 .os-action-btn:hover { opacity:0.82 !important; transform:translateY(-1px); }
 .os-mat-row:hover    { background:#ffffff09 !important; }
 @media (max-width:1024px) {
@@ -36,17 +53,17 @@ const GLOBAL_STYLES = `
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const STATUS_META = {
-  aberta:       { label: 'Aberta',       color: '#3b82f6', bg: '#1e3a5f' },
-  agendada:     { label: 'Agendada',     color: '#a78bfa', bg: '#2e1b4e' },
-  em_andamento: { label: 'Em andamento', color: '#f59e0b', bg: '#451a03' },
-  concluida:    { label: 'Concluída',    color: '#22c55e', bg: '#052e16' },
-  cancelada:    { label: 'Cancelada',    color: '#ef4444', bg: '#450a0a' },
+  aberta:       { label: 'Aberta',       color: '#2563eb', bg: '#dbeafe' },
+  agendada:     { label: 'Agendada',     color: '#7c3aed', bg: '#ede9fe' },
+  em_andamento: { label: 'Em andamento', color: '#d97706', bg: '#fef3c7' },
+  concluida:    { label: 'Concluída',    color: '#16a34a', bg: '#dcfce7' },
+  cancelada:    { label: 'Cancelada',    color: '#dc2626', bg: '#fee2e2' },
 }
 
 const TIPO_META = {
   instalacao:   { label: 'Instalação',   icon: '📶', color: '#22c55e' },
   manutencao:   { label: 'Manutenção',   icon: '🔧', color: '#f59e0b' },
-  suporte:      { label: 'Suporte',      icon: '💬', color: '#3b82f6' },
+  suporte:      { label: 'Suporte',      icon: '💬', color: '#2563eb' },
   cancelamento: { label: 'Cancelamento', icon: '✕',  color: '#ef4444' },
 }
 
@@ -150,10 +167,10 @@ function slaBadge(dataAbertura, slaHoras, status) {
   if (status === 'concluida' || status === 'cancelada') return null
   const prazoMs = new Date(dataAbertura).getTime() + slaHoras * 3_600_000
   const restMs  = prazoMs - Date.now()
-  if (restMs <= 0) return { label: 'SLA Vencido', color: '#ef4444', bg: '#450a0a22' }
+  if (restMs <= 0) return { label: 'SLA Vencido', color: '#dc2626', bg: '#fee2e2' }
   const h = Math.ceil(restMs / 3_600_000)
-  if (h <= 4)  return { label: `SLA ${h}h`, color: '#f59e0b', bg: '#451a0322' }
-  if (h <= 24) return { label: `SLA ${h}h`, color: '#a78bfa', bg: '#2e1b4e22' }
+  if (h <= 4)  return { label: `SLA ${h}h`, color: '#d97706', bg: '#fef3c7' }
+  if (h <= 24) return { label: `SLA ${h}h`, color: '#7c3aed', bg: '#ede9fe' }
   return null
 }
 
@@ -339,7 +356,7 @@ function StatusStepper({ status }) {
         <div style={{ marginLeft: 12, marginBottom: 14 }}>
           <span style={{
             fontSize: 11, fontWeight: 700, color: '#ef4444',
-            background: '#450a0a', border: '1px solid #ef444444',
+            background: '#fee2e2', border: '1px solid #dc262644',
             padding: '2px 8px', borderRadius: 99,
           }}>✕ Cancelada</span>
         </div>
@@ -463,58 +480,146 @@ function KanbanCard({ os, onOpen }) {
 
 // ─── Mobile Card ───────────────────────────────────────────────────────────────
 
+function clienteInitial(nome) {
+  if (!nome) return '?'
+  const parts = nome.trim().split(/\s+/)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return parts[0][0].toUpperCase()
+}
+
+const AVATAR_COLORS = [
+  ['#C45A2C', '#F7F0E2'], ['#1A120D', '#F4A771'], ['#8E3B1A', '#F7F0E2'],
+  ['#2A1F17', '#E88A5A'], ['#4A3828', '#F4A771'], ['#6B3A1F', '#F7F0E2'],
+  ['#D97706', '#1A120D'], ['#3B1A0A', '#F4A771'],
+]
+
+function avatarColor(nome) {
+  if (!nome) return AVATAR_COLORS[0]
+  let h = 0
+  for (let i = 0; i < nome.length; i++) h = (h * 31 + nome.charCodeAt(i)) >>> 0
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]
+}
+
 function MobileCard({ os, onOpen }) {
   const sm = STATUS_META[os.status] ?? STATUS_META.aberta
-  const tm = TIPO_META[os.tipo]
-  const isUrgente = os.prioridade === 'urgente' || os.prioridade === 'alta'
+  const [avatarBg, avatarFg] = avatarColor(os.cliente_nome)
+  const initials = clienteInitial(os.cliente_nome)
+  const netStatus = os.conexao?.status ?? null
+
+  const contratoColor = os.contrato_status === 'ativo'    ? '#166534'
+                      : os.contrato_status === 'suspenso' ? '#92400e'
+                      : os.contrato_status === 'cancelado' ? '#991b1b' : null
+  const contratoBg   = os.contrato_status === 'ativo'    ? '#dcfce7'
+                      : os.contrato_status === 'suspenso' ? '#fef3c7'
+                      : os.contrato_status === 'cancelado' ? '#fee2e2' : FO.beige
+
   return (
     <div
       onClick={() => onOpen(os)}
       style={{
         background: 'var(--card-bg)',
         border: `1px solid var(--border-color)`,
-        borderLeft: `3px solid ${sm.color}`,
-        borderRadius: 10, padding: '12px 14px', cursor: 'pointer',
+        borderLeft: `4px solid ${sm.color}`,
+        borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
       }}
     >
-      {/* Linha 1: cliente + status */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--foreground)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {os.cliente_nome ?? '—'}
-        </span>
-        <StatusBadge status={os.status} />
+      {/* ── Topo: avatar + nome + status ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px 8px' }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+          background: avatarBg, border: `2px solid ${avatarFg}55`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16, fontWeight: 800, color: avatarFg,
+          boxShadow: `0 2px 8px ${avatarFg}33`,
+        }}>
+          {initials}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
+            {os.cliente_nome ?? '—'}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'monospace', fontWeight: 600 }}>
+            {os.os_id}
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+          <StatusBadge status={os.status} />
+          {/* Online/Offline pill */}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
+            color: netStatus === 'ONLINE' ? '#166534' : netStatus === 'OFFLINE' ? '#991b1b' : FO.muted,
+            background: netStatus === 'ONLINE' ? '#dcfce7' : netStatus === 'OFFLINE' ? '#fee2e2' : FO.beige,
+            border: `1.5px solid ${netStatus === 'ONLINE' ? '#16a34a55' : netStatus === 'OFFLINE' ? '#dc262655' : FO.line}`,
+            borderRadius: 99, padding: '2px 7px',
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: netStatus === 'ONLINE' ? '#16a34a' : netStatus === 'OFFLINE' ? '#dc2626' : FO.muted,
+              boxShadow: netStatus === 'ONLINE' ? '0 0 5px #16a34a88' : netStatus === 'OFFLINE' ? '0 0 5px #dc262688' : 'none',
+              animation: netStatus ? 'pulse-dot 1.8s ease-in-out infinite' : 'none',
+            }} />
+            {netStatus ?? 'SEM SINAL'}
+          </span>
+        </div>
       </div>
 
-      {/* Linha 2: tipo + endereço */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
-        <span style={{ fontSize: 12, color: tm?.color ?? 'var(--text-muted)', fontWeight: 600 }}>
-          {tm?.icon} {tm?.label ?? os.tipo}
-        </span>
-        {os.cliente_endereco && (
-          <>
-            <span style={{ color: 'var(--border-color)', fontSize: 10 }}>·</span>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-              {os.cliente_endereco}
+      {/* ── Banner de infos: fundo escuro espresso ── */}
+      <div style={{
+        background: `linear-gradient(135deg, ${FO.espressoUp}, ${FO.espresso})`,
+        padding: '8px 14px 10px',
+        display: 'flex', flexDirection: 'column', gap: 5,
+      }}>
+        {/* Grid 2 colunas para infos rápidas */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+          {os.cliente_endereco && (
+            <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: FO.orangeGlow, fontFamily: 'monospace' }}>📍 Endereço</div>
+              <div style={{ fontSize: 11, color: FO.cream, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{os.cliente_endereco}</div>
+            </div>
+          )}
+          {os.cliente_contato && (
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: FO.orangeGlow, fontFamily: 'monospace' }}>📞 Contato</div>
+              <div style={{ fontSize: 11, color: FO.cream, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{os.cliente_contato}</div>
+            </div>
+          )}
+          {os.tecnico_nome && (
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: FO.orangeGlow, fontFamily: 'monospace' }}>🔧 Técnico</div>
+              <div style={{ fontSize: 11, color: FO.cream, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{os.tecnico_nome}</div>
+            </div>
+          )}
+          {os.data_agendamento && (
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: FO.orangeGlow, fontFamily: 'monospace' }}>📅 Agendado</div>
+              <div style={{ fontSize: 11, color: FO.cream, fontWeight: 500 }}>{fmtDate(os.data_agendamento)}</div>
+            </div>
+          )}
+          {os.descricao && (
+            <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: FO.orangeGlow, fontFamily: 'monospace' }}>📋 Motivo</div>
+              <div style={{ fontSize: 11, color: FO.cream, fontWeight: 500, lineHeight: 1.4 }}>{os.descricao}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Rodapé do banner: prioridade + contrato status + data abertura */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+          <PrioBadge prioridade={os.prioridade} />
+          {os.contrato_status && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 99,
+              color: contratoColor ?? FO.muted, background: contratoBg,
+              border: `1px solid ${contratoColor ?? FO.line}55`,
+            }}>
+              {os.contrato_status.charAt(0).toUpperCase() + os.contrato_status.slice(1)}
             </span>
-          </>
-        )}
-      </div>
-
-      {/* Linha 3: técnico + data + urgente */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-        {os.tecnico_nome ? (
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            🔧 {os.tecnico_nome}
+          )}
+          <span style={{ marginLeft: 'auto', fontSize: 10, color: FO.muted, fontFamily: 'monospace' }}>
+            {fmtDate(os.data_abertura)}
           </span>
-        ) : (
-          <span style={{ fontSize: 11, color: '#ef444488', flex: 1 }}>Sem técnico</span>
-        )}
-        {isUrgente && (
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', background: '#ef444415', border: '1px solid #ef444430', borderRadius: 4, padding: '1px 6px' }}>
-            {os.prioridade === 'urgente' ? 'URGENTE' : 'ALTA'}
-          </span>
-        )}
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{fmtDate(os.data_abertura)}</span>
+        </div>
       </div>
     </div>
   )
@@ -554,13 +659,13 @@ function CreateModal({ onClose, onCreated, olts, userRole, usuarios = [] }) {
 
   const sectionHead = (label, color) => (
     <div style={{
-      fontSize: 10, fontWeight: 700, color: color ?? '#3b82f6',
+      fontSize: 10, fontWeight: 700, color: color ?? FO.orange,
       letterSpacing: 1.2, textTransform: 'uppercase',
       display: 'flex', alignItems: 'center', gap: 8,
     }}>
-      <div style={{ flex: 1, height: 1, background: color ? `${color}44` : '#3b82f644' }} />
+      <div style={{ flex: 1, height: 1, background: color ? `${color}44` : `${FO.orange}44` }} />
       {label}
-      <div style={{ flex: 1, height: 1, background: color ? `${color}44` : '#3b82f644' }} />
+      <div style={{ flex: 1, height: 1, background: color ? `${color}44` : `${FO.orange}44` }} />
     </div>
   )
 
@@ -577,7 +682,7 @@ function CreateModal({ onClose, onCreated, olts, userRole, usuarios = [] }) {
         boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
       }}>
         {/* Colored top strip */}
-        <div style={{ height: 4, borderRadius: '14px 14px 0 0', background: 'linear-gradient(90deg,#3b82f6,#a78bfa)' }} />
+        <div style={{ height: 4, borderRadius: '14px 14px 0 0', background: `linear-gradient(90deg, ${FO.orange}, ${FO.orangeGlow})` }} />
 
         <div style={{ padding: '20px 24px 24px' }}>
           {/* Header */}
@@ -598,8 +703,8 @@ function CreateModal({ onClose, onCreated, olts, userRole, usuarios = [] }) {
 
           {err && (
             <div style={{
-              background: '#450a0a', border: '1px solid #7f1d1d',
-              borderRadius: 8, padding: '9px 14px', marginBottom: 16, fontSize: 12, color: '#fca5a5',
+              background: '#fee2e2', border: '1px solid #dc262644',
+              borderRadius: 8, padding: '9px 14px', marginBottom: 16, fontSize: 12, color: '#991b1b',
               display: 'flex', gap: 8, alignItems: 'flex-start',
             }}>
               <span style={{ flexShrink: 0 }}>⚠</span> {err}
@@ -628,7 +733,7 @@ function CreateModal({ onClose, onCreated, olts, userRole, usuarios = [] }) {
               </div>
             </div>
 
-            {sectionHead('Cliente', '#3b82f6')}
+            {sectionHead('Cliente', FO.orange)}
 
             <div>
               <label style={LBL}>Nome do Cliente *</label>
@@ -746,8 +851,9 @@ function CreateModal({ onClose, onCreated, olts, userRole, usuarios = [] }) {
                 type="submit" disabled={isPending}
                 style={{
                   padding: '9px 26px', borderRadius: 8, border: 'none',
-                  background: isPending ? '#1d4ed8' : '#3b82f6',
-                  color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                  background: isPending ? FO.orangeDeep : `linear-gradient(180deg, ${FO.orangeSoft}, ${FO.orange})`,
+                  color: FO.cream, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                  boxShadow: `0 4px 12px ${FO.orange}44`,
                   opacity: isPending ? 0.8 : 1,
                   display: 'flex', alignItems: 'center', gap: 8,
                 }}
@@ -781,9 +887,9 @@ function CopyBtn({ value, label = '' }) {
       title={`Copiar ${label}`}
       className="os-copy-btn"
       style={{
-        padding: '2px 7px', borderRadius: 5, border: '1px solid #334155',
-        background: ok ? '#1e3a5f' : 'transparent',
-        color: ok ? '#93c5fd' : '#64748b',
+        padding: '2px 7px', borderRadius: 5, border: `1px solid ${FO.line}`,
+        background: ok ? `${FO.orange}18` : 'transparent',
+        color: ok ? FO.orange : 'var(--text-muted)',
         cursor: 'pointer', fontSize: 10, fontWeight: 700,
         transition: 'all 0.15s', flexShrink: 0,
       }}
@@ -825,8 +931,8 @@ function DadosTab({ os, canWrite, canStatus, canDelete, isPending, nextStatuses,
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ ...DV, fontFamily: 'monospace', fontWeight: 700, fontSize: 14 }}>{os.os_id}</span>
           <a href={`/admin/os/${os.os_id}`} style={{
-            fontSize: 11, color: '#60a5fa', background: '#1d4ed822',
-            border: '1px solid #1d4ed855', borderRadius: 5,
+            fontSize: 11, color: FO.orange, background: `${FO.orange}14`,
+            border: `1px solid ${FO.orange}44`, borderRadius: 5,
             padding: '2px 8px', textDecoration: 'none', fontWeight: 600,
           }}>Abrir página ↗</a>
         </div>
@@ -970,7 +1076,7 @@ function DadosTab({ os, canWrite, canStatus, canDelete, isPending, nextStatuses,
 
       {canDelete && (
         <div style={{ paddingTop: 8 }}>
-          <button onClick={onDelete} disabled={isPending} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #7f1d1d', background: '#450a0a', color: '#fca5a5', cursor: 'pointer', fontSize: 11 }}>Excluir OS</button>
+          <button onClick={onDelete} disabled={isPending} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #dc262644', background: '#fee2e2', color: '#991b1b', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>Excluir OS</button>
         </div>
       )}
     </>
@@ -1227,17 +1333,41 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
 
         {/* Header */}
         <div style={{ padding: '10px 14px 0', borderBottom: '1px solid var(--border-color)', background: 'var(--background)', flexShrink: 0 }}>
-          {/* Row 1: Cliente (most important) + close */}
+          {/* Row 1: Cliente + close */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>
                 {os.cliente_nome ?? '—'}
               </div>
-              {/* Row 2: status + tipo + prioridade */}
+              {/* Row 2: badges */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                 <StatusBadge status={os.status} />
                 <TipoBadge tipo={os.tipo} />
                 <PrioBadge prioridade={os.prioridade} />
+                {connStatus && (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
+                    color: connStatus === 'ONLINE' ? '#166534' : '#991b1b',
+                    background: connStatus === 'ONLINE' ? '#dcfce7' : '#fee2e2',
+                    border: `1.5px solid ${connStatus === 'ONLINE' ? '#16a34a66' : '#dc262666'}`,
+                    borderRadius: 99, padding: '2px 8px',
+                  }}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: '50%',
+                      background: connStatus === 'ONLINE' ? '#16a34a' : '#dc2626',
+                      boxShadow: connStatus === 'ONLINE' ? '0 0 5px #16a34a88' : '0 0 5px #dc262688',
+                      animation: 'pulse-dot 1.8s ease-in-out infinite',
+                    }} />
+                    {connStatus}
+                  </span>
+                )}
+                {(() => {
+                  const sla = slaBadge(os.data_abertura, slaHoras, os.status)
+                  return sla ? (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: sla.color, background: sla.bg, border: `1px solid ${sla.color}44`, borderRadius: 4, padding: '2px 7px' }}>⏱ {sla.label}</span>
+                  ) : null
+                })()}
               </div>
               {/* Row 3: OS ID + tecnico + agendamento */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, flexWrap: 'wrap' }}>
@@ -1245,24 +1375,13 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
                 {os.tecnico_nome && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>🔧 {os.tecnico_nome}</span>}
                 {os.data_agendamento && <span style={{ fontSize: 11, color: '#a78bfa' }}>📅 {fmtDate(os.data_agendamento)}</span>}
                 {os.cliente_contato && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>📞 {os.cliente_contato}</span>}
-                {(() => {
-                  const sla = slaBadge(os.data_abertura, slaHoras, os.status)
-                  return sla ? (
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, color: sla.color,
-                      background: sla.bg, border: `1px solid ${sla.color}44`,
-                      borderRadius: 4, padding: '2px 7px',
-                    }}>⏱ {sla.label}</span>
-                  ) : null
-                })()}
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               <a href={`/admin/os/${os.os_id}`} style={{
-                fontSize: 11, fontWeight: 600, color: '#60a5fa',
-                background: '#1d4ed822', border: '1px solid #1d4ed855',
-                borderRadius: 6, padding: '4px 10px', textDecoration: 'none',
-                whiteSpace: 'nowrap',
+                fontSize: 11, fontWeight: 600, color: FO.orange,
+                background: `${FO.orange}14`, border: `1px solid ${FO.orange}44`,
+                borderRadius: 6, padding: '4px 10px', textDecoration: 'none', whiteSpace: 'nowrap',
               }}>Abrir ↗</a>
               <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, padding: 4 }}>✕</button>
             </div>
@@ -1283,7 +1402,7 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
         </div>
 
         {/* Feedback */}
-        {err && <div style={{ margin: '8px 16px 0', background: '#450a0a', border: '1px solid #7f1d1d44', borderRadius: 6, padding: '7px 11px', fontSize: 11, color: '#fca5a5' }}>⚠ {err}</div>}
+        {err && <div style={{ margin: '8px 16px 0', background: '#fee2e2', border: '1px solid #dc262644', borderRadius: 6, padding: '7px 11px', fontSize: 11, color: '#991b1b' }}>⚠ {err}</div>}
         {msg && <div style={{ margin: '8px 16px 0', background: '#052e16', border: '1px solid #16a34a44', borderRadius: 6, padding: '7px 11px', fontSize: 11, color: '#4ade80' }}>✓ {msg}</div>}
 
         {/* Body */}
@@ -1314,20 +1433,20 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '8px 12px', borderRadius: 8,
-                background: connStatus === 'ONLINE' ? '#052e1633' : connStatus === 'OFFLINE' ? '#450a0a33' : '#1e293b33',
-                border: `1px solid ${connStatus === 'ONLINE' ? '#16a34a44' : connStatus === 'OFFLINE' ? '#ef444444' : '#33415544'}`,
+                background: connStatus === 'ONLINE' ? '#dcfce7' : connStatus === 'OFFLINE' ? '#fee2e2' : FO.beige,
+                border: `1px solid ${connStatus === 'ONLINE' ? '#16a34a44' : connStatus === 'OFFLINE' ? '#dc262644' : FO.line}`,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{
                     width: 10, height: 10, borderRadius: '50%', display: 'inline-block', flexShrink: 0,
-                    background: connStatus === 'ONLINE' ? '#22c55e' : connStatus === 'OFFLINE' ? '#ef4444' : '#64748b',
+                    background: connStatus === 'ONLINE' ? '#16a34a' : connStatus === 'OFFLINE' ? '#dc2626' : FO.muted,
                     animation: connStatus ? 'pulse-dot 1.8s ease-in-out infinite' : 'none',
-                    boxShadow: connStatus === 'ONLINE' ? '0 0 6px #22c55e' : connStatus === 'OFFLINE' ? '0 0 6px #ef4444' : 'none',
+                    boxShadow: connStatus === 'ONLINE' ? '0 0 6px #16a34a88' : connStatus === 'OFFLINE' ? '0 0 6px #dc262688' : 'none',
                   }} />
-                  <span style={{ fontSize: 12, fontWeight: 800, color: connStatus === 'ONLINE' ? '#4ade80' : connStatus === 'OFFLINE' ? '#f87171' : '#94a3b8' }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: connStatus === 'ONLINE' ? '#166534' : connStatus === 'OFFLINE' ? '#991b1b' : FO.muted }}>
                     {connStatus ?? 'SEM DADOS'}
                   </span>
-                  {connPolling && <span style={{ fontSize: 9, color: '#475569' }}>ao vivo</span>}
+                  {connPolling && <span style={{ fontSize: 9, color: FO.muted, fontFamily: 'monospace' }}>ao vivo</span>}
                 </div>
                 <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                   {os.onu_serial ?? os.conexao?.mac ?? '—'}
@@ -1345,29 +1464,29 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
                   <button key={label} className="os-copy-btn"
                     onClick={() => val && navigator.clipboard.writeText(String(val))}
                     disabled={!val}
-                    style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: '1px solid #334155', background: '#0f172a', color: val ? '#94a3b8' : '#374151', cursor: val ? 'pointer' : 'not-allowed', transition: 'all 0.15s' }}
+                    style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: `1px solid ${FO.line}`, background: FO.beige, color: val ? FO.espresso : FO.muted, cursor: val ? 'pointer' : 'not-allowed', transition: 'all 0.15s' }}
                   >{label}</button>
                 ))}
                 <button className="os-action-btn"
                   onClick={() => { const mac = Array.from({length:6},()=>Math.floor(Math.random()*256).toString(16).padStart(2,'0')).join(':').toUpperCase(); setConexaoForm(p=>({...p,mac})); navigator.clipboard.writeText(mac) }}
-                  style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: '1px solid #1e40af44', background: '#1e3a5f', color: '#93c5fd', cursor: 'pointer', transition: 'all 0.15s' }}
+                  style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: `1px solid ${FO.orange}44`, background: `${FO.orange}14`, color: FO.orange, cursor: 'pointer', transition: 'all 0.15s' }}
                 >⚡ MAC Auto</button>
                 {canOnuAuth && (
                   <button className="os-action-btn"
                     onClick={() => flash('Comando de autorização ONU enviado.')}
-                    style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: '1px solid #15803d44', background: '#052e16', color: '#4ade80', cursor: 'pointer', transition: 'all 0.15s' }}
+                    style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: '1px solid #16a34a44', background: '#dcfce7', color: '#166534', cursor: 'pointer', transition: 'all 0.15s' }}
                   >✓ Autorizar ONU</button>
                 )}
                 {conexaoForm.ip && (
                   <button className="os-action-btn"
                     onClick={() => window.open(`http://${conexaoForm.ip}`, '_blank')}
-                    style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: '1px solid #a16207', background: '#451a03', color: '#fbbf24', cursor: 'pointer', transition: 'all 0.15s' }}
+                    style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: `1px solid ${FO.orange}44`, background: `${FO.orange}14`, color: FO.orange, cursor: 'pointer', transition: 'all 0.15s' }}
                   >↗ CPE</button>
                 )}
               </div>
 
               {/* Dados de acesso */}
-              <Section title="Acesso" color="#3b82f6">
+              <Section title="Acesso" color={FO.orange}>
                 {[
                   { label: 'Login',  key: 'login',     val: conexaoForm.login },
                   { label: 'Senha',  key: 'senha',     val: conexaoForm.senha, secret: true },
@@ -1377,7 +1496,7 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
                   { label: 'Slot',   key: 'slot',      val: conexaoForm.slot },
                   { label: 'PON',    key: 'pon_porta', val: conexaoForm.pon_porta },
                 ].map(({ label, key, val, secret }) => (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid #1e293b' }}>
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: `1px solid ${FO.line}` }}>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 60, flexShrink: 0 }}>{label}</span>
                     {canWrite ? (
                       <input type={secret && !showSenha ? 'password' : 'text'} value={val}
@@ -1390,13 +1509,13 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
                       </span>
                     )}
                     <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
-                      {secret && <button onClick={() => setShowSenha(s => !s)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 11, padding: 0 }}>{showSenha ? '🙈' : '👁'}</button>}
+                      {secret && <button onClick={() => setShowSenha(s => !s)} style={{ background: 'none', border: 'none', color: FO.muted, cursor: 'pointer', fontSize: 11, padding: 0 }}>{showSenha ? '🙈' : '👁'}</button>}
                       {val && <CopyBtn value={val} label={label} />}
                     </div>
                   </div>
                 ))}
                 {canWrite && (
-                  <button onClick={handleSaveConexao} disabled={isPending} style={{ marginTop: 6, padding: '4px 12px', borderRadius: 5, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700, opacity: isPending ? 0.7 : 1 }}>
+                  <button onClick={handleSaveConexao} disabled={isPending} style={{ marginTop: 6, padding: '4px 12px', borderRadius: 5, border: 'none', background: `linear-gradient(180deg, ${FO.orangeSoft}, ${FO.orange})`, color: FO.cream, cursor: 'pointer', fontSize: 11, fontWeight: 700, opacity: isPending ? 0.7 : 1 }}>
                     {isPending ? '...' : '💾 Salvar'}
                   </button>
                 )}
@@ -1409,7 +1528,7 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
                   { label: 'Download', key: 'download', val: planoForm.download, ph: '500 Mbps' },
                   { label: 'Upload',   key: 'upload',   val: planoForm.upload,   ph: '250 Mbps' },
                 ].map(({ label, key, val, ph }) => (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid #1e293b' }}>
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: `1px solid ${FO.line}` }}>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 60, flexShrink: 0 }}>{label}</span>
                     {canWrite
                       ? <input value={val} onChange={e => setPlanoForm(p => ({ ...p, [key]: e.target.value }))} placeholder={ph} style={{ ...INP_SM, flex: 1, padding: '2px 6px', fontSize: 11 }} />
@@ -1417,7 +1536,7 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
                   </div>
                 ))}
                 {canWrite && (
-                  <button onClick={handleSavePlano} disabled={isPending} style={{ marginTop: 6, padding: '4px 12px', borderRadius: 5, border: 'none', background: '#6d28d9', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700, opacity: isPending ? 0.7 : 1 }}>
+                  <button onClick={handleSavePlano} disabled={isPending} style={{ marginTop: 6, padding: '4px 12px', borderRadius: 5, border: 'none', background: `linear-gradient(180deg, ${FO.orangeSoft}, ${FO.orange})`, color: FO.cream, cursor: 'pointer', fontSize: 11, fontWeight: 700, opacity: isPending ? 0.7 : 1 }}>
                     {isPending ? '...' : '💾 Salvar'}
                   </button>
                 )}
@@ -1513,14 +1632,14 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{materiais.length} item(s)</span>
                 {(canWrite || canStatus) && (
-                  <button onClick={() => setShowMatForm(s => !s)} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #1e40af44', background: '#1e3a5f', color: '#93c5fd', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                  <button onClick={() => setShowMatForm(s => !s)} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${FO.orange}44`, background: `${FO.orange}14`, color: FO.orange, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
                     {showMatForm ? '✕ Cancelar' : '+ Material'}
                   </button>
                 )}
               </div>
 
               {showMatForm && (
-                <div style={{ padding: '10px 12px', background: '#0f172a', borderRadius: 8, border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: 8, animation: 'fadeInUp 0.2s ease' }}>
+                <div style={{ padding: '10px 12px', background: FO.beige, borderRadius: 8, border: `1px solid ${FO.line}`, display: 'flex', flexDirection: 'column', gap: 8, animation: 'fadeInUp 0.2s ease' }}>
                   {/* Preset dropdown */}
                   <div>
                     <label style={LBL}>Material</label>
@@ -1561,7 +1680,7 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
                       </select>
                     </div>
                   </div>
-                  <button onClick={handleAddMaterial} disabled={isPending || !matForm.nome.trim()} style={{ padding: '7px 0', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: isPending ? 0.7 : 1 }}>
+                  <button onClick={handleAddMaterial} disabled={isPending || !matForm.nome.trim()} style={{ padding: '7px 0', borderRadius: 6, border: 'none', background: `linear-gradient(180deg, ${FO.orangeSoft}, ${FO.orange})`, color: FO.cream, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: isPending ? 0.7 : 1 }}>
                     {isPending ? 'Adicionando...' : '+ Adicionar'}
                   </button>
                 </div>
@@ -1572,12 +1691,12 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {materiais.map((m, i) => (
-                    <div key={m._id ?? i} className="os-mat-row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 6, background: i % 2 === 0 ? '#0f172a' : 'transparent' }}>
+                    <div key={m._id ?? i} className="os-mat-row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 6, background: i % 2 === 0 ? FO.beige : 'transparent' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.nome}</div>
                         <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Qtd: {m.quantidade}</div>
                       </div>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: m.tipo === 'COMODATO' ? '#451a0322' : '#1e3a5f22', color: m.tipo === 'COMODATO' ? '#fb923c' : '#60a5fa', border: `1px solid ${m.tipo === 'COMODATO' ? '#ea580c44' : '#3b82f644'}` }}>{m.tipo}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: m.tipo === 'COMODATO' ? `${FO.orange}18` : `${FO.espresso}10`, color: m.tipo === 'COMODATO' ? FO.orange : FO.espresso, border: `1px solid ${m.tipo === 'COMODATO' ? FO.orange+'44' : FO.line}` }}>{m.tipo}</span>
                       {canDelete && <button onClick={() => handleRemoveMaterial(m._id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 }}>✕</button>}
                     </div>
                   ))}
@@ -1592,7 +1711,7 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
               {canWrite && (
                 <>
                   <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFotos} style={{ display: 'none' }} />
-                  <button onClick={() => fileRef.current?.click()} style={{ padding: '8px 0', borderRadius: 7, border: '2px dashed #334155', background: 'transparent', color: '#64748b', cursor: 'pointer', fontSize: 12, width: '100%' }}>
+                  <button onClick={() => fileRef.current?.click()} style={{ padding: '8px 0', borderRadius: 7, border: `2px dashed ${FO.orange}66`, background: `${FO.orange}08`, color: FO.orange, cursor: 'pointer', fontSize: 12, width: '100%' }}>
                     📷 Selecionar fotos
                   </button>
                 </>
@@ -1603,7 +1722,7 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                   {fotos.map((f, i) => (
-                    <div key={f._id ?? i} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', border: '1px solid #1e293b', background: '#0f172a' }}>
+                    <div key={f._id ?? i} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', border: `1px solid ${FO.line}`, background: FO.beige }}>
                       <img src={f.url} alt={f.nome} style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }} />
                       <div style={{ padding: '4px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: 9, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{f.nome}</span>
@@ -1613,7 +1732,7 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
                   ))}
                 </div>
               )}
-              <p style={{ fontSize: 10, color: '#334155', textAlign: 'center' }}>Em produção, usar armazenamento externo (S3, Cloudinary, etc.)</p>
+              <p style={{ fontSize: 10, color: FO.muted, textAlign: 'center' }}>Em produção, usar armazenamento externo (S3, Cloudinary, etc.)</p>
             </>
           )}
 
@@ -1627,27 +1746,27 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
                       <textarea value={notaText} onChange={e => setNotaText(e.target.value)} placeholder="Digite a nota..." rows={2} style={{ ...INP_SM, resize: 'none' }} />
                       <div style={{ display: 'flex', gap: 7 }}>
                         <button onClick={() => { setShowNota(false); setNotaText('') }} style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}>Cancelar</button>
-                        <button onClick={handleAddNota} disabled={isPending || !notaText.trim()} style={{ flex: 2, padding: '6px 0', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>Adicionar Nota</button>
+                        <button onClick={handleAddNota} disabled={isPending || !notaText.trim()} style={{ flex: 2, padding: '6px 0', borderRadius: 6, border: 'none', background: `linear-gradient(180deg, ${FO.orangeSoft}, ${FO.orange})`, color: FO.cream, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>Adicionar Nota</button>
                       </div>
                     </div>
                   ) : (
-                    <button onClick={() => setShowNota(true)} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #1e40af44', background: '#1e3a5f', color: '#93c5fd', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>+ Nota</button>
+                    <button onClick={() => setShowNota(true)} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${FO.orange}44`, background: `${FO.orange}14`, color: FO.orange, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>+ Nota</button>
                   )}
                 </div>
               )}
 
               {/* Auto entry: criação */}
               <div style={{ position: 'relative', paddingLeft: 20 }}>
-                <div style={{ position: 'absolute', left: 5, top: 6, width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
-                <div style={{ position: 'absolute', left: 8, top: 14, width: 1, height: 'calc(100% - 14px)', background: '#1e293b' }} />
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>OS aberta</div>
+                <div style={{ position: 'absolute', left: 5, top: 6, width: 8, height: 8, borderRadius: '50%', background: FO.orange }} />
+                <div style={{ position: 'absolute', left: 8, top: 14, width: 1, height: 'calc(100% - 14px)', background: FO.line }} />
+                <div style={{ fontSize: 11, fontWeight: 700, color: FO.orange }}>OS aberta</div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{os.criado_por ?? 'Sistema'} · {fmtDateTime(os.data_abertura ?? os.created_at)}</div>
               </div>
 
               {historico.length === 0 && <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-muted)', fontSize: 11 }}>Nenhum registro adicional</div>}
 
               {[...historico].reverse().map((h, i) => {
-                const colors = ['#a78bfa','#22c55e','#f59e0b','#3b82f6','#f87171']
+                const colors = [FO.orange, '#16a34a', '#d97706', '#7c3aed', '#dc2626']
                 const c = colors[i % colors.length]
                 return (
                   <div key={h._id ?? i} style={{ position: 'relative', paddingLeft: 20, animation: 'fadeInUp 0.2s ease' }}>
@@ -1663,7 +1782,7 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
           {/* ════ TAB: PROVISIONAR ════ */}
           {activeTab === 'provisionar' && (
             <>
-              <div style={{ padding: '10px 14px', background: '#1a2742', borderRadius: 8, border: '1px solid #3b82f644', fontSize: 12, color: '#93c5fd', lineHeight: 1.5 }}>
+              <div style={{ padding: '10px 14px', background: FO.beige, borderRadius: 8, border: `1px solid ${FO.orange}44`, fontSize: 12, color: FO.espresso, lineHeight: 1.5 }}>
                 Preencha os dados e clique em <strong>Concluir e Provisionar</strong> para ativar a ONU na OLT automaticamente.
               </div>
               <form onSubmit={handleConcluir} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1697,29 +1816,27 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
 
 // SGP-style status tab definitions (order matters for tab row)
 const STATUS_TABS = [
-  { key: '', label: 'Todos', color: '#64748b' },
-  { key: 'aberta',       label: 'Aberta',       color: '#3b82f6' },
-  { key: 'agendada',     label: 'Agendada',     color: '#a78bfa' },
-  { key: 'em_andamento', label: 'Em andamento', color: '#f59e0b' },
-  { key: 'concluida',    label: 'Concluida',    color: '#22c55e' },
-  { key: 'cancelada',    label: 'Cancelada',    color: '#ef4444' },
+  { key: '', label: 'Todos', color: '#7A5C46' },
+  { key: 'aberta',       label: 'Aberta',       color: '#2563eb' },
+  { key: 'agendada',     label: 'Agendada',     color: '#7c3aed' },
+  { key: 'em_andamento', label: 'Em andamento', color: '#d97706' },
+  { key: 'concluida',    label: 'Concluida',    color: '#16a34a' },
+  { key: 'cancelada',    label: 'Cancelada',    color: '#dc2626' },
 ]
 
 // Strip counts for the stats bar (keyed from stats object)
 const STATS_STRIP = [
-  { key: 'abertas',      status: 'aberta',       label: 'Abertas',      color: '#3b82f6' },
-  { key: 'agendadas',    status: 'agendada',     label: 'Agendadas',    color: '#a78bfa' },
-  { key: 'em_andamento', status: 'em_andamento', label: 'Em andamento', color: '#f59e0b' },
-  { key: 'concluidas',   status: 'concluida',    label: 'Concluidas',   color: '#22c55e' },
-  { key: 'canceladas',   status: 'cancelada',    label: 'Canceladas',   color: '#ef4444' },
+  { key: 'abertas',      status: 'aberta',       label: 'Abertas',      color: '#2563eb' },
+  { key: 'agendadas',    status: 'agendada',     label: 'Agendadas',    color: '#7c3aed' },
+  { key: 'em_andamento', status: 'em_andamento', label: 'Em andamento', color: '#d97706' },
+  { key: 'concluidas',   status: 'concluida',    label: 'Concluidas',   color: '#16a34a' },
+  { key: 'canceladas',   status: 'cancelada',    label: 'Canceladas',   color: '#dc2626' },
 ]
 
 export default function ServiceOrdersClient({ initialItems, initialTotal, stats, olts, usuarios = [], userRole, userId = '', userName }) {
   const [items, setItems]               = useState(initialItems ?? [])
   const [total, setTotal]               = useState(initialTotal ?? 0)
   const [filterStatus, setFilterStatus] = useState('')
-  const [filterTipo, setFilterTipo]     = useState('')
-  const [search, setSearch]             = useState('')
   const [showCreate, setShowCreate]     = useState(false)
   const [selectedOS, setSelectedOS]     = useState(null)
   const [view, setView]                 = useState('list')   // 'list' | 'kanban'
@@ -1730,21 +1847,9 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
 
   // ── Derived filtered list ──
   const filtered = useMemo(() => {
-    let r = items
-    if (filterStatus) r = r.filter(o => o.status === filterStatus)
-    if (filterTipo)   r = r.filter(o => o.tipo   === filterTipo)
-    if (search) {
-      const q = search.toLowerCase()
-      r = r.filter(o =>
-        o.os_id?.toLowerCase().includes(q) ||
-        o.cliente_nome?.toLowerCase().includes(q) ||
-        o.tecnico_nome?.toLowerCase().includes(q) ||
-        o.auxiliar_nome?.toLowerCase().includes(q) ||
-        o.onu_serial?.toLowerCase().includes(q)
-      )
-    }
-    return r
-  }, [items, filterStatus, filterTipo, search])
+    if (!filterStatus) return items
+    return items.filter(o => o.status === filterStatus)
+  }, [items, filterStatus])
 
   // ── Items grouped by status for Kanban ──
   const byStatus = useMemo(() => {
@@ -1814,9 +1919,7 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
 
   // ── Toggle filter helpers ──
   function toggleStatus(s) { setFilterStatus(p => p === s ? '' : s) }
-  function toggleTipo(k)   { setFilterTipo(p => p === k ? '' : k) }
-
-  const hasFilters = !!(filterStatus || filterTipo || search)
+  const hasFilters = !!filterStatus
 
   return (
     <div>
@@ -1831,24 +1934,24 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
         }}>
           {sseToasts.map(t => (
             <div key={t.id} style={{
-              background: 'linear-gradient(135deg,#1e3a5f,#0f172a)',
-              border: '1px solid #3b82f6',
-              borderLeft: '4px solid #3b82f6',
+              background: `linear-gradient(135deg, ${FO.espressoUp}, ${FO.espresso})`,
+              border: `1px solid ${FO.orange}66`,
+              borderLeft: `4px solid ${FO.orange}`,
               borderRadius: 12, padding: '12px 16px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+              boxShadow: `0 8px 24px rgba(26,18,13,0.45)`,
               animation: 'fadeInUp 0.3s ease',
-              color: 'var(--foreground)',
+              color: FO.cream,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <span style={{ fontSize: 16 }}>{TIPO_META[t.tipo]?.icon ?? '📋'}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa' }}>Nova OS — {TIPO_META[t.tipo]?.label ?? t.tipo}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: FO.orangeGlow }}>Nova OS — {TIPO_META[t.tipo]?.label ?? t.tipo}</span>
                 <button
                   onClick={() => setSseToasts(p => p.filter(x => x.id !== t.id))}
-                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: FO.muted, cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
                 >✕</button>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{t.cliente_nome ?? '—'}</div>
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{t.os_id}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: FO.cream }}>{t.cliente_nome ?? '—'}</div>
+              <div style={{ fontSize: 11, color: FO.muted, marginTop: 2 }}>{t.os_id}</div>
             </div>
           ))}
         </div>
@@ -1865,7 +1968,7 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
           </h1>
           <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
             {stats?.total ?? total} total
-            {stats?.abertas   > 0 && <span style={{ color: '#3b82f6', marginLeft: 8 }}>· {stats.abertas} abertas</span>}
+            {stats?.abertas   > 0 && <span style={{ color: FO.orange, marginLeft: 8 }}>· {stats.abertas} abertas</span>}
             {stats?.em_andamento > 0 && <span style={{ color: '#f59e0b', marginLeft: 8 }}>· {stats.em_andamento} em andamento</span>}
           </p>
         </div>
@@ -1879,8 +1982,10 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
           {canCreate && (
             <button onClick={() => setShowCreate(true)} style={{
               padding: '8px 20px', borderRadius: 8, border: 'none',
-              background: '#3b82f6', color: '#fff', cursor: 'pointer',
+              background: `linear-gradient(180deg, ${FO.orangeSoft}, ${FO.orange})`,
+              color: FO.cream, cursor: 'pointer',
               fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
+              boxShadow: `0 4px 12px ${FO.orange}44`,
             }}>+ Nova OS</button>
           )}
         </div>
@@ -1928,45 +2033,23 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
         })}
       </div>
 
-      {/* ── Search + Tipo + View toggle ── */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
-        <input
-          placeholder="Buscar OS, cliente, técnico, serial..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{
-            flex: '1 1 220px', minWidth: 0,
-            background: 'var(--inp-bg)', border: '1px solid var(--border-color)',
-            borderRadius: 7, padding: '8px 12px', color: 'var(--foreground)', fontSize: 13,
-          }}
-        />
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {Object.entries(TIPO_META).map(([k, v]) => (
-            <button key={k} onClick={() => toggleTipo(k)} style={{
-              padding: '6px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
-              border: `1px solid ${filterTipo === k ? v.color : 'var(--border-color)'}`,
-              background: filterTipo === k ? `${v.color}18` : 'transparent',
-              color: filterTipo === k ? v.color : 'var(--text-muted)',
-              fontWeight: filterTipo === k ? 700 : 400, transition: 'all 0.12s',
-              whiteSpace: 'nowrap',
-            }}>{v.icon} {v.label}</button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 7, overflow: 'hidden', marginLeft: 'auto' }}>
+      {/* ── View toggle ── */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 7, overflow: 'hidden' }}>
           {[['list', '≡ Lista'], ['kanban', '⬛ Kanban']].map(([v, lbl]) => (
             <button key={v} onClick={() => setView(v)} style={{
               padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none',
-              background: view === v ? '#3b82f6' : 'transparent',
-              color: view === v ? '#fff' : 'var(--text-muted)', transition: 'all 0.12s',
+              background: view === v ? FO.orange : 'transparent',
+              color: view === v ? FO.cream : 'var(--text-muted)', transition: 'all 0.12s',
             }}>{lbl}</button>
           ))}
         </div>
         {hasFilters && (
-          <button onClick={() => { setFilterStatus(''); setFilterTipo(''); setSearch('') }} style={{
-            fontSize: 11, color: '#3b82f6', background: 'none',
-            border: '1px solid #3b82f633', borderRadius: 6,
+          <button onClick={() => setFilterStatus('')} style={{
+            fontSize: 11, color: FO.orange, background: 'none',
+            border: `1px solid ${FO.orange}44`, borderRadius: 6,
             cursor: 'pointer', padding: '5px 10px', whiteSpace: 'nowrap',
-          }}>✕ Limpar filtros</button>
+          }}>✕ Limpar filtro</button>
         )}
       </div>
 
@@ -2024,9 +2107,9 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
                       <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Nenhuma OS encontrada</div>
                       {hasFilters && (
                         <button
-                          onClick={() => { setFilterStatus(''); setFilterTipo(''); setSearch('') }}
+                          onClick={() => setFilterStatus('')}
                           style={{
-                            fontSize: 12, color: '#3b82f6', background: 'none',
+                            fontSize: 12, color: FO.orange, background: 'none',
                             border: 'none', cursor: 'pointer', textDecoration: 'underline',
                           }}
                         >Limpar filtros</button>
@@ -2125,7 +2208,7 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
                         <PrioBadge prioridade={os.prioridade} />
                       </td>
 
-                      {/* Status badge */}
+                      {/* Status badge + Online/Offline */}
                       <td style={{ padding: '11px 12px', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                           <StatusBadge status={os.status} />
@@ -2139,6 +2222,20 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
                               }}>{sla.label}</span>
                             ) : null
                           })()}
+                          {os.conexao?.status && (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              fontSize: 9, fontWeight: 700,
+                              color: os.conexao.status === 'ONLINE' ? '#166534' : '#991b1b',
+                            }}>
+                              <span style={{
+                                width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
+                                background: os.conexao.status === 'ONLINE' ? '#16a34a' : '#dc2626',
+                                boxShadow: os.conexao.status === 'ONLINE' ? '0 0 4px #16a34a88' : '0 0 4px #dc262688',
+                              }} />
+                              {os.conexao.status === 'ONLINE' ? 'Online' : 'Offline'}
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -2174,7 +2271,7 @@ export default function ServiceOrdersClient({ initialItems, initialTotal, stats,
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Nenhuma OS encontrada</div>
                 {hasFilters && (
                   <button
-                    onClick={() => { setFilterStatus(''); setFilterTipo(''); setSearch('') }}
+                    onClick={() => setFilterStatus('')}
                     style={{
                       fontSize: 12, color: '#3b82f6', background: 'none',
                       border: 'none', cursor: 'pointer', textDecoration: 'underline',

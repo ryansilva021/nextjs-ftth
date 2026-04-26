@@ -91,12 +91,18 @@ export async function getSGPStatus() {
     }
   }
 
+  const stats = sgp.last_sync_stats ?? null
   return {
     isConfigured:  !!(sgp.host && sgp.username && sgp.password_enc),
-    host:          sgp.host       ?? null,
-    username:      sgp.username   ?? null,
-    lastSync:      sgp.last_sync  ? sgp.last_sync.toISOString() : null,
-    lastSyncStats: sgp.last_sync_stats ?? null,
+    host:          sgp.host      ?? null,
+    username:      sgp.username  ?? null,
+    lastSync:      sgp.last_sync ? sgp.last_sync.toISOString() : null,
+    lastSyncStats: stats ? {
+      novos:         stats.novos         ?? 0,
+      cancelamentos: stats.cancelamentos ?? 0,
+      sincronizados: stats.sincronizados ?? 0,
+      erros:         stats.erros         ?? 0,
+    } : null,
     isSyncing:     sgp.is_syncing ?? false,
   }
 }
@@ -127,12 +133,12 @@ export async function syncSGP() {
   await SGPConfig.updateOne({ projeto_id }, { $set: { is_syncing: true } })
   await nocLog(projeto_id, 'SGP', 'Sincronização iniciada', 'info')
 
-  let novos          = 0
-  let cancelamentos  = 0
-  let erros          = 0
+  let novos         = 0
+  let cancelamentos = 0
+  let sincronizados = 0
+  let erros         = 0
 
   try {
-    // Decrypt password and authenticate
     const password = decrypt(sgp.password_enc)
     const token    = await authenticate(sgp.host, sgp.username, password)
 
@@ -148,30 +154,37 @@ export async function syncSGP() {
       try {
         const serialNorm = cliente.serial.toUpperCase().trim()
         const onu        = await ONU.findOne({ projeto_id, serial: serialNorm }).lean()
-        const isAtivo    = cliente.status === 'ativo'
+        const cs         = cliente.contrato_status // 'ativo' | 'suspenso' | 'cancelado'
 
-        if (!onu && isAtivo) {
-          // New subscriber: queue install
-          await ProvisionEvent.create({
-            projeto_id,
-            tipo:    'install',
-            status:  'pending',
-            cliente: cliente.nome,
-            serial:  serialNorm,
-          })
-          novos++
-        } else if (onu && !isAtivo && onu.status !== 'cancelled') {
-          // Cancelled subscriber: queue removal
+        if (!onu) {
+          if (cs === 'ativo') {
+            await ProvisionEvent.create({
+              projeto_id,
+              tipo:    'install',
+              status:  'pending',
+              cliente: cliente.nome,
+              serial:  serialNorm,
+            })
+            novos++
+          }
+        } else if (cs === 'cancelado' && onu.status !== 'cancelled') {
           await ProvisionEvent.create({
             projeto_id,
             tipo:    'cancel',
             status:  'pending',
             cliente: cliente.nome,
             serial:  serialNorm,
-            olt_id:  onu.olt_id  ?? null,
-            cto_id:  onu.cto_id  ?? null,
+            olt_id:  onu.olt_id ?? null,
+            cto_id:  onu.cto_id ?? null,
           })
+          await ONU.updateOne({ _id: onu._id }, { $set: { status: 'cancelled' } })
           cancelamentos++
+        } else if (cs === 'suspenso' && onu.status === 'active') {
+          await ONU.updateOne({ _id: onu._id }, { $set: { status: 'offline', last_status: 'suspenso_sgp' } })
+          sincronizados++
+        } else if (cs === 'ativo' && onu.status === 'offline') {
+          await ONU.updateOne({ _id: onu._id }, { $set: { status: 'active', last_status: 'reativado_sgp' } })
+          sincronizados++
         }
       } catch (itemErr) {
         console.error('[SGP] Error processing cliente:', cliente.id, itemErr.message)
@@ -182,7 +195,7 @@ export async function syncSGP() {
     await nocLog(
       projeto_id,
       'SYNC',
-      `Sync concluído: ${novos} novos, ${cancelamentos} cancelamentos, ${erros} erros`,
+      `Sync concluído: ${novos} novos, ${cancelamentos} cancelamentos, ${sincronizados} atualizações, ${erros} erros`,
       erros > 0 ? 'warn' : 'success'
     )
   } catch (err) {
@@ -190,20 +203,19 @@ export async function syncSGP() {
     await nocLog(projeto_id, 'SGP', `Erro na sincronização: ${err.message}`, 'error')
     erros++
   } finally {
-    // Always release the lock
     await SGPConfig.updateOne(
       { projeto_id },
       {
         $set: {
-          is_syncing:     false,
-          last_sync:      new Date(),
-          last_sync_stats: { novos, cancelamentos, erros },
+          is_syncing:      false,
+          last_sync:       new Date(),
+          last_sync_stats: { novos, cancelamentos, sincronizados, erros },
         },
       }
     )
   }
 
-  return { novos, cancelamentos, erros }
+  return { novos, cancelamentos, sincronizados, erros }
 }
 
 // ─── fetchFromSGP ─────────────────────────────────────────────────────────────

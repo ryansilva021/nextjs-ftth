@@ -128,21 +128,37 @@ function Toast({ toast }) {
   )
 }
 
+// ─── SLA helper ────────────────────────────────────────────────────────────────
+
+function getSlaInfo(dataAbertura, slaHoras, status) {
+  if (!slaHoras || !dataAbertura) return null
+  if (status === 'concluida' || status === 'cancelada') return null
+  const prazoMs = new Date(dataAbertura).getTime() + slaHoras * 3_600_000
+  const restMs  = prazoMs - Date.now()
+  if (restMs <= 0) return { label: 'SLA Vencido', color: '#ef4444', bg: '#450a0a33', urgent: true }
+  const h = Math.ceil(restMs / 3_600_000)
+  if (h <= 4)  return { label: `SLA: ${h}h restante${h > 1 ? 's' : ''}`, color: '#f59e0b', bg: '#451a0333' }
+  if (h <= 24) return { label: `SLA: ${h}h restantes`, color: '#a78bfa', bg: '#2e1b4e33' }
+  const d = Math.floor(restMs / 86_400_000)
+  return { label: `SLA: ${d}d ${Math.ceil((restMs % 86_400_000) / 3_600_000)}h`, color: '#94a3b8', bg: '#1e293b55' }
+}
+
 // ─── Header ────────────────────────────────────────────────────────────────────
 
 function OSHeader({ os }) {
-  const sm = { color: getStatusCfg(os.status).darkColor, bg: getStatusCfg(os.status).darkBg }
-  const tm = TIPO_META[os.tipo] ?? TIPO_META.suporte
-  const pm = PRIO_META[os.prioridade] ?? PRIO_META.normal
+  const sm  = { color: getStatusCfg(os.status).darkColor, bg: getStatusCfg(os.status).darkBg, label: getStatusCfg(os.status).label }
+  const tm  = TIPO_META[os.tipo] ?? TIPO_META.suporte
+  const pm  = PRIO_META[os.prioridade] ?? PRIO_META.normal
+  const sla = getSlaInfo(os.data_abertura, os.slaHoras, os.status)
 
   return (
     <div style={{
       backgroundColor: '#050f1f',
       borderBottom: '1px solid var(--border-color)',
-      padding: '16px 24px',
+      padding: '14px 24px',
     }}>
       {/* Top row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
         <a
           href="/admin/os"
           style={{
@@ -150,13 +166,12 @@ function OSHeader({ os }) {
             padding: '4px 10px', borderRadius: 6,
             backgroundColor: '#ffffff0d', border: '1px solid var(--border-color)',
             color: 'var(--text-muted)', fontSize: 11, textDecoration: 'none',
-            fontWeight: 600, letterSpacing: '0.02em',
+            fontWeight: 600, letterSpacing: '0.02em', flexShrink: 0,
           }}
         >
           ← OS
         </a>
 
-        {/* OS ID */}
         <span style={{
           fontFamily: 'monospace', fontSize: 16, fontWeight: 700,
           color: 'var(--foreground)', letterSpacing: '0.04em',
@@ -164,7 +179,6 @@ function OSHeader({ os }) {
           {os.os_id}
         </span>
 
-        {/* Tipo badge */}
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           padding: '3px 10px', borderRadius: 99,
@@ -174,7 +188,6 @@ function OSHeader({ os }) {
           {tm.icon} {tm.label}
         </span>
 
-        {/* Status badge */}
         <span style={{
           display: 'inline-flex', alignItems: 'center',
           padding: '3px 10px', borderRadius: 99,
@@ -184,7 +197,6 @@ function OSHeader({ os }) {
           {sm.label}
         </span>
 
-        {/* Prioridade strip */}
         {(os.prioridade === 'alta' || os.prioridade === 'urgente') && (
           <span style={{
             padding: '3px 10px', borderRadius: 99,
@@ -194,22 +206,30 @@ function OSHeader({ os }) {
             {pm.label}
           </span>
         )}
+
+        {sla && (
+          <span style={{
+            padding: '3px 10px', borderRadius: 99,
+            backgroundColor: sla.bg, border: `1px solid ${sla.color}55`,
+            color: sla.color, fontSize: 11, fontWeight: 700,
+            marginLeft: 'auto',
+            animation: sla.urgent ? 'pulse 1.5s infinite' : 'none',
+          }}>
+            ⏱ {sla.label}
+          </span>
+        )}
       </div>
 
       {/* Client info row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--foreground)' }}>
           {os.cliente_nome ?? '—'}
         </span>
         {os.cliente_contato && (
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {os.cliente_contato}
-          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{os.cliente_contato}</span>
         )}
         {os.cliente_endereco && (
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {os.cliente_endereco}
-          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>📍 {os.cliente_endereco}</span>
         )}
         {os.tecnico_nome && (
           <span style={{
@@ -217,7 +237,7 @@ function OSHeader({ os }) {
             padding: '2px 8px', borderRadius: 4,
             backgroundColor: '#1d4ed818', border: '1px solid #1d4ed844',
           }}>
-            Tec: {os.tecnico_nome}
+            👷 {os.tecnico_nome}
           </span>
         )}
         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
@@ -310,10 +330,12 @@ function StatusStepper({ currentStatus }) {
 // ─── Tab bar ───────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'conexao',   label: 'Conexão',   icon: '🌐' },
-  { id: 'materiais', label: 'Materiais', icon: '📦' },
-  { id: 'fotos',     label: 'Fotos',     icon: '📷' },
-  { id: 'historico', label: 'Histórico', icon: '📋' },
+  { id: 'dados',     label: 'Dados Gerais', icon: '📋' },
+  { id: 'rede',      label: 'Rede',         icon: '🌐' },
+  { id: 'materiais', label: 'Materiais',    icon: '📦' },
+  { id: 'fotos',     label: 'Fotos',        icon: '📷' },
+  { id: 'historico', label: 'Histórico',    icon: '🕐' },
+  { id: 'financeiro',label: 'Financeiro',   icon: '💰' },
 ]
 
 function TabBar({ active, onChange }) {
@@ -479,7 +501,130 @@ function ConnectionStatusDot({ status, osId, onUpdate }) {
   )
 }
 
-// ─── Tab Conexão ───────────────────────────────────────────────────────────────
+// ─── Tab Dados Gerais ──────────────────────────────────────────────────────────
+
+function TabDados({ os }) {
+  const tm = TIPO_META[os.tipo] ?? TIPO_META.suporte
+  const pm = PRIO_META[os.prioridade] ?? PRIO_META.normal
+  const sm = { color: getStatusCfg(os.status).darkColor, bg: getStatusCfg(os.status).darkBg, label: getStatusCfg(os.status).label }
+
+  function Field({ label, value, mono }) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 3,
+        padding: '10px 14px', borderRadius: 8,
+        backgroundColor: '#0d1b2e', border: '1px solid var(--border-color)',
+      }}>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          {label}
+        </span>
+        <span style={{
+          fontSize: 14, fontWeight: 600, color: value ? 'var(--foreground)' : '#475569',
+          fontFamily: mono ? 'monospace' : 'inherit',
+        }}>
+          {value ?? '—'}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '20px 24px', animation: 'slideIn 0.2s ease', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Identificação */}
+      <div style={{ backgroundColor: '#050f1f', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-color)', backgroundColor: '#0a1628' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Identificação
+          </span>
+        </div>
+        <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+          <Field label="OS ID"  value={os.os_id} mono />
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 3,
+            padding: '10px 14px', borderRadius: 8,
+            backgroundColor: '#0d1b2e', border: '1px solid var(--border-color)',
+          }}>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tipo</span>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              color: tm.color, fontSize: 13, fontWeight: 700, marginTop: 2,
+            }}>
+              {tm.icon} {tm.label}
+            </span>
+          </div>
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 3,
+            padding: '10px 14px', borderRadius: 8,
+            backgroundColor: '#0d1b2e', border: '1px solid var(--border-color)',
+          }}>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Status</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: sm.color, fontSize: 13, fontWeight: 700, marginTop: 2 }}>
+              {sm.label}
+            </span>
+          </div>
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 3,
+            padding: '10px 14px', borderRadius: 8,
+            backgroundColor: '#0d1b2e', border: '1px solid var(--border-color)',
+          }}>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Prioridade</span>
+            <span style={{ color: pm.color, fontSize: 13, fontWeight: 700, marginTop: 2 }}>{pm.label}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Cliente */}
+      <div style={{ backgroundColor: '#050f1f', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-color)', backgroundColor: '#0a1628' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Cliente
+          </span>
+        </div>
+        <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+          <Field label="Nome"     value={os.cliente_nome}     />
+          <Field label="Contato"  value={os.cliente_contato}  />
+          <Field label="Endereço" value={os.cliente_endereco} />
+          {os.cliente_contrato && <Field label="Contrato" value={os.cliente_contrato} mono />}
+        </div>
+      </div>
+
+      {/* Datas e responsável */}
+      <div style={{ backgroundColor: '#050f1f', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-color)', backgroundColor: '#0a1628' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Datas & Responsável
+          </span>
+        </div>
+        <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+          <Field label="Data de Abertura"   value={fmtDateTime(os.data_abertura)} />
+          <Field label="Data de Agendamento" value={fmtDate(os.data_agendamento)} />
+          <Field label="Técnico"            value={os.tecnico_nome} />
+          <Field label="Criado por"         value={os.criado_por} />
+          {os.data_conclusao && <Field label="Concluída em" value={fmtDateTime(os.data_conclusao)} />}
+        </div>
+      </div>
+
+      {/* Observações */}
+      {(os.descricao || os.observacao || os.observacoes) && (
+        <div style={{ backgroundColor: '#050f1f', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-color)', backgroundColor: '#0a1628' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Observações
+            </span>
+          </div>
+          <div style={{ padding: 14 }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--foreground)', lineHeight: 1.6 }}>
+              {os.descricao ?? os.observacao ?? os.observacoes}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Tab Rede (ex-Conexão) ─────────────────────────────────────────────────────
 
 function TabConexao({ os, onOsUpdate, userRole }) {
   const { toast, show } = useToast()
@@ -1435,11 +1580,112 @@ function TabHistorico({ os, onOsUpdate, userRole }) {
   )
 }
 
+// ─── Tab Financeiro ─────────────────────────────────────────────────────────────
+
+function TabFinanceiro({ os }) {
+  const materiais   = os.materiais ?? []
+  const comodatos   = materiais.filter(m => m.tipo === 'COMODATO' && m.valor)
+  const totalComodato = comodatos.reduce((acc, m) => acc + (Number(m.valor) * m.quantidade), 0)
+  const totalPecas    = materiais.filter(m => m.tipo === 'OS' && m.valor)
+    .reduce((acc, m) => acc + (Number(m.valor) * m.quantidade), 0)
+
+  const sla = getSlaInfo(os.data_abertura, os.slaHoras, os.status)
+
+  return (
+    <div style={{ padding: '20px 24px', animation: 'slideIn 0.2s ease', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Summary cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+        {[
+          { label: 'Total Comodato', value: `R$ ${totalComodato.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, color: '#f59e0b', show: true },
+          { label: 'Total Peças OS', value: `R$ ${totalPecas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, color: '#60a5fa', show: true },
+          { label: 'SLA Contratado', value: os.slaHoras ? `${os.slaHoras}h` : '—', color: '#a78bfa', show: true },
+        ].map(card => card.show && (
+          <div key={card.label} style={{
+            padding: '14px 16px', borderRadius: 10,
+            backgroundColor: '#050f1f', border: `1px solid ${card.color}33`,
+            display: 'flex', flexDirection: 'column', gap: 6,
+          }}>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {card.label}
+            </span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: card.color }}>
+              {card.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* SLA info */}
+      {sla && (
+        <div style={{
+          padding: '12px 16px', borderRadius: 8,
+          backgroundColor: sla.bg, border: `1px solid ${sla.color}55`,
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span style={{ fontSize: 18 }}>⏱</span>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: sla.color }}>{sla.label}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+              Prazo: {os.slaHoras}h a partir de {fmtDateTime(os.data_abertura)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comodatos table */}
+      {comodatos.length > 0 && (
+        <div style={{ backgroundColor: '#050f1f', border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-color)', backgroundColor: '#0a1628' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Equipamentos em Comodato
+            </span>
+          </div>
+          {comodatos.map((m, i) => (
+            <div key={m._id ?? i} style={{
+              display: 'grid', gridTemplateColumns: '1fr 50px 110px',
+              padding: '10px 14px',
+              borderBottom: i < comodatos.length - 1 ? '1px solid var(--border-color)' : 'none',
+              alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 13, color: 'var(--foreground)', fontWeight: 500 }}>{m.nome}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>×{m.quantidade}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', textAlign: 'right' }}>
+                R$ {(Number(m.valor) * m.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          ))}
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 50px 110px',
+            padding: '10px 14px', backgroundColor: '#f59e0b0a',
+            borderTop: '1px solid #f59e0b33',
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total</span>
+            <span />
+            <span style={{ fontSize: 15, fontWeight: 800, color: '#f59e0b', textAlign: 'right' }}>
+              R$ {totalComodato.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {comodatos.length === 0 && totalPecas === 0 && (
+        <div style={{
+          padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13,
+          border: '2px dashed var(--border-color)', borderRadius: 10,
+        }}>
+          Nenhum item financeiro registrado
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────────────
 
 export default function OSDetailClient({ os: initialOs, userRole, userName }) {
   const [os, setOs] = useState(initialOs)
-  const [activeTab, setActiveTab] = useState('conexao')
+  const [activeTab, setActiveTab] = useState('dados')
 
   // Auto-poll connection status every 8 seconds (mock)
   useEffect(() => {
@@ -1471,7 +1717,10 @@ export default function OSDetailClient({ os: initialOs, userRole, userName }) {
         <TabBar active={activeTab} onChange={setActiveTab} />
 
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          {activeTab === 'conexao' && (
+          {activeTab === 'dados' && (
+            <TabDados os={os} />
+          )}
+          {activeTab === 'rede' && (
             <TabConexao os={os} onOsUpdate={handleOsUpdate} userRole={userRole} />
           )}
           {activeTab === 'materiais' && (
@@ -1482,6 +1731,9 @@ export default function OSDetailClient({ os: initialOs, userRole, userName }) {
           )}
           {activeTab === 'historico' && (
             <TabHistorico os={os} onOsUpdate={handleOsUpdate} userRole={userRole} />
+          )}
+          {activeTab === 'financeiro' && (
+            <TabFinanceiro os={os} />
           )}
         </div>
       </div>

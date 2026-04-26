@@ -33,6 +33,7 @@ export async function syncSGP(projeto_id) {
 
   let novos         = 0
   let cancelamentos = 0
+  let sincronizados = 0
   let erros         = 0
 
   try {
@@ -47,18 +48,22 @@ export async function syncSGP(projeto_id) {
       try {
         const serialNorm = cliente.serial.toUpperCase().trim()
         const onu        = await ONU.findOne({ projeto_id, serial: serialNorm }).lean()
-        const isAtivo    = cliente.status === 'ativo'
+        const cs         = cliente.contrato_status // 'ativo' | 'suspenso' | 'cancelado'
 
-        if (!onu && isAtivo) {
-          await ProvisionEvent.create({
-            projeto_id,
-            tipo:    'install',
-            status:  'pending',
-            cliente: cliente.nome,
-            serial:  serialNorm,
-          })
-          novos++
-        } else if (onu && !isAtivo && onu.status !== 'cancelled') {
+        if (!onu) {
+          // ONU não existe localmente — só importa se contrato está ativo
+          if (cs === 'ativo') {
+            await ProvisionEvent.create({
+              projeto_id,
+              tipo:    'install',
+              status:  'pending',
+              cliente: cliente.nome,
+              serial:  serialNorm,
+            })
+            novos++
+          }
+        } else if (cs === 'cancelado' && onu.status !== 'cancelled') {
+          // Cancelamento: fila de desprovisionamento na OLT + marca como cancelada
           await ProvisionEvent.create({
             projeto_id,
             tipo:    'cancel',
@@ -68,8 +73,19 @@ export async function syncSGP(projeto_id) {
             olt_id:  onu.olt_id ?? null,
             cto_id:  onu.cto_id ?? null,
           })
+          await ONU.updateOne({ _id: onu._id }, { $set: { status: 'cancelled' } })
           cancelamentos++
+        } else if (cs === 'suspenso' && onu.status === 'active') {
+          // Suspensão (inadimplência, bloqueio): marca offline sem desprovisionamento
+          await ONU.updateOne({ _id: onu._id }, { $set: { status: 'offline', last_status: 'suspenso_sgp' } })
+          sincronizados++
+        } else if (cs === 'ativo' && onu.status === 'offline') {
+          // Reativação: contrato voltou a ativo, marca ONU como active novamente
+          await ONU.updateOne({ _id: onu._id }, { $set: { status: 'active', last_status: 'reativado_sgp' } })
+          sincronizados++
         }
+        // cs === 'ativo' + onu.status === 'active'  → sem mudança (já sincronizado)
+        // cs === 'suspenso' + onu.status !== 'active' → já offline ou cancelled, sem mudança
       } catch (itemErr) {
         console.error('[SGP sync] Error processing cliente:', cliente.id, itemErr.message)
         erros++
@@ -79,7 +95,7 @@ export async function syncSGP(projeto_id) {
     await nocLog(
       projeto_id,
       'SYNC',
-      `Sync automático concluído: ${novos} novos, ${cancelamentos} cancelamentos, ${erros} erros`,
+      `Sync automático concluído: ${novos} novos, ${cancelamentos} cancelamentos, ${sincronizados} atualizações, ${erros} erros`,
       erros > 0 ? 'warn' : 'success'
     )
   } catch (err) {
@@ -93,11 +109,11 @@ export async function syncSGP(projeto_id) {
         $set: {
           is_syncing:      false,
           last_sync:       new Date(),
-          last_sync_stats: { novos, cancelamentos, erros },
+          last_sync_stats: { novos, cancelamentos, sincronizados, erros },
         },
       }
     )
   }
 
-  return { novos, cancelamentos, erros }
+  return { novos, cancelamentos, sincronizados, erros }
 }

@@ -53,6 +53,7 @@ const SGPConfigSchema = new Schema(
     last_sync_stats: {
       novos:         { type: Number, default: 0 },
       cancelamentos: { type: Number, default: 0 },
+      sincronizados: { type: Number, default: 0 }, // status updates (reactivations + suspensions)
       erros:         { type: Number, default: 0 },
     },
 
