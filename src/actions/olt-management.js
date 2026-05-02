@@ -15,7 +15,7 @@
 
 import { connectDB }           from '@/lib/db'
 import { requireActiveEmpresa } from '@/lib/tenant-guard'
-import { HuaweiOltAdapter }    from '@/lib/huawei-adapter'
+import { getOltAdapter }       from '@/lib/olt-adapter-factory'
 import { OLT }                 from '@/models/OLT'
 import { nocLog }              from '@/lib/noc-logger'
 
@@ -39,12 +39,7 @@ async function _getOltAndAdapter(projeto_id, oltId) {
     throw new Error(`OLT não encontrada: ${oltId}`)
   }
 
-  const adapter = new HuaweiOltAdapter({
-    ip:       olt.ip       ?? 'mock',
-    ssh_user: olt.ssh_user ?? 'admin',
-    ssh_pass: olt.ssh_pass ?? '',
-    ssh_port: olt.ssh_port ?? 22,
-  })
+  const adapter = getOltAdapter(olt)
 
   return { olt, adapter }
 }
@@ -250,4 +245,49 @@ export async function deleteOnuAction(oltId, slot, port, onuId, servicePortId, c
   )
 
   return { success: result.success }
+}
+
+// ─── testOltConnectionAction ──────────────────────────────────────────────────
+
+/**
+ * Tests the network/protocol connectivity for an OLT and persists the result.
+ *
+ * Works with all supported protocols (SSH, Telnet, REST API) by delegating
+ * to the adapter returned by the factory.
+ *
+ * @param {string} oltId
+ * @returns {Promise<{ ok: boolean, ms: number, message: string, olt_id: string }>}
+ */
+export async function testOltConnectionAction(oltId) {
+  const session    = await requireActiveEmpresa(NOC_ALLOWED)
+  const { projeto_id } = session.user
+
+  await connectDB()
+
+  const olt = await OLT.findOne({ projeto_id, id: oltId }).lean()
+  if (!olt) throw new Error(`OLT não encontrada: ${oltId}`)
+
+  const adapter = getOltAdapter(olt)
+  const result  = await adapter.testConnection()
+
+  // Persist link state regardless of outcome
+  await OLT.updateOne(
+    { projeto_id, id: oltId },
+    {
+      $set: {
+        link_status:    result.ok ? 'online' : 'offline',
+        link_tested_at: new Date(),
+        link_error:     result.ok ? null : (result.message ?? 'Falha na conexão'),
+      },
+    }
+  )
+
+  await nocLog(
+    projeto_id,
+    'OLT',
+    `[OLT] Teste de conexão: ${olt.nome} → ${result.ok ? 'OK' : 'FALHOU'} (${result.ms}ms)`,
+    result.ok ? 'info' : 'warn'
+  )
+
+  return { ...result, olt_id: oltId }
 }

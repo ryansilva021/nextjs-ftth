@@ -56,10 +56,16 @@ async function request(method, path, body = null) {
  * @returns {Promise<{ id: string, name: string, email: string }>}
  */
 export async function createCustomer({ name, email, cpfCnpj, phone } = {}) {
-  // Tenta buscar cliente existente pelo e-mail
   if (email) {
     const existing = await request('GET', `/customers?email=${encodeURIComponent(email)}&limit=1`)
-    if (existing?.data?.length > 0) return existing.data[0]
+    if (existing?.data?.length > 0) {
+      const customer = existing.data[0]
+      // Se temos CNPJ mas o cliente existente não tem, atualiza antes de retornar
+      if (cpfCnpj && !customer.cpfCnpj) {
+        return request('POST', `/customers/${customer.id}`, { cpfCnpj })
+      }
+      return customer
+    }
   }
 
   return request('POST', '/customers', {
@@ -67,7 +73,7 @@ export async function createCustomer({ name, email, cpfCnpj, phone } = {}) {
     email,
     cpfCnpj:  cpfCnpj || undefined,
     mobilePhone: phone || undefined,
-    notificationDisabled: true, // FiberOps gerencia os próprios e-mails
+    notificationDisabled: true,
   })
 }
 

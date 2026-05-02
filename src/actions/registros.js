@@ -16,11 +16,78 @@ import { connectDB } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { hashPassword } from '@/lib/password'
 import { RegistroPendente } from '@/models/RegistroPendente'
+import { CheckoutPendente } from '@/models/CheckoutPendente'
 import { User } from '@/models/User'
 import { Projeto } from '@/models/Projeto'
 import { Empresa } from '@/models/Empresa'
 
 const SUPERADMIN_ONLY = ['superadmin']
+
+// ---------------------------------------------------------------------------
+// iniciarCheckoutPagamento — chamado pelo wizard antes da etapa de pagamento
+// ---------------------------------------------------------------------------
+
+const PLANO_CHECKOUT_MAP = {
+  pro:        'pro',
+  enterprise: 'enterprise',
+}
+
+/**
+ * Cria/atualiza um CheckoutPendente com verified=true e credenciais preferidas.
+ * Usado pelo wizard de cadastro para iniciar o fluxo de pagamento sem e-mail de verificação,
+ * pois o e-mail já foi coletado e validado pelo wizard.
+ *
+ * @param {Object} p
+ * @param {string} p.email
+ * @param {string} p.empresa
+ * @param {string} [p.cnpj]
+ * @param {string} p.plano    — id interno: starter|pro|business|enterprise
+ * @param {string} p.username — credencial desejada
+ * @param {string} p.password — senha em texto plano (será hashada aqui)
+ */
+export async function iniciarCheckoutPagamento({ email, empresa, cnpj, plano, username, password }) {
+  if (!email?.trim())    throw new Error('E-mail é obrigatório')
+  if (!empresa?.trim())  throw new Error('Nome da empresa é obrigatório')
+  if (!plano)            throw new Error('Plano é obrigatório')
+  if (!username?.trim()) throw new Error('Usuário é obrigatório')
+  if (!password)         throw new Error('Senha é obrigatória')
+
+  const planoCheckout = PLANO_CHECKOUT_MAP[plano]
+  if (!planoCheckout) throw new Error(`Plano "${plano}" não requer pagamento`)
+
+  const normalizedUser = username.toLowerCase().trim()
+  if (!/^[a-z0-9_.-]+$/.test(normalizedUser) || normalizedUser.length < 3) {
+    throw new Error('Usuário inválido')
+  }
+
+  await connectDB()
+
+  const preferred_password_hash = await hashPassword(password)
+
+  await CheckoutPendente.findOneAndUpdate(
+    { email: email.trim().toLowerCase() },
+    {
+      email:                   email.trim().toLowerCase(),
+      empresa_nome:            empresa.trim(),
+      cnpj:                    cnpj?.replace(/\D/g, '') || null,
+      plano:                   planoCheckout,
+      code:                    '000000',
+      code_expires_at:         new Date(Date.now() + 60 * 60 * 1000),
+      verified:                true,
+      preferred_username:      normalizedUser,
+      preferred_password_hash,
+      asaas_customer_id:       null,
+      asaas_subscription_id:   null,
+      payment_id:              null,
+      payment_method:          null,
+      onboarding_completed:    false,
+      expires_at:              new Date(Date.now() + 48 * 60 * 60 * 1000),
+    },
+    { upsert: true, new: true }
+  )
+
+  return { ok: true }
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/registro/check?login= → checkLoginDisponivel
@@ -84,7 +151,7 @@ export async function criarRegistro(data) {
     throw new Error('username deve conter apenas letras minúsculas, números, _ . e -')
   }
 
-  const planoValido = ['starter', 'pro', 'enterprise'].includes(plano) ? plano : 'pro'
+  const planoValido = ['free', 'pro', 'enterprise'].includes(plano) ? plano : 'pro'
 
   await connectDB()
 

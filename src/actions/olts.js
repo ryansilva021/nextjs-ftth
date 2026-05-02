@@ -68,7 +68,7 @@ export async function upsertOLT(data) {
   const session = await requireActiveEmpresa(WRITE_ROLES)
   const { role, projeto_id: userProjeto } = session.user
 
-  const { olt_id, projeto_id, lat, lng, nome, modelo, portas_pon, ip, status, ssh_user, ssh_pass, ssh_port, rest_url } = data ?? {}
+  const { olt_id, projeto_id, lat, lng, nome, modelo, portas_pon, ip, status, ssh_user, ssh_pass, ssh_port, rest_url, protocolo, tipo, telnet_port, api_token } = data ?? {}
 
   if (!olt_id?.trim()) throw new Error('olt_id é obrigatório')
   if (!nome?.trim())   throw new Error('nome é obrigatório')
@@ -103,9 +103,14 @@ export async function upsertOLT(data) {
     status:     status          ?? 'ativo',
     ssh_user:   ssh_user?.trim() || 'admin',
     ssh_port:   ssh_port != null ? Number(ssh_port) : 22,
-    rest_url:   rest_url?.trim() || null,
+    rest_url:    rest_url?.trim()    || null,
+    protocolo:   protocolo          ?? 'ssh',
+    tipo:        tipo               ?? 'huawei',
+    telnet_port: telnet_port != null ? Number(telnet_port) : 23,
     // Só sobrescreve a senha se uma nova foi fornecida
-    ...(ssh_pass?.trim() ? { ssh_pass: ssh_pass.trim() } : {}),
+    ...(ssh_pass?.trim()  ? { ssh_pass:  ssh_pass.trim()  } : {}),
+    // Só sobrescreve o token se um novo foi fornecido
+    ...(api_token?.trim() ? { api_token: api_token.trim() } : {}),
   }
 
   const olt = await OLT.findOneAndUpdate(

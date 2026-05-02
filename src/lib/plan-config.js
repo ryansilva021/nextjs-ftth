@@ -74,7 +74,7 @@ export const PLAN_PRICES = {
   trial:      0,
   free:       0,
   starter:    14900,
-  pro:        29900,
+  pro:        54900,
   business:   54900,
   enterprise: 99900,
   carrier:    null,

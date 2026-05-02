@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-const LAB = process.env.NEXT_PUBLIC_NETWORK_LAB_URL ?? 'http://localhost:4000'
+// Proxy server-side — never call the lab directly from the browser
+const LAB = '/api/noc/connections'
 
 const FO = {
   bg: '#EDE3D2', card: '#F7F0E2', espresso: '#1A120D', orange: '#C45A2C',
@@ -67,10 +68,33 @@ export default function OLTIntegrationModal({ onClose, onSaved, editData = null 
   // Auto-fill port when protocol changes
   useEffect(() => {
     if (!isEdit) {
-      set('port', DEFAULT_PORTS[form.protocol] ?? 22)
-      if (form.protocol === 'simulator') set('mode', 'simulated')
+      if (form.protocol === 'simulator') {
+        set('mode', 'simulated')
+      } else {
+        set('port', DEFAULT_PORTS[form.protocol] ?? 22)
+      }
     }
   }, [form.protocol]) // eslint-disable-line
+
+  // Auto-fill simulator SSH defaults when switching to simulated mode
+  useEffect(() => {
+    if (!isEdit && form.mode === 'simulated' && form.protocol === 'ssh') {
+      setForm(f => ({
+        ...f,
+        ip:   f.ip   && f.ip !== 'localhost' ? f.ip : 'localhost',
+        port: f.port && f.port !== 22 ? f.port : 2222,
+        user: f.user || 'admin',
+      }))
+    }
+    if (!isEdit && form.mode === 'simulated' && form.protocol === 'telnet') {
+      setForm(f => ({
+        ...f,
+        ip:   f.ip   && f.ip !== 'localhost' ? f.ip : 'localhost',
+        port: f.port && f.port !== 23 ? f.port : 2222,
+        user: f.user || 'admin',
+      }))
+    }
+  }, [form.mode, form.protocol]) // eslint-disable-line
 
   // Auto-fill model when vendor changes
   useEffect(() => {
@@ -80,22 +104,28 @@ export default function OLTIntegrationModal({ onClose, onSaved, editData = null 
     }
   }, [form.vendor]) // eslint-disable-line
 
+  // Sanitise IP: strip protocol prefix and trailing slashes that users accidentally paste
+  function sanitiseIP(raw) {
+    return raw.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim()
+  }
+
   const handleTest = useCallback(async () => {
     setTesting(true)
     setTestResult(null)
     setError(null)
     try {
+      const payload = { ...form, ip: sanitiseIP(form.ip) }
       // Se editando uma conexão existente, testa via ID
       if (isEdit && editData.id) {
-        const res = await fetch(`${LAB}/api/connections/${editData.id}/test`, { method: 'POST' })
+        const res = await fetch(`${LAB}/${editData.id}/test`, { method: 'POST' })
         const data = await res.json()
         setTestResult(data)
       } else {
         // Testa sem persistir — cria temp e testa
-        const res = await fetch(`${LAB}/api/connections/test-preview`, {
+        const res = await fetch(`${LAB}/test-preview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         })
         const data = await res.json()
         setTestResult(data)
@@ -114,12 +144,13 @@ export default function OLTIntegrationModal({ onClose, onSaved, editData = null 
     setSaving(true)
     setError(null)
     try {
-      const url    = isEdit ? `${LAB}/api/connections/${editData.id}` : `${LAB}/api/connections`
+      const payload = { ...form, ip: sanitiseIP(form.ip) }
+      const url    = isEdit ? `${LAB}/${editData.id}` : LAB
       const method = isEdit ? 'PUT' : 'POST'
       const res    = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
@@ -221,24 +252,37 @@ export default function OLTIntegrationModal({ onClose, onSaved, editData = null 
 
           {/* IP + Porta (oculto para simulator) */}
           {needsIP && (
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
-              <Field label="Endereço IP" required>
-                <input
-                  style={inputStyle}
-                  placeholder="192.168.1.10"
-                  value={form.ip}
-                  onChange={e => set('ip', e.target.value)}
-                />
-              </Field>
-              <Field label="Porta">
-                <input
-                  style={inputStyle}
-                  type="number"
-                  value={form.port}
-                  onChange={e => set('port', parseInt(e.target.value) || DEFAULT_PORTS[form.protocol])}
-                />
-              </Field>
-            </div>
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                <Field
+                  label="Endereço IP"
+                  required
+                  hint={form.mode === 'simulated' ? 'Simulador local: use localhost' : undefined}
+                >
+                  <input
+                    style={inputStyle}
+                    placeholder={form.mode === 'simulated' ? 'localhost' : '192.168.1.10'}
+                    value={form.ip}
+                    onChange={e => set('ip', sanitiseIP(e.target.value))}
+                  />
+                </Field>
+                <Field label="Porta" hint={form.mode === 'simulated' ? 'SSH sim: 2222' : undefined}>
+                  <input
+                    style={inputStyle}
+                    type="number"
+                    value={form.port}
+                    onChange={e => set('port', parseInt(e.target.value) || DEFAULT_PORTS[form.protocol])}
+                  />
+                </Field>
+              </div>
+              {form.mode === 'simulated' && (form.protocol === 'ssh' || form.protocol === 'telnet') && (
+                <div style={{ padding: '8px 12px', borderRadius: 7, backgroundColor: '#eff6ff', border: '1px solid #3b82f633', marginBottom: 14, marginTop: -6 }}>
+                  <p style={{ fontSize: 11, color: '#1e40af', margin: 0 }}>
+                    <strong>Simulador SSH:</strong> IP = <code>localhost</code>, Porta = <code>2222</code>, Usuário/Senha = <code>admin</code> / <code>admin</code>
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           {/* Credenciais (oculto para SNMP e Simulator) */}

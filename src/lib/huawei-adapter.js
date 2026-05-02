@@ -38,13 +38,14 @@ async function acquireLock(ip) {
  */
 export class HuaweiOltAdapter {
   /**
-   * @param {{ ip: string, ssh_user: string, ssh_pass: string, ssh_port?: number }} olt
+   * @param {{ ip: string, ssh_user: string, ssh_pass: string, ssh_port?: number, vendor?: string }} olt
    */
   constructor(olt) {
     this.olt      = olt
     this.client   = null
     this.stream   = null
     this.isMock   = olt.ip === 'mock'
+    this.vendor   = olt.vendor ?? 'huawei'
     this._release = null
   }
 
@@ -60,20 +61,22 @@ export class HuaweiOltAdapter {
     this._release = await acquireLock(this.olt.ip)
 
     // Lazy dynamic import — keeps ssh2 out of the webpack bundle.
-    // Falls back to mock if ssh2 is not installed.
     let Client
     try {
       const ssh2 = await import('ssh2')
       Client = ssh2.Client
     } catch {
-      console.warn('[HuaweiAdapter] ssh2 not available, switching to mock mode')
-      this.isMock = true
       if (this._release) { this._release(); this._release = null }
-      return
+      throw new Error('Módulo ssh2 não instalado. Execute: npm install ssh2')
     }
 
     await new Promise((resolve, reject) => {
       this.client = new Client()
+
+      this.client.on('keyboard-interactive', (_name, _instructions, _lang, prompts, finish) => {
+        // Respond to each prompt (typically "Password:") with the configured password
+        finish(prompts.map(() => this.olt.ssh_pass ?? ''))
+      })
 
       this.client.on('ready', () => {
         this.client.shell((err, stream) => {
@@ -83,19 +86,34 @@ export class HuaweiOltAdapter {
           stream.on('data', (chunk) => {
             this._buffer += chunk.toString()
           })
-          // Wait for initial prompt
-          setTimeout(resolve, 1500)
+
+          // After initial banner loads, check for simulator OLT selection menu
+          // and auto-select OLT 1 so the adapter behaves like a direct real OLT connection.
+          setTimeout(() => {
+            if (this._buffer.includes('Enter OLT number')) {
+              // Simulator menu detected — select the first OLT automatically
+              stream.write('1\n')
+              this._buffer = ''
+              setTimeout(resolve, 1500)
+            } else {
+              resolve()
+            }
+          }, 1500)
         })
       })
 
       this.client.on('error', reject)
 
       this.client.connect({
-        host:         this.olt.ip,
-        port:         this.olt.ssh_port ?? 22,
-        username:     this.olt.ssh_user,
-        password:     this.olt.ssh_pass,
-        readyTimeout: 8_000,
+        host:            this.olt.ip,
+        port:            this.olt.ssh_port ?? 22,
+        username:        this.olt.ssh_user,
+        password:        this.olt.ssh_pass,
+        tryKeyboard:     true,   // required for simulators using keyboard-interactive auth
+        readyTimeout:    8_000,
+        algorithms: {
+          serverHostKey: ['ssh-ed25519', 'ecdsa-sha2-nistp256', 'ssh-rsa'],
+        },
       })
     })
   }
@@ -139,6 +157,41 @@ export class HuaweiOltAdapter {
     await new Promise((res) => setTimeout(res, waitMs))
 
     return this._buffer
+  }
+
+  /**
+   * Tests the SSH connectivity to the OLT by opening a session, sending
+   * `display version`, and immediately disconnecting.
+   *
+   * Never throws — always returns a result object.
+   *
+   * @returns {Promise<{ ok: boolean, ms: number, message: string }>}
+   */
+  async testConnection() {
+    if (this.isMock) {
+      return { ok: true, ms: 1, message: 'Mock OLT (simulado)' }
+    }
+
+    const t0 = Date.now()
+    const timeout = 15_000
+
+    try {
+      await Promise.race([
+        (async () => {
+          await this.connect()
+          await this.sendCmd('display version', 1000)
+          await this.disconnect()
+        })(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout após 15s')), timeout)
+        ),
+      ])
+
+      return { ok: true, ms: Date.now() - t0, message: 'Conexão SSH estabelecida com sucesso' }
+    } catch (err) {
+      try { await this.disconnect() } catch {}
+      return { ok: false, ms: Date.now() - t0, message: err.message ?? 'Falha na conexão SSH' }
+    }
   }
 
   /**
@@ -254,13 +307,7 @@ export class HuaweiOltAdapter {
    * @returns {Promise<Array<{ serial: string, pon: string, pon_port: number, mock?: boolean }>>}
    */
   async getUnconfiguredOnus() {
-    if (this.isMock) {
-      return [
-        { serial: 'HWTCE1234567A', pon: '0/1/0', pon_port: 0, board: '0/1', slot: 0, mock: true },
-        { serial: 'ZTEG9ABCDEF01', pon: '0/1/1', pon_port: 1, board: '0/1', slot: 0, mock: true },
-        { serial: 'HWTC8A9B0C1D2', pon: '0/2/0', pon_port: 0, board: '0/2', slot: 0, mock: true },
-      ]
-    }
+    if (this.isMock) return []
 
     try {
       await this.sendCmd('enable', 500)
@@ -357,20 +404,16 @@ export class HuaweiOltAdapter {
 
   /**
    * Returns all ONUs provisioned on a given GPON port.
-   * Real: runs `display ont info <slot> <port> all` and parses each ONU row.
+   * Dispatches to ZTE or Huawei implementation based on this.vendor.
    *
    * @param {number} slot
    * @param {number} port
    * @returns {Promise<Array<{ onuId: number, serial: string, cliente: string, status: string, rx: number|null, tx: number|null }>>}
    */
   async getOnus(slot, port) {
-    if (this.isMock) {
-      return [
-        { onuId: 0, serial: 'HWTCE1234567A', cliente: 'João Silva',   status: 'online',  rx: -18.5, tx: 2.3  },
-        { onuId: 1, serial: 'HWTCE2345678B', cliente: 'Maria Santos', status: 'online',  rx: -22.1, tx: 2.1  },
-        { onuId: 2, serial: 'ZTEG9ABCDEF01', cliente: 'Pedro Alves',  status: 'offline', rx: null,  tx: null },
-      ]
-    }
+    if (this.isMock) return []
+
+    if (this.vendor === 'zte') return this.getZTEOnus(slot, port)
 
     try {
       const output = await this.sendCmd(`display ont info ${slot} ${port} all`, 2000)
@@ -395,6 +438,80 @@ export class HuaweiOltAdapter {
     } catch (err) {
       console.error('[HuaweiAdapter] getOnus error:', err.message)
       return []
+    }
+  }
+
+  /**
+   * ZTE: Returns all ONUs on a given GPON port.
+   * Runs `show gpon onu state gpon_onu-<slot>/<port>` and parses the tabular output.
+   *
+   * Expected ZTE output columns: ONU-ID  SN  Admin-State  Oper-State  Rx-Power  Tx-Power
+   *
+   * @param {number} slot
+   * @param {number} port
+   * @returns {Promise<Array<{ onuId: number, serial: string, status: string, rx: number|null, tx: number|null }>>}
+   */
+  async getZTEOnus(slot, port) {
+    try {
+      const output = await this.sendCmd(`show gpon onu state gpon_onu-${slot}/${port}`, 2000)
+      const results = []
+
+      for (const line of output.split('\n')) {
+        // ZTE format: "  1   ZTEG1234ABCD  enable  online  -18.50  2.30"
+        const m = line.match(/^\s*(\d+)\s+([A-Z0-9]{8,16})\s+\S+\s+(\S+)\s+(-?\d+\.\d+|-+)\s+(-?\d+\.\d+|-+)/i)
+        if (!m) continue
+
+        const onuId  = parseInt(m[1], 10)
+        const serial = m[2].toUpperCase()
+        const status = m[3].toLowerCase()
+        const rx     = m[4] === '----' || m[4] === '-' ? null : parseFloat(m[4])
+        const tx     = m[5] === '----' || m[5] === '-' ? null : parseFloat(m[5])
+
+        results.push({ onuId, serial, status, rx, tx })
+      }
+
+      return results
+    } catch (err) {
+      console.error('[HuaweiAdapter][ZTE] getZTEOnus error:', err.message)
+      return []
+    }
+  }
+
+  /**
+   * ZTE: Returns detailed info for a single ONU.
+   * Runs `show gpon onu detail-info gpon_onu-<slot>/<port>:<onuId>`.
+   *
+   * @param {number} slot
+   * @param {number} port
+   * @param {number} onuId
+   * @returns {Promise<{ onuId: number, serial: string, status: string, rx: number|null, tx: number|null, mac: string|null, distance: string|null }>}
+   */
+  async getZTEOnuDetail(slot, port, onuId) {
+    try {
+      const output = await this.sendCmd(
+        `show gpon onu detail-info gpon_onu-${slot}/${port}:${onuId}`,
+        2000
+      )
+
+      const serialMatch   = output.match(/SN\s*[:\s]+([A-Z0-9]{8,16})/i)
+      const statusMatch   = output.match(/Oper[- ]?[Ss]tate\s*[:\s]+(\S+)/i)
+      const rxMatch       = output.match(/Rx\s+[Pp]ower\s*[:\s]+(-?\d+\.\d+)/i)
+      const txMatch       = output.match(/Tx\s+[Pp]ower\s*[:\s]+(-?\d+\.\d+)/i)
+      const macMatch      = output.match(/MAC\s*[:\s]+([\da-fA-F:]{17})/i)
+      const distanceMatch = output.match(/Distance\s*[:\s]+([\d.]+\s*(?:km|m))/i)
+
+      return {
+        onuId,
+        serial:   serialMatch   ? serialMatch[1].toUpperCase()   : 'unknown',
+        status:   statusMatch   ? statusMatch[1].toLowerCase()   : 'unknown',
+        rx:       rxMatch       ? parseFloat(rxMatch[1])         : null,
+        tx:       txMatch       ? parseFloat(txMatch[1])         : null,
+        mac:      macMatch      ? macMatch[1].toUpperCase()      : null,
+        distance: distanceMatch ? distanceMatch[1].trim()        : null,
+      }
+    } catch (err) {
+      console.error('[HuaweiAdapter][ZTE] getZTEOnuDetail error:', err.message)
+      return { onuId, serial: 'unknown', status: 'error', rx: null, tx: null, mac: null, distance: null, error: err.message }
     }
   }
 

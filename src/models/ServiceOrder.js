@@ -46,14 +46,6 @@ const ServiceOrderSchema = new Schema(
     cliente_nome:     { type: String, trim: true, default: null },
     cliente_contato:  { type: String, trim: true, default: null },
     cliente_endereco: { type: String, trim: true, default: null },
-    cliente_contrato: { type: String, trim: true, default: null }, // número do contrato no SGP
-
-    // Status do contrato SGP (sincronizado via SGP sync)
-    contrato_status: {
-      type: String,
-      enum: ['ativo', 'suspenso', 'cancelado', null],
-      default: null,
-    },
 
     // Equipe responsável
     tecnico_nome:   { type: String, trim: true, default: null },

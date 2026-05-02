@@ -16,8 +16,44 @@ export class POLTAdapter {
    * @param {number} [timeoutMs=10000]
    */
   constructor(baseUrl, timeoutMs = 10_000) {
-    this.endpoint  = `${baseUrl.replace(/\/$/, '')}/polt/polt_actions`
+    this.baseUrl   = baseUrl.replace(/\/$/, '')
+    this.endpoint  = `${this.baseUrl}/polt/polt_actions`
     this.timeoutMs = timeoutMs
+  }
+
+  /**
+   * Tests REST connectivity by issuing GET <baseUrl>/health with an 8s timeout.
+   *
+   * Never throws — always returns a result object.
+   *
+   * @returns {Promise<{ ok: boolean, ms: number, message: string }>}
+   */
+  async testConnection() {
+    const t0 = Date.now()
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 8_000)
+
+    try {
+      const res = await fetch(`${this.baseUrl}/health`, {
+        method: 'GET',
+        signal: controller.signal,
+      })
+
+      const ms = Date.now() - t0
+
+      if (res.ok) {
+        return { ok: true, ms, message: `REST OK (HTTP ${res.status})` }
+      }
+      return { ok: false, ms, message: `REST respondeu HTTP ${res.status}` }
+    } catch (err) {
+      const ms = Date.now() - t0
+      if (err.name === 'AbortError') {
+        return { ok: false, ms, message: 'Timeout após 8s' }
+      }
+      return { ok: false, ms, message: err.message ?? 'Erro de rede' }
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   /**

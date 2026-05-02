@@ -8,7 +8,6 @@ import { Poste } from '@/models/Poste'
 import { LogEvento } from '@/models/LogEvento'
 import { ONU } from '@/models/ONU'
 import { ProvisionEvent } from '@/models/ProvisionEvent'
-import { SGPConfig } from '@/models/SGPConfig'
 import { requireActiveEmpresa } from '@/lib/tenant-guard'
 
 const NOC_ALLOWED = ['superadmin', 'admin', 'noc']
@@ -20,7 +19,7 @@ export async function getNOCStats(projetoId) {
 
   await connectDB()
 
-  const [olts, totalCDOs, totalCTOs, totalPostes, eventos, onuDocs, pendingCount, sgp, ctos] = await Promise.all([
+  const [olts, totalCDOs, totalCTOs, totalPostes, eventos, onuDocs, pendingCount, ctos] = await Promise.all([
     OLT.find({ projeto_id: pid }, 'id nome ip modelo status capacidade').lean(),
     CaixaEmendaCDO.countDocuments({ projeto_id: pid }),
     CTO.countDocuments({ projeto_id: pid }),
@@ -28,7 +27,6 @@ export async function getNOCStats(projetoId) {
     LogEvento.find({ projeto_id: pid }).sort({ ts: -1 }).limit(50).lean(),
     ONU.find({ projeto_id: pid, status: { $ne: 'cancelled' } }).sort({ createdAt: -1 }).limit(200).lean(),
     ProvisionEvent.countDocuments({ projeto_id: pid, status: { $in: ['pending', 'processing'] } }),
-    SGPConfig.findOne({ projeto_id: pid }).lean(),
     CTO.find({ projeto_id: pid }, 'cto_id nome cdo_id diagrama').limit(100).lean(),
   ])
 
@@ -47,16 +45,7 @@ export async function getNOCStats(projetoId) {
     provisioning: onuDocs.filter((o) => o.status === 'provisioning').length,
   }
 
-  const sgpStatus = sgp
-    ? {
-        isConfigured:  !!(sgp.host && sgp.username && sgp.password_enc),
-        host:          sgp.host      ?? null,
-        username:      sgp.username  ?? null,
-        lastSync:      sgp.last_sync ? sgp.last_sync.toISOString() : null,
-        lastSyncStats: sgp.last_sync_stats ?? null,
-        isSyncing:     sgp.is_syncing ?? false,
-      }
-    : { isConfigured: false, host: null, username: null, lastSync: null, lastSyncStats: null, isSyncing: false }
+
 
   const ctosWithOccupancy = ctos.map((cto) => {
     const splitters  = cto.diagrama?.splitters ?? []
@@ -121,7 +110,6 @@ export async function getNOCStats(projetoId) {
     })),
     onuStats,
     pendingEvents: pendingCount,
-    sgpStatus,
     ctos: ctosWithOccupancy,
     onus,
     alertas,

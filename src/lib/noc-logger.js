@@ -12,7 +12,7 @@ import { NOCLog } from '@/models/NOCLog'
  * Safe to call from any server-side context.
  *
  * @param {string|null} projeto_id
- * @param {string} tag - Source tag (e.g. 'SGP', 'SYNC', 'OLT', 'CTO', 'QUEUE')
+ * @param {string} tag - Source tag (e.g. 'OLT', 'CTO', 'QUEUE', 'SYNC')
  * @param {string} message
  * @param {'info'|'warn'|'error'|'success'} nivel
  * @returns {Promise<void>}

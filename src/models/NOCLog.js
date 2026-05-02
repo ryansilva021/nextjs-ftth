@@ -23,7 +23,7 @@ const NOCLogSchema = new Schema(
       default: () => new Date(),
     },
 
-    // Source tag for grouping (e.g. 'SGP', 'SYNC', 'OLT', 'CTO', 'QUEUE')
+    // Source tag for grouping (e.g. 'OLT', 'CTO', 'QUEUE', 'SYNC')
     tag: {
       type:    String,
       trim:    true,

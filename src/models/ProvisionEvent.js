@@ -31,7 +31,6 @@ const ProvisionEventSchema = new Schema(
       default: 'pending',
     },
 
-    // Client name/identifier from SGP
     cliente: {
       type:    String,
       trim:    true,

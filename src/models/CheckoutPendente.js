@@ -38,7 +38,7 @@ const CheckoutPendenteSchema = new Schema(
     plano: {
       type:     String,
       required: true,
-      enum:     ['basico', 'pro', 'enterprise'],
+      enum:     ['free', 'starter', 'basico', 'pro', 'business', 'enterprise', 'carrier'],
     },
 
     // Código de verificação de 6 dígitos
@@ -86,6 +86,10 @@ const CheckoutPendenteSchema = new Schema(
       type:    Boolean,
       default: false,
     },
+
+    // Credenciais preferidas (definidas pelo wizard de cadastro)
+    preferred_username:      { type: String, default: null },
+    preferred_password_hash: { type: String, default: null },
 
     // TTL: 48h após criação o documento é removido automaticamente pelo MongoDB
     expires_at: {

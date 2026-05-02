@@ -75,7 +75,6 @@ const ONUSchema = new Schema(
       default: null,
     },
 
-    // Client name or identifier (synced from SGP)
     cliente: {
       type:    String,
       trim:    true,

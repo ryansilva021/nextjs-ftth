@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import OLTIntegrationModal from '@/components/noc/OLTIntegrationModal'
 
-const LAB = process.env.NEXT_PUBLIC_NETWORK_LAB_URL ?? 'http://localhost:4000'
+// Proxy server-side — never call the lab directly from the browser
+const LAB = '/api/noc/connections'
 
 const FO = {
   bg: '#EDE3D2', card: '#F7F0E2', espresso: '#1A120D', orange: '#C45A2C',
@@ -49,9 +50,9 @@ function ConnectionCard({ conn, onAction, onEdit }) {
     setLoading(action)
     try {
       if (action === 'remove') {
-        await fetch(`${LAB}/api/connections/${conn.id}`, { method: 'DELETE' })
+        await fetch(`${LAB}/${conn.id}`, { method: 'DELETE' })
       } else {
-        await fetch(`${LAB}/api/connections/${conn.id}/${action}`, { method: 'POST' })
+        await fetch(`${LAB}/${conn.id}/${action}`, { method: 'POST' })
       }
       onAction?.(conn.id, action)
     } catch (e) {
@@ -181,7 +182,7 @@ export default function OLTConnectionsView() {
 
   const fetchConnections = useCallback(async () => {
     try {
-      const res  = await fetch(`${LAB}/api/connections`, { cache: 'no-store' })
+      const res  = await fetch(LAB, { cache: 'no-store' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setConnections(Array.isArray(data) ? data : (data.data ?? []))
@@ -262,7 +263,7 @@ export default function OLTConnectionsView() {
       {!labOnline && (
         <div style={{ padding: '12px 16px', borderRadius: 8, backgroundColor: '#fee2e2', border: '1px solid #dc262633', marginBottom: 20 }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: '#991b1b', margin: 0 }}>
-            ⚠ Network Lab inacessível em {LAB}
+            ⚠ Network Lab inacessível
           </p>
           <p style={{ fontSize: 12, color: '#991b1b', margin: '4px 0 0' }}>
             Inicie o lab com <code style={{ backgroundColor: '#fca5a5', padding: '1px 5px', borderRadius: 4 }}>npm start</code> no diretório fiberops-network-lab.

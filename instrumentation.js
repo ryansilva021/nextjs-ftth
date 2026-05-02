@@ -1,7 +1,7 @@
 /**
  * instrumentation.js
  * Next.js startup hook (Next.js 15+).
- * Registers cron jobs for SGP sync, ONU provisioning queue, and Auto-Find.
+ * Registers cron jobs for ONU provisioning queue and Auto-Find.
  *
  * Each job has an overlap guard: if the previous execution is still running,
  * the new tick is skipped to prevent event-loop saturation and node-cron
@@ -13,42 +13,10 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
 
-  const [{ default: cron }, { connectDB }, { SGPConfig }] = await Promise.all([
+  const [{ default: cron }, { connectDB }] = await Promise.all([
     import('node-cron'),
     import('@/lib/db'),
-    import('@/models/SGPConfig'),
   ])
-
-  // ── SGP auto-sync every 5 minutes ──────────────────────────────────────────
-  let syncRunning = false
-  cron.schedule('*/5 * * * *', async () => {
-    if (syncRunning) return
-    syncRunning = true
-    try {
-      await connectDB()
-
-      const configs = await SGPConfig
-        .find({ is_active: true, is_syncing: false })
-        .select('projeto_id')
-        .lean()
-
-      if (configs.length === 0) return
-
-      const { syncSGP: _syncSGP } = await import('@/lib/sgp-sync')
-
-      for (const cfg of configs) {
-        try {
-          await _syncSGP(cfg.projeto_id)
-        } catch (err) {
-          console.error(`[cron] sgp-sync failed for ${cfg.projeto_id}:`, err.message)
-        }
-      }
-    } catch (err) {
-      console.error('[cron] sgp auto-sync error:', err.message)
-    } finally {
-      syncRunning = false
-    }
-  })
 
   // ── Provision queue drain every 5 minutes ──────────────────────────────────
   let provisionRunning = false
@@ -93,7 +61,7 @@ export async function register() {
 
       const { OLT } = await import('@/models/OLT')
       const { ONU } = await import('@/models/ONU')
-      const { HuaweiOltAdapter } = await import('@/lib/huawei-adapter')
+      const { getOltAdapter } = await import('@/lib/olt-adapter-factory')
       const { nocLog } = await import('@/lib/noc-logger')
 
       const projects = await OLT.distinct('projeto_id', { status: { $ne: 'inativo' } })
@@ -102,13 +70,13 @@ export async function register() {
         const olts = await OLT.find({ projeto_id: pid, status: { $ne: 'inativo' } }).lean()
 
         for (const olt of olts) {
-          const adapter = new HuaweiOltAdapter({
-            ip:       olt.ip ?? 'mock',
-            ssh_user: olt.ssh_user ?? 'admin',
-            ssh_pass: olt.ssh_pass ?? '',
-          })
+          if (!olt.ip) {
+            console.warn(`[AutoFind] OLT ${olt.nome ?? olt.id} sem IP — ignorada`)
+            continue
+          }
+          const adapter = getOltAdapter(olt)
           try {
-            // Wrap SSH work in a timeout so a slow OLT can't block the job
+            // Wrap adapter work in a timeout so a slow OLT can't block the job
             await Promise.race([
               (async () => {
                 await adapter.connect()
@@ -137,6 +105,21 @@ export async function register() {
             if (err.message !== 'SSH timeout') {
               console.error(`[cron] auto-find OLT ${olt.ip}:`, err.message)
             }
+            // Persist failure state so the UI can surface it
+            try {
+              await OLT.updateOne(
+                { projeto_id: olt.projeto_id, id: olt.id },
+                {
+                  $set: {
+                    link_status:    'offline',
+                    link_error:     err.message,
+                    link_tested_at: new Date(),
+                  },
+                }
+              )
+            } catch (writeErr) {
+              console.error(`[cron] auto-find OLT state write error ${olt.ip}:`, writeErr.message)
+            }
           }
         }
       }
@@ -147,5 +130,5 @@ export async function register() {
     }
   })
 
-  console.log('[NOC] Cron jobs registered (SGP sync + provision queue every 5 min, Auto-Find every 1 min)')
+  console.log('[NOC] Cron jobs registered (provision queue every 5 min, Auto-Find every 1 min)')
 }

@@ -90,10 +90,13 @@ export async function criarContaParaCheckout(checkout) {
     trial_expira_em:       null,
   })
 
-  // Gerar credenciais do admin
-  const username      = toUsername(checkout.empresa_nome)
-  const temp_password = genTempPassword()
-  const password_hash = await hashPassword(temp_password)
+  // Usa credenciais preferidas (wizard) ou gera automaticamente
+  const usePreferred  = !!(checkout.preferred_username && checkout.preferred_password_hash)
+  const username      = usePreferred ? checkout.preferred_username : toUsername(checkout.empresa_nome)
+  const temp_password = usePreferred ? null : genTempPassword()
+  const password_hash = usePreferred
+    ? checkout.preferred_password_hash
+    : await hashPassword(temp_password)
 
   await User.create({
     username,
@@ -103,7 +106,7 @@ export async function criarContaParaCheckout(checkout) {
     empresa_id:           String(empresa._id),
     email:                checkout.email,
     nome_completo:        checkout.empresa_nome,
-    must_change_password: true,
+    must_change_password: !usePreferred,
     is_active:            true,
   })
 
@@ -111,16 +114,18 @@ export async function criarContaParaCheckout(checkout) {
   checkout.onboarding_completed = true
   await checkout.save()
 
-  // Enviar e-mail de boas-vindas (não-bloqueante)
-  import('@/lib/email').then(({ sendWelcomeEmail }) => {
-    sendWelcomeEmail({
-      to:           checkout.email,
-      empresa_nome: checkout.empresa_nome,
-      username,
-      temp_password,
-      plano:        checkout.plano,
-    }).catch(e => console.warn('[onboarding] Falha ao enviar e-mail de boas-vindas:', e?.message))
-  }).catch(() => {})
+  // Enviar e-mail de boas-vindas apenas quando usamos credenciais auto-geradas
+  if (!usePreferred) {
+    import('@/lib/email').then(({ sendWelcomeEmail }) => {
+      sendWelcomeEmail({
+        to:           checkout.email,
+        empresa_nome: checkout.empresa_nome,
+        username,
+        temp_password,
+        plano:        checkout.plano,
+      }).catch(e => console.warn('[onboarding] Falha ao enviar e-mail de boas-vindas:', e?.message))
+    }).catch(() => {})
+  }
 
   console.log(`[onboarding] Nova conta criada: ${checkout.empresa_nome} / ${username}`)
   return empresa

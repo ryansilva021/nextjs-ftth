@@ -176,7 +176,6 @@ const EmpresaSchema = new Schema(
         { step: 'primeira_olt',     completed: false, completed_at: null },
         { step: 'primeira_cto',     completed: false, completed_at: null },
         { step: 'primeiro_tecnico', completed: false, completed_at: null },
-        { step: 'integracao_sgp',   completed: false, completed_at: null },
       ],
     },
 

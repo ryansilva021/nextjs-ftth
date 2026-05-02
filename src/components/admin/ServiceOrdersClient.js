@@ -1814,7 +1814,7 @@ function OSDrawer({ os: initialOs, olts, usuarios = [], userRole, userId, onClos
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-// SGP-style status tab definitions (order matters for tab row)
+// Status tab definitions (order matters for tab row)
 const STATUS_TABS = [
   { key: '', label: 'Todos', color: '#7A5C46' },
   { key: 'aberta',       label: 'Aberta',       color: '#2563eb' },

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { upsertOLT, deleteOLT } from '@/actions/olts'
+import { testOltConnectionAction } from '@/actions/olt-management'
 
 const LocationPicker = dynamic(() => import('@/components/map/LocationPicker'), {
   ssr: false,
@@ -66,6 +67,11 @@ const FORM_VAZIO = {
   capacidade: 16, status: 'ativo', lat: '', lng: '',
   ssh_user: 'admin', ssh_pass: '', ssh_port: 22,
   rest_url: '',
+  // NEW:
+  protocolo: 'ssh',
+  tipo: 'huawei',
+  telnet_port: 23,
+  api_token: '',
 }
 
 export default function OLTsClient({ oltsIniciais, projetoId, userRole, busca = '', limiteAtingido = false }) {
@@ -83,6 +89,33 @@ export default function OLTsClient({ oltsIniciais, projetoId, userRole, busca = 
   const [sucesso, setSucesso]         = useState(null)
   const [mostrarMapa, setMostrarMapa] = useState(false)
   const [gpsCarregando, setGpsCarregando] = useState(false)
+
+  const [testing,    setTesting]    = useState(null)   // oltId being tested, or null
+  const [testResult, setTestResult] = useState({})     // { [oltId]: { ok, ms, message } }
+  const [linkOverride, setLinkOverride] = useState({}) // { [oltId]: 'online'|'offline' }
+  const pollRef = useRef(null)
+
+  // Polling de link_status a cada 30s (lê MongoDB, não abre SSH)
+  useEffect(() => {
+    async function fetchLinkStatus() {
+      try {
+        const res = await fetch('/api/olts/link-status', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        setLinkOverride((prev) => {
+          const next = { ...prev }
+          for (const [id, s] of Object.entries(data)) {
+            // só atualiza se não há resultado manual mais recente
+            if (!prev[id]) next[id] = s.link_status
+          }
+          return next
+        })
+      } catch {}
+    }
+    fetchLinkStatus()
+    pollRef.current = setInterval(fetchLinkStatus, 30_000)
+    return () => clearInterval(pollRef.current)
+  }, [])
 
   function abrirNovo() {
     setForm(FORM_VAZIO)
@@ -107,6 +140,10 @@ export default function OLTsClient({ oltsIniciais, projetoId, userRole, busca = 
       ssh_pass:   '',  // nunca pré-preenche senha
       ssh_port:   olt.ssh_port ?? 22,
       rest_url:   olt.rest_url ?? '',
+      protocolo:   olt.protocolo  ?? 'ssh',
+      tipo:        olt.tipo       ?? 'huawei',
+      telnet_port: olt.telnet_port ?? 23,
+      api_token:   '',  // never pre-fill token
     })
     setOltEditando(olt)
     setErro(null)
@@ -136,7 +173,33 @@ export default function OLTsClient({ oltsIniciais, projetoId, userRole, busca = 
 
   function handleFormChange(e) {
     const { name, value } = e.target
-    setForm((prev) => ({ ...prev, [name]: value }))
+    setForm((prev) => {
+      const next = { ...prev, [name]: value }
+      // When switching to simulator, pre-fill SSH defaults for the local lab
+      if (name === 'tipo' && value === 'simulator') {
+        if (!next.ip) next.ip = 'localhost'
+        if (!next.ssh_user || next.ssh_user === 'admin') next.ssh_user = 'admin'
+        if (next.ssh_port === 22 || !next.ssh_port) next.ssh_port = 2222
+        next.protocolo = 'ssh'
+      }
+      return next
+    })
+  }
+
+  async function handleTest(olt) {
+    const id = olt.id ?? olt.olt_id
+    setTesting(id)
+    setTestResult((prev) => ({ ...prev, [id]: null }))
+    try {
+      const res = await testOltConnectionAction(id)
+      setTestResult((prev) => ({ ...prev, [id]: res }))
+      setLinkOverride((prev) => ({ ...prev, [id]: res.ok ? 'online' : 'offline' }))
+    } catch (e) {
+      setTestResult((prev) => ({ ...prev, [id]: { ok: false, ms: 0, message: e.message } }))
+      setLinkOverride((prev) => ({ ...prev, [id]: 'offline' }))
+    } finally {
+      setTesting(null)
+    }
   }
 
   async function handleSalvar() {
@@ -159,6 +222,10 @@ export default function OLTsClient({ oltsIniciais, projetoId, userRole, busca = 
         ssh_pass:   form.ssh_pass.trim() || null,
         ssh_port:   parseInt(form.ssh_port) || 22,
         rest_url:   form.rest_url.trim() || null,
+        protocolo:   form.protocolo,
+        tipo:        form.tipo,
+        telnet_port: parseInt(form.telnet_port) || 23,
+        api_token:   form.api_token?.trim() || null,
       })
       const normalizado = { ...res, id: res.id ?? form.olt_id.trim() }
       if (oltEditando) {
@@ -231,7 +298,7 @@ export default function OLTsClient({ oltsIniciais, projetoId, userRole, busca = 
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--card-bg)' }}>
-                {['ID', 'Nome', 'Modelo', 'IP Gerência', 'Portas PON', 'Status', 'Mapa', 'Ações'].map((h) => (
+                {['ID', 'Nome', 'Tipo / Protocolo', 'IP Gerência', 'Portas PON', 'Link', 'Status', 'Mapa', 'Ações'].map((h) => (
                   <th key={h} className="text-left text-xs text-slate-400 font-semibold uppercase tracking-wider px-4 py-3">{h}</th>
                 ))}
               </tr>
@@ -239,7 +306,7 @@ export default function OLTsClient({ oltsIniciais, projetoId, userRole, busca = 
             <tbody>
               {oltsVisiveis.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="text-center text-slate-500 py-12 text-sm">
+                  <td colSpan={9} className="text-center text-slate-500 py-12 text-sm">
                     Nenhuma OLT cadastrada ainda.
                   </td>
                 </tr>
@@ -247,19 +314,77 @@ export default function OLTsClient({ oltsIniciais, projetoId, userRole, busca = 
               {oltsVisiveis.map((olt, i) => {
                 const st = STATUS_CONFIG[olt.status] ?? { label: olt.status ?? '—', color: 'var(--text-secondary)' }
                 const temCoordenadas = olt.lat != null && olt.lng != null
+                const oltId = olt.id ?? olt.olt_id
+                const linkStatus = linkOverride[oltId] ?? olt.link_status ?? 'unknown'
+                const result = testResult[oltId]
+                const proto = olt.protocolo ?? 'ssh'
                 return (
                   <tr key={olt._id} style={{ borderBottom: i < oltsVisiveis.length - 1 ? '1px solid var(--border-color)' : 'none' }}
                     className="hover:bg-slate-800/30 transition-colors">
+                    {/* ID */}
                     <td className="px-4 py-3 font-mono text-xs" style={{ color: '#D4622B' }}>{olt.id ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-200 font-medium">{olt.nome ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">{olt.modelo ?? '—'}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-400">
-                      {olt.ip ?? '—'}
-                      {olt.ssh_port && olt.ssh_port !== 22 && (
-                        <span style={{ color: '#64748b', marginLeft: 4 }}>:{olt.ssh_port}</span>
+                    {/* Nome */}
+                    <td className="px-4 py-3">
+                      <span className="text-slate-200 font-medium">{olt.nome ?? '—'}</span>
+                      {olt.modelo && (
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--border-color)' }}>{olt.modelo}</div>
                       )}
                     </td>
+                    {/* Tipo / Protocolo */}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          {olt.tipo ?? 'huawei'}
+                        </span>
+                        <span style={{
+                          fontSize: 10, padding: '2px 6px', borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: 3,
+                          backgroundColor: proto === 'api' ? 'rgba(139,92,246,0.12)' : proto === 'telnet' ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)',
+                          border: `1px solid ${proto === 'api' ? 'rgba(139,92,246,0.3)' : proto === 'telnet' ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.3)'}`,
+                          color: proto === 'api' ? '#a78bfa' : proto === 'telnet' ? '#fbbf24' : '#4ade80',
+                          fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+                        }}>
+                          {proto}
+                        </span>
+                      </div>
+                    </td>
+                    {/* IP Gerência */}
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs text-slate-400">{olt.ip ?? '—'}</span>
+                    </td>
+                    {/* Portas PON */}
                     <td className="px-4 py-3 text-slate-300">{olt.capacidade ?? 16}</td>
+                    {/* Link */}
+                    <td className="px-4 py-3">
+                      {linkStatus === 'online' && (
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>Online</span>
+                          </div>
+                          {result?.ms > 0 && (
+                            <span style={{ fontSize: 10, color: 'var(--border-color)', paddingLeft: 14 }}>{result.ms}ms</span>
+                          )}
+                        </div>
+                      )}
+                      {linkStatus === 'offline' && (
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>Offline</span>
+                          </div>
+                          {result?.ms > 0 && (
+                            <span style={{ fontSize: 10, color: 'var(--border-color)', paddingLeft: 14 }}>{result.ms}ms</span>
+                          )}
+                        </div>
+                      )}
+                      {linkStatus === 'unknown' && (
+                        <div className="flex items-center gap-1.5">
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#64748b', display: 'inline-block', flexShrink: 0 }} />
+                          <span style={{ fontSize: 11, color: '#64748b' }}>—</span>
+                        </div>
+                      )}
+                    </td>
+                    {/* Status */}
                     <td className="px-4 py-3">
                       <span style={{
                         fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
@@ -270,17 +395,26 @@ export default function OLTsClient({ oltsIniciais, projetoId, userRole, busca = 
                         {st.label}
                       </span>
                     </td>
+                    {/* Mapa */}
                     <td className="px-4 py-3">
                       {temCoordenadas
                         ? <span title={`${olt.lat?.toFixed(5)}, ${olt.lng?.toFixed(5)}`} style={{ fontSize: 13, color: '#22c55e' }}>✓</span>
                         : <span title="Sem coordenadas — não aparece no mapa" style={{ fontSize: 12, color: '#f59e0b', fontWeight: 700, cursor: 'help' }}>⚠ Sem local</span>
                       }
                     </td>
+                    {/* Ações */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => abrirEditar(olt)} className="text-xs" style={{ color: '#D4622B' }}>Editar</button>
+                        <button onClick={() => handleTest(olt)} disabled={testing === oltId}
+                          title="Testar conexão"
+                          style={{ color: testing === oltId ? '#475569' : '#a78bfa', fontSize: 12 }}
+                          className="text-xs disabled:cursor-wait">
+                          {testing === oltId ? '⏳' : '⚡ Testar'}
+                        </button>
                         <span className="text-slate-700">|</span>
-                        <button onClick={() => setConfirmDelete(olt)} className="text-xs text-red-400 hover:text-red-300">Excluir</button>
+                        <button onClick={() => abrirEditar(olt)} style={{ color: '#D4622B', fontSize: 11 }}>Editar</button>
+                        <span style={{ color: 'var(--border-color)' }}>|</span>
+                        <button onClick={() => setConfirmDelete(olt)} style={{ fontSize: 11 }} className="text-red-400 hover:text-red-300">Excluir</button>
                       </div>
                     </td>
                   </tr>
@@ -330,12 +464,17 @@ export default function OLTsClient({ oltsIniciais, projetoId, userRole, busca = 
                       placeholder="ex: Huawei MA5800-X7" style={fieldInput}
                       className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
                   </div>
-                  <div>
-                    <label style={labelStyle}>IP de Gerência</label>
-                    <input name="ip" value={form.ip} onChange={handleFormChange}
-                      placeholder="ex: 192.168.1.1" style={fieldInput}
-                      className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
-                  </div>
+                  {form.protocolo !== 'api' && (
+                    <div>
+                      <label style={labelStyle}>
+                        {form.tipo === 'simulator' ? 'IP / Host do Simulador' : 'IP de Gerência'}
+                      </label>
+                      <input name="ip" value={form.ip} onChange={handleFormChange}
+                        placeholder={form.tipo === 'simulator' ? 'localhost' : 'ex: 192.168.1.1'}
+                        style={fieldInput}
+                        className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -369,47 +508,112 @@ export default function OLTsClient({ oltsIniciais, projetoId, userRole, busca = 
                 </div>
               </div>
 
-              {/* Conexão SSH */}
+              {/* Conexão */}
               <div style={fieldGroup}>
-                <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>Conexão SSH</p>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label style={labelStyle}>Usuário SSH</label>
-                    <input name="ssh_user" value={form.ssh_user} onChange={handleFormChange}
-                      placeholder="admin" style={fieldInput}
-                      className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Senha SSH {oltEditando && <span style={{ fontWeight: 400, textTransform: 'none' }}>(vazio = manter)</span>}</label>
-                    <input name="ssh_pass" value={form.ssh_pass} onChange={handleFormChange}
-                      type="password" placeholder={oltEditando ? '••••••••' : 'senha'}
-                      style={fieldInput}
-                      className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Porta SSH</label>
-                    <input name="ssh_port" value={form.ssh_port} onChange={handleFormChange}
-                      type="number" min={1} max={65535} placeholder="22" style={fieldInput}
-                      className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
-                  </div>
-                </div>
-              </div>
+                <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>Conexão</p>
 
-              {/* REST URL Simulador (opcional) */}
-              <div style={fieldGroup}>
-                <p style={{ ...labelStyle, marginBottom: 0, color: 'var(--border-color)' }}>
-                  Simulador REST <span style={{ fontWeight: 400, textTransform: 'none', color: 'var(--text-muted)' }}>(opcional)</span>
-                </p>
-                <div>
-                  <label style={labelStyle}>URL da API REST do simulador</label>
-                  <input name="rest_url" value={form.rest_url} onChange={handleFormChange}
-                    placeholder="http://localhost:3002"
-                    style={fieldInput}
-                    className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Preencha para habilitar sincronização automática com o provedor-virtual.
-                  </p>
+                {/* Tipo + Protocolo sempre visíveis */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label style={labelStyle}>Tipo / Fabricante</label>
+                    <select name="tipo" value={form.tipo} onChange={handleFormChange} style={{ ...fieldInput, cursor: 'pointer' }}
+                      className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40">
+                      <option value="simulator">Simulador (local)</option>
+                      <option value="huawei">Huawei</option>
+                      <option value="zte">ZTE</option>
+                      <option value="fiberhome">FiberHome</option>
+                      <option value="datacom">Datacom</option>
+                      <option value="intelbras">Intelbras</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Protocolo</label>
+                    <select name="protocolo" value={form.protocolo} onChange={handleFormChange} style={{ ...fieldInput, cursor: 'pointer' }}
+                      className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40">
+                      <option value="ssh">SSH</option>
+                      <option value="telnet">Telnet</option>
+                      <option value="api">API REST</option>
+                    </select>
+                  </div>
                 </div>
+
+                {/* Hint para simulador */}
+                {form.tipo === 'simulator' && (
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -4 }}>
+                    {form.protocolo === 'ssh'
+                      ? <>Simulador SSH: use <code style={{ color: '#a78bfa' }}>localhost</code>, porta <code style={{ color: '#a78bfa' }}>2222</code>, usuário/senha <code style={{ color: '#a78bfa' }}>admin</code>.</>
+                      : form.protocolo === 'api'
+                        ? <>API REST do simulador. Inicie com <code style={{ color: '#a78bfa' }}>npm start</code> no diretório fiberops-network-lab.</>
+                        : <>Simulador Telnet: use <code style={{ color: '#a78bfa' }}>localhost</code> e a porta Telnet do simulador.</>
+                    }
+                  </p>
+                )}
+
+                {/* SSH */}
+                {form.protocolo === 'ssh' && (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label style={labelStyle}>Usuário SSH</label>
+                      <input name="ssh_user" value={form.ssh_user} onChange={handleFormChange} placeholder="admin" style={fieldInput}
+                        className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Senha SSH {oltEditando && <span style={{ fontWeight: 400, textTransform: 'none' }}>(vazio = manter)</span>}</label>
+                      <input name="ssh_pass" value={form.ssh_pass} onChange={handleFormChange}
+                        type="password" placeholder={oltEditando ? '••••••••' : 'senha'} style={fieldInput}
+                        className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Porta SSH</label>
+                      <input name="ssh_port" value={form.ssh_port} onChange={handleFormChange}
+                        type="number" min={1} max={65535} placeholder="22" style={fieldInput}
+                        className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Telnet */}
+                {form.protocolo === 'telnet' && (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label style={labelStyle}>Usuário</label>
+                      <input name="ssh_user" value={form.ssh_user} onChange={handleFormChange} placeholder="admin" style={fieldInput}
+                        className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Senha {oltEditando && <span style={{ fontWeight: 400, textTransform: 'none' }}>(vazio = manter)</span>}</label>
+                      <input name="ssh_pass" value={form.ssh_pass} onChange={handleFormChange}
+                        type="password" placeholder={oltEditando ? '••••••••' : 'senha'} style={fieldInput}
+                        className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Porta Telnet</label>
+                      <input name="telnet_port" value={form.telnet_port} onChange={handleFormChange}
+                        type="number" min={1} max={65535} placeholder="23" style={fieldInput}
+                        className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                    </div>
+                  </div>
+                )}
+
+                {/* API REST */}
+                {form.protocolo === 'api' && (
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <label style={labelStyle}>URL da API</label>
+                      <input name="rest_url" value={form.rest_url} onChange={handleFormChange}
+                        placeholder={form.tipo === 'simulator' ? 'http://localhost:4000' : 'http://192.168.1.100:8080'}
+                        style={fieldInput}
+                        className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Token {oltEditando && <span style={{ fontWeight: 400, textTransform: 'none' }}>(vazio = manter)</span>}</label>
+                      <input name="api_token" value={form.api_token} onChange={handleFormChange}
+                        type="password" placeholder={oltEditando ? '••••••••' : 'Bearer token (opcional)'}
+                        style={fieldInput}
+                        className="w-full rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500/40" />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Localização (opcional) */}

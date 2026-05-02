@@ -166,16 +166,17 @@ export async function processNextEvent(projeto_id_override = null) {
 
       const { cto, olt, splitterIdx, saidaIdx } = found
 
-      let oltResult  = { mock: true }
-      let rx_power   = null
-      let tx_power   = null
+      let oltResult = null
+      let rx_power  = null
+      let tx_power  = null
 
       if (olt) {
         const adapter = new HuaweiOltAdapter({
-          ip:       olt.ip ?? 'mock',
+          ip:       olt.ip,
           ssh_user: olt.ssh_user ?? 'admin',
           ssh_pass: olt.ssh_pass ?? '',
           ssh_port: olt.ssh_port ?? 22,
+          vendor:   olt.vendor   ?? 'huawei',
         })
         try {
           await adapter.connect()
@@ -196,14 +197,14 @@ export async function processNextEvent(projeto_id_override = null) {
             await adapter.disconnect()
           }
         } catch (sshErr) {
-          await nocLog(projeto_id, 'OLT', `SSH falhou (${sshErr.message}), usando mock`, 'warn')
-          oltResult = { mock: true }
+          // SSH/connection failed — do not fake data, mark event as failed
+          await ProvisionEvent.updateOne(
+            { _id: event._id },
+            { $set: { status: 'failed', last_error: `SSH falhou: ${sshErr.message}`, processed_at: new Date() } }
+          )
+          await nocLog(projeto_id, 'NOC', `[Provision] SSH falhou para ${olt.nome}: ${sshErr.message}`, 'error')
+          return { processed: false, reason: `SSH falhou: ${sshErr.message}` }
         }
-      }
-
-      if (oltResult.mock) {
-        rx_power = parseFloat((-18.5 + (Math.random() * 6 - 3)).toFixed(2))
-        tx_power = 2.3
       }
 
       const signal_quality = calculateSignalQuality(rx_power)
@@ -246,12 +247,13 @@ export async function processNextEvent(projeto_id_override = null) {
 
       if (onu?.olt_id) {
         const olt = await OLT.findOne({ projeto_id, id: onu.olt_id }).lean()
-        if (olt) {
+        if (olt?.ip) {
           const adapter = new HuaweiOltAdapter({
-            ip:       olt.ip ?? 'mock',
+            ip:       olt.ip,
             ssh_user: olt.ssh_user ?? 'admin',
             ssh_pass: olt.ssh_pass ?? '',
             ssh_port: olt.ssh_port ?? 22,
+            vendor:   olt.vendor   ?? 'huawei',
           })
           try {
             await adapter.connect()
@@ -263,6 +265,8 @@ export async function processNextEvent(projeto_id_override = null) {
           } catch (sshErr) {
             await nocLog(projeto_id, 'OLT', `SSH deleteOnu falhou (${sshErr.message}), continuando`, 'warn')
           }
+        } else if (olt) {
+          await nocLog(projeto_id, 'OLT', `OLT ${olt.nome ?? olt.id} sem IP — deleteOnu ignorado, prosseguindo cancelamento`, 'warn')
         }
       }
 
@@ -343,11 +347,17 @@ export async function autoFindONUs() {
   const found = []
 
   for (const olt of olts) {
+    if (!olt.ip) {
+      await nocLog(projeto_id, 'NOC', `[AutoFind] OLT ${olt.nome} sem IP configurado — ignorada`, 'warn')
+      continue
+    }
+
     const adapter = new HuaweiOltAdapter({
-      ip:       olt.ip ?? 'mock',
+      ip:       olt.ip,
       ssh_user: olt.ssh_user ?? 'admin',
       ssh_pass: olt.ssh_pass ?? '',
       ssh_port: olt.ssh_port ?? 22,
+      vendor:   olt.vendor   ?? 'huawei',
     })
     try {
       await adapter.connect()
@@ -362,8 +372,8 @@ export async function autoFindONUs() {
           slot:     d.slot  ?? null,
           olt_id:   olt.id,
           olt_nome: olt.nome,
-          olt_ip:   olt.ip ?? null,
-          mock:     d.mock ?? false,
+          olt_ip:   olt.ip,
+          mock:     false,
         })
       }
     } catch (err) {
@@ -507,14 +517,19 @@ export async function quickProvisionAutoFound({ serial, olt_id, olt_ip, pon, pon
   // ── Provision on OLT ─────────────────────────────────────────────────────
   let rx_power  = null
   let tx_power  = null
-  let oltResult = { mock: true }
+  let oltResult = null
   let onuIdUsed = 1
 
+  if (!olt?.ip) {
+    throw new Error(`OLT "${olt?.nome ?? olt_id ?? 'desconhecida'}" não tem IP configurado`)
+  }
+
   const adapter = new HuaweiOltAdapter({
-    ip:       olt?.ip ?? 'mock',
+    ip:       olt.ip,
     ssh_user: olt?.ssh_user ?? 'admin',
     ssh_pass: olt?.ssh_pass ?? '',
     ssh_port: olt?.ssh_port ?? 22,
+    vendor:   olt?.vendor   ?? 'huawei',
   })
 
   try {
@@ -543,13 +558,7 @@ export async function quickProvisionAutoFound({ serial, olt_id, olt_ip, pon, pon
     }
   } catch (sshErr) {
     try { await adapter.disconnect() } catch {}
-    await nocLog(projeto_id, 'OLT', `SSH falhou (${sshErr.message}), usando mock`, 'warn')
-    oltResult = { mock: true }
-  }
-
-  if (oltResult.mock) {
-    rx_power = parseFloat((-18.5 + (Math.random() * 6 - 3)).toFixed(2))
-    tx_power = parseFloat((2.0 + Math.random() * 2.5).toFixed(2))
+    throw new Error(`SSH falhou para OLT ${olt.nome ?? olt.ip}: ${sshErr.message}`)
   }
 
   // ── Signal analysis ──────────────────────────────────────────────────────
@@ -636,7 +645,7 @@ export async function quickProvisionAutoFound({ serial, olt_id, olt_ip, pon, pon
     statusGeral:    sig.statusGeral,
     diags:          sig.diags,
     report,
-    mock:           oltResult.mock ?? false,
+    mock:           false,
   }
 }
 
@@ -773,22 +782,25 @@ export async function testOnuConnection({ serial }) {
 
   const onuId = onu.onu_id_olt ?? 1
 
+  if (!olt?.ip) {
+    return { ok: false, error: `OLT não tem IP configurado — não é possível testar a ONU ${serialNorm}` }
+  }
+
   const adapter = new HuaweiOltAdapter({
-    ip:       olt?.ip ?? 'mock',
+    ip:       olt.ip,
     ssh_user: olt?.ssh_user ?? 'admin',
     ssh_pass: olt?.ssh_pass ?? '',
     ssh_port: olt?.ssh_port ?? 22,
+    vendor:   olt?.vendor   ?? 'huawei',
   })
 
-  let status         = 'unknown'
+  let status          = 'unknown'
   let last_down_cause = null
-  let rx             = null
-  let tx             = null
-  let isMock         = adapter.isMock
+  let rx              = null
+  let tx              = null
 
   try {
     await adapter.connect()
-    isMock = adapter.isMock
 
     try {
       const [runStatus, optical] = await Promise.all([
@@ -811,22 +823,8 @@ export async function testOnuConnection({ serial }) {
     )
   } catch (sshErr) {
     try { await adapter.disconnect() } catch {}
-    await nocLog(projeto_id, 'OLT', `SSH falhou (${sshErr.message}), usando simulação`, 'warn')
-    isMock = true
-  }
-
-  // Mock simulation when no real OLT is available
-  if (isMock) {
-    const isOnline = Math.random() > 0.25
-    status = isOnline ? 'online' : 'offline'
-    if (isOnline) {
-      rx = parseFloat((-18 - Math.random() * 12).toFixed(2))
-      tx = parseFloat((1.5 + Math.random() * 3.5).toFixed(2))
-    } else {
-      // Simulate various failure modes
-      const roll = Math.random()
-      rx = roll < 0.5 ? null : parseFloat((-28 - Math.random() * 8).toFixed(2))
-    }
+    await nocLog(projeto_id, 'OLT', `SSH falhou para ONU ${serialNorm}: ${sshErr.message}`, 'error')
+    return { ok: false, error: sshErr.message }
   }
 
   const diag = analyzeFailure({ status, rx, tx, last_down_cause })
@@ -837,7 +835,7 @@ export async function testOnuConnection({ serial }) {
     diag.nivel === 'ok' ? 'success' : diag.nivel === 'atencao' ? 'warn' : 'error'
   )
 
-  // Persist results
+  // Persist results — only real data from OLT
   await ONU.updateOne(
     { projeto_id, serial: serialNorm },
     {
@@ -854,7 +852,7 @@ export async function testOnuConnection({ serial }) {
     }
   )
 
-  return { ...diag, mock: isMock }
+  return { ...diag, mock: false }
 }
 
 // ─── monitorOfflineOnus ───────────────────────────────────────────────────────

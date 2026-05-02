@@ -121,6 +121,55 @@ const OLTSchema = new Schema(
       default: null,
     },
 
+    // Protocolo de gerência utilizado para esta OLT
+    protocolo: {
+      type:    String,
+      enum:    ['ssh', 'telnet', 'api'],
+      default: 'ssh',
+    },
+
+    // Tipo/fabricante da OLT
+    tipo: {
+      type:    String,
+      enum:    ['simulator', 'huawei', 'zte', 'fiberhome', 'datacom', 'intelbras'],
+      default: 'huawei',
+    },
+
+    // Porta Telnet (padrão 23)
+    telnet_port: {
+      type:    Number,
+      default: 23,
+      min:     [1,     'telnet_port deve ser >= 1'],
+      max:     [65535, 'telnet_port deve ser <= 65535'],
+    },
+
+    // Token de autenticação para OLTs com protocolo 'api'
+    api_token: {
+      type:    String,
+      trim:    true,
+      default: null,
+    },
+
+    // Estado da última verificação de conectividade
+    link_status: {
+      type:    String,
+      enum:    ['online', 'offline', 'unknown'],
+      default: 'unknown',
+    },
+
+    // Timestamp da última verificação de link
+    link_tested_at: {
+      type:    Date,
+      default: null,
+    },
+
+    // Mensagem de erro da última verificação de link (null se OK)
+    link_error: {
+      type:    String,
+      trim:    true,
+      default: null,
+    },
+
     // Mapa DIO (Distribution Input/Output): porta física → PON → local alimentado
     // Formato: { total: 48, mapa: [{ porta, pon, local }], placas: [] }
     dio_config: {

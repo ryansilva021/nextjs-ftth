@@ -3,10 +3,12 @@
 /**
  * src/hooks/useNetworkLab.js
  *
- * Hook React que consome o fiberops-network-lab diretamente via
- * NEXT_PUBLIC_NETWORK_LAB_URL (prefixo /api/ automático).
+ * Hook React que consome dados de OLT/ONU via proxy server-side autenticado
+ * em /api/noc/network-lab. O proxy roteia para o FastAPI engine (porta 8000)
+ * quando NETWORK_ENGINE_URL estiver configurado, ou para o Node.js lab (porta
+ * 4000) como fallback.
  *
- * Fallback: quando o lab está offline, retorna { data: null, labOnline: false }
+ * Fallback: quando o backend está offline, retorna { data: null, labOnline: false }
  * sem lançar erros na UI.
  *
  * Uso:
@@ -15,13 +17,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-const LAB_BASE =
-  (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_NETWORK_LAB_URL : null) ??
-  process.env.NEXT_PUBLIC_NETWORK_LAB_URL ??
-  'http://localhost:4000'
+const PROXY_BASE = '/api/noc/network-lab'
 
 function labURL(path, params = {}) {
-  const url = new URL(`${LAB_BASE}/api${path}`)
+  const url = new URL(`${PROXY_BASE}${path}`, window.location.origin)
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== null) url.searchParams.set(k, String(v))
   }
@@ -60,13 +59,19 @@ export function useNetworkLab(path, options = {}) {
         signal: ctrl.signal,
         cache: 'no-store',
       })
+      // 503 = proxy reached but engine/lab is offline
+      if (res.status === 503) {
+        setLabOnline(false)
+        setData(null)
+        return
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
       setData(json)
       setLabOnline(true)
     } catch (e) {
       if (e.name === 'AbortError') return
-      // Erros de rede = lab offline, não propagamos para a UI como erro crítico
+      // Erros de rede = engine offline, não propagamos para a UI como erro crítico
       const isNetworkErr = e.message.includes('fetch') || e.message.includes('Failed') ||
         e.message.includes('NetworkError') || e.message.includes('net::')
       if (isNetworkErr) {
@@ -137,8 +142,8 @@ export function useDashboardSummary(interval = 15_000) {
   return useNetworkLab('/dashboard', { interval })
 }
 
-// ── Utilitário: URL base do lab (para uso externo) ─────────────────────────────
+// ── Utilitário: URL base do proxy (para uso externo) ──────────────────────────
 
 export function getLabBaseURL() {
-  return LAB_BASE
+  return PROXY_BASE
 }

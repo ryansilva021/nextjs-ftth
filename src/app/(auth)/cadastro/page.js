@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
-import { checkLoginDisponivel, criarRegistro } from '@/actions/registros'
+import { checkLoginDisponivel, criarRegistro, iniciarCheckoutPagamento } from '@/actions/registros'
 
 // ───────────────────────── Brand palette ─────────────────────────
 const FO = {
@@ -136,28 +136,12 @@ const PLANS = [
     features: ['50 CTOs cadastradas', '1 técnico de campo', 'Mapa interativo básico', 'Suporte por comunidade', 'Marca FiberOps nas telas'],
   },
   {
-    id: 'starter',
-    name: 'Starter',
-    subtitle: 'Para ISPs iniciando a gestão digital',
-    price: 149, unit: '/mês',
-    trial: '15 dias grátis',
-    features: ['200 CTOs cadastradas', '3 técnicos de campo', 'Mapa interativo offline', 'Diagrama de fibra', 'Suporte por e-mail', 'Integração com 1 OLT'],
-  },
-  {
     id: 'pro',
     name: 'Pro',
-    subtitle: 'O mais escolhido pelos ISPs regionais',
-    price: 299, unit: '/mês',
-    trial: '30 dias grátis',
-    popular: true,
-    features: ['1.000 CTOs cadastradas', '15 técnicos de campo', 'Mapa interativo offline', 'Financeiro integrado + PIX', 'Multi-fabricante (Huawei, ZTE, Datacom)', 'Gestão de postes e rotas', 'Notificações push de campo', 'Suporte prioritário 12h'],
-  },
-  {
-    id: 'business',
-    name: 'Business',
     subtitle: 'Para ISPs em expansão com múltiplas cidades',
     price: 549, unit: '/mês',
     trial: '30 dias grátis',
+    popular: true,
     features: ['3.000 CTOs cadastradas', '40 técnicos de campo', 'Roteirização inteligente de campo', 'BI + dashboards customizados', 'Integração com ERP e CRM', 'Multi-unidade (filiais)', 'Suporte prioritário 8h úteis', 'Onboarding guiado'],
   },
   {
@@ -167,14 +151,6 @@ const PLANS = [
     price: 999, unit: '/mês',
     trial: '30 dias grátis',
     features: ['CTOs ilimitadas', 'Técnicos ilimitados', 'API dedicada + webhooks', 'SLA 99,9% contratual', 'Gerente de sucesso dedicado', 'Customizações sob demanda', 'Relatórios Anatel automáticos', 'Suporte 24/7 com engenheiro'],
-  },
-  {
-    id: 'carrier',
-    name: 'Carrier',
-    subtitle: 'Para concessionárias e redes neutras de grande porte',
-    price: null, unit: 'Sob consulta',
-    trial: 'POC guiada 60 dias',
-    features: ['Infraestrutura multi-tenant', 'Deploy on-premise ou nuvem dedicada', 'Integração com OSS/BSS legados', 'Engenharia dedicada in-house', 'Contrato Anatel customizado', 'Suporte 24/7 com NOC compartilhado'],
   },
 ]
 
@@ -295,36 +271,46 @@ function PlanCard({ plan, selected, onSelect }) {
 }
 
 // ───────────────────────── Form primitives ─────────────────────────
-function FieldLabel({ label, required, hint, children }) {
+function FieldLabel({ label, required, hint, error, children }) {
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{
         fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase',
-        color: 'rgba(30,22,18,0.55)', marginBottom: 8,
+        color: error ? '#dc2626' : 'rgba(30,22,18,0.55)', marginBottom: 8,
         fontFamily: '"JetBrains Mono", monospace', fontWeight: 500,
+        transition: 'color .15s',
       }}>
-        {label}{required && <span style={{ color: FO.orange }}> *</span>}
+        {label}{required && <span style={{ color: error ? '#dc2626' : FO.orange }}> *</span>}
       </div>
       {children}
-      {hint && <div style={{ fontSize: 11.5, color: 'rgba(30,22,18,0.5)', marginTop: 6 }}>{hint}</div>}
+      {error
+        ? <div style={{ fontSize: 11.5, color: '#dc2626', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="#dc2626" strokeWidth="1.2"/><path d="M5.5 3.2v2.6M5.5 7.6v.1" stroke="#dc2626" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            {error}
+          </div>
+        : hint && <div style={{ fontSize: 11.5, color: 'rgba(30,22,18,0.5)', marginTop: 6 }}>{hint}</div>
+      }
     </div>
   )
 }
 
-function FInput({ placeholder, value, onChange, type = 'text', autoFocus, right }) {
+function FInput({ placeholder, value, onChange, type = 'text', autoFocus, right, hasError, onFocus: onFocusProp, onBlur: onBlurProp }) {
   const [focus, setFocus] = useState(false)
+  const borderColor = hasError && !focus ? '#dc2626' : focus ? FO.orange : FO.line
+  const shadow      = focus ? `0 0 0 3px ${hasError ? '#dc262620' : FO.orange + '20'}` : hasError ? '0 0 0 2px #dc262618' : 'none'
   return (
     <div style={{
       display: 'flex', alignItems: 'center',
       height: 44, borderRadius: 6,
-      border: `1px solid ${focus ? FO.orange : FO.line}`,
-      background: '#fff',
-      boxShadow: focus ? `0 0 0 3px ${FO.orange}20` : 'none',
+      border: `1px solid ${borderColor}`,
+      background: hasError && !focus ? '#fff8f8' : '#fff',
+      boxShadow: shadow,
       transition: 'all .15s', overflow: 'hidden',
     }}>
       <input
         type={type} placeholder={placeholder} value={value || ''}
-        onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
+        onFocus={() => { setFocus(true); onFocusProp?.() }}
+        onBlur={() => { setFocus(false); onBlurProp?.() }}
         onChange={(e) => onChange(e.target.value)}
         autoFocus={autoFocus}
         style={{
@@ -338,18 +324,20 @@ function FInput({ placeholder, value, onChange, type = 'text', autoFocus, right 
   )
 }
 
-function FSelect({ value, onChange, options }) {
+function FSelect({ value, onChange, options, hasError }) {
   return (
     <select
       value={value || ''} onChange={(e) => onChange(e.target.value)}
       style={{
         width: '100%', height: 44, padding: '0 14px',
-        borderRadius: 6, border: `1px solid ${FO.line}`,
-        background: '#fff', fontSize: 14, color: FO.espresso,
+        borderRadius: 6, border: `1px solid ${hasError ? '#dc2626' : FO.line}`,
+        background: hasError ? '#fff8f8' : '#fff',
+        fontSize: 14, color: FO.espresso,
         fontFamily: 'inherit', outline: 'none', appearance: 'none',
         backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'><path d='M1 1l5 5 5-5' stroke='%231A120D' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")`,
         backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center',
         paddingRight: 36, boxSizing: 'border-box',
+        transition: 'border-color .15s, background .15s',
       }}>
       <option value="" disabled>Selecione…</option>
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -394,29 +382,43 @@ function Step1Plan({ data, setData }) {
 }
 
 // ───────────────────────── Step 2 — Company ─────────────────────────
-function Step2Company({ data, setData }) {
+function Step2Company({ data, setData, errors = {}, requireCnpj = false }) {
   const sizes  = ['1–500 clientes', '500–2.000', '2.000–10.000', '10.000–50.000', '50.000+']
   const states = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
+
+  function formatCNPJ(v) {
+    const d = v.replace(/\D/g, '').slice(0, 14)
+    if (d.length <= 2)  return d
+    if (d.length <= 5)  return `${d.slice(0,2)}.${d.slice(2)}`
+    if (d.length <= 8)  return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5)}`
+    if (d.length <= 12) return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8)}`
+    return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`
+  }
+
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }} className="fo-two-col">
-        <FieldLabel label="Razão social" required>
-          <FInput autoFocus placeholder="Ex.: Conecta Fibra LTDA" value={data.empresa} onChange={(v) => setData({ ...data, empresa: v })}/>
+        <FieldLabel label="Razão social" required error={errors.empresa}>
+          <FInput autoFocus placeholder="Ex.: Conecta Fibra LTDA" value={data.empresa} hasError={!!errors.empresa}
+            onChange={(v) => setData({ ...data, empresa: v })}/>
         </FieldLabel>
-        <FieldLabel label="CNPJ">
-          <FInput placeholder="00.000.000/0000-00" value={data.cnpj} onChange={(v) => setData({ ...data, cnpj: v })}/>
+        <FieldLabel label="CNPJ" required={requireCnpj} error={errors.cnpj}
+          hint={!errors.cnpj && !requireCnpj ? 'Necessário para pagamento via PIX' : undefined}>
+          <FInput placeholder="00.000.000/0000-00" value={data.cnpj ?? ''} hasError={!!errors.cnpj}
+            onChange={(v) => setData({ ...data, cnpj: formatCNPJ(v) })}/>
         </FieldLabel>
-        <FieldLabel label="Base de clientes" required>
-          <FSelect value={data.size} onChange={(v) => setData({ ...data, size: v })} options={sizes}/>
+        <FieldLabel label="Base de clientes" required error={errors.size}>
+          <FSelect value={data.size} hasError={!!errors.size} onChange={(v) => setData({ ...data, size: v })} options={sizes}/>
         </FieldLabel>
-        <FieldLabel label="Fabricante de OLT" required>
-          <FSelect value={data.vendor} onChange={(v) => setData({ ...data, vendor: v })} options={['Huawei','ZTE','Datacom','Parks','Furukawa','Multi-fabricante','Outro']}/>
+        <FieldLabel label="Fabricante de OLT" required error={errors.vendor}>
+          <FSelect value={data.vendor} hasError={!!errors.vendor} onChange={(v) => setData({ ...data, vendor: v })} options={['Huawei','ZTE','Datacom','Parks','Furukawa','Multi-fabricante','Outro']}/>
         </FieldLabel>
-        <FieldLabel label="Estado" required>
-          <FSelect value={data.state} onChange={(v) => setData({ ...data, state: v })} options={states}/>
+        <FieldLabel label="Estado" required error={errors.state}>
+          <FSelect value={data.state} hasError={!!errors.state} onChange={(v) => setData({ ...data, state: v })} options={states}/>
         </FieldLabel>
-        <FieldLabel label="Cidade" required>
-          <FInput placeholder="Ex.: Goiânia" value={data.city} onChange={(v) => setData({ ...data, city: v })}/>
+        <FieldLabel label="Cidade" required error={errors.city}>
+          <FInput placeholder="Ex.: Goiânia" value={data.city} hasError={!!errors.city}
+            onChange={(v) => setData({ ...data, city: v })}/>
         </FieldLabel>
       </div>
       <FieldLabel label="Website ou rede social">
@@ -427,7 +429,7 @@ function Step2Company({ data, setData }) {
 }
 
 // ───────────────────────── Step 3 — Contact + Credentials ─────────────────────────
-function Step3Contact({ data, setData, loginDisponivel, setLoginDisponivel, verificandoLogin, setVerificandoLogin }) {
+function Step3Contact({ data, setData, loginDisponivel, setLoginDisponivel, verificandoLogin, setVerificandoLogin, errors = {} }) {
   async function verificarLogin(valor) {
     if (!valor || valor.length < 3) { setLoginDisponivel(null); return }
     setVerificandoLogin(true)
@@ -458,18 +460,22 @@ function Step3Contact({ data, setData, loginDisponivel, setLoginDisponivel, veri
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }} className="fo-two-col">
-        <FieldLabel label="Nome completo" required>
-          <FInput placeholder="Seu nome" value={data.nome} onChange={(v) => setData({ ...data, nome: v })}/>
+        <FieldLabel label="Nome completo" required error={errors.nome}>
+          <FInput placeholder="Seu nome" value={data.nome} hasError={!!errors.nome}
+            onChange={(v) => setData({ ...data, nome: v })}/>
         </FieldLabel>
-        <FieldLabel label="Cargo" required>
-          <FSelect value={data.cargo} onChange={(v) => setData({ ...data, cargo: v })}
+        <FieldLabel label="Cargo" required error={errors.cargo}>
+          <FSelect value={data.cargo} hasError={!!errors.cargo}
+            onChange={(v) => setData({ ...data, cargo: v })}
             options={['Diretor / Sócio','Gerente de NOC','Gerente de operações','TI / Infra','Financeiro','Outro']}/>
         </FieldLabel>
-        <FieldLabel label="E-mail corporativo" required>
-          <FInput type="email" placeholder="nome@empresa.com.br" value={data.email} onChange={(v) => setData({ ...data, email: v })}/>
+        <FieldLabel label="E-mail corporativo" required error={errors.email}>
+          <FInput type="email" placeholder="nome@empresa.com.br" value={data.email} hasError={!!errors.email}
+            onChange={(v) => setData({ ...data, email: v })}/>
         </FieldLabel>
-        <FieldLabel label="WhatsApp" required>
-          <FInput placeholder="(00) 00000-0000" value={data.phone} onChange={(v) => setData({ ...data, phone: v })}/>
+        <FieldLabel label="WhatsApp" required error={errors.phone}>
+          <FInput placeholder="(00) 00000-0000" value={data.phone} hasError={!!errors.phone}
+            onChange={(v) => setData({ ...data, phone: v })}/>
         </FieldLabel>
       </div>
 
@@ -490,10 +496,12 @@ function Step3Contact({ data, setData, loginDisponivel, setLoginDisponivel, veri
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }} className="fo-two-col">
-        <FieldLabel label="Usuário" required hint="Letras minúsculas, números e _ . -">
+        <FieldLabel label="Usuário" required error={errors.username}
+          hint={!errors.username ? 'Letras minúsculas, números e _ . -' : undefined}>
           <FInput
             placeholder="ex: joao.silva"
             value={data.username}
+            hasError={!!errors.username || loginDisponivel === false}
             onChange={(v) => { setData({ ...data, username: v }); setLoginDisponivel(null) }}
             right={
               <div style={{ fontSize: 14, paddingRight: 4 }}>
@@ -503,15 +511,19 @@ function Step3Contact({ data, setData, loginDisponivel, setLoginDisponivel, veri
               </div>
             }
           />
-          {loginDisponivel === false && <div style={{ fontSize: 11.5, color: '#ef4444', marginTop: 5 }}>Usuário já em uso.</div>}
-          {loginDisponivel === true  && <div style={{ fontSize: 11.5, color: FO.success, marginTop: 5 }}>Disponível!</div>}
+          {!errors.username && loginDisponivel === false && <div style={{ fontSize: 11.5, color: '#ef4444', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="#ef4444" strokeWidth="1.2"/><path d="M5.5 3.2v2.6M5.5 7.6v.1" stroke="#ef4444" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            Usuário já em uso.
+          </div>}
+          {loginDisponivel === true && <div style={{ fontSize: 11.5, color: FO.success, marginTop: 5 }}>Disponível!</div>}
         </FieldLabel>
 
-        <FieldLabel label="Senha" required>
+        <FieldLabel label="Senha" required error={errors.password}>
           <FInput
             type={data.showPass ? 'text' : 'password'}
             placeholder="mínimo 6 caracteres"
             value={data.password}
+            hasError={!!errors.password}
             onChange={(v) => setData({ ...data, password: v })}
             right={
               <button type="button"
@@ -521,7 +533,7 @@ function Step3Contact({ data, setData, loginDisponivel, setLoginDisponivel, veri
               </button>
             }
           />
-          {(data.password || '').length > 0 && (
+          {!errors.password && (data.password || '').length > 0 && (
             <div style={{ marginTop: 8 }}>
               <div style={{ display: 'flex', gap: 3 }}>
                 {[1,2,3,4,5].map((n) => (
@@ -534,15 +546,19 @@ function Step3Contact({ data, setData, loginDisponivel, setLoginDisponivel, veri
         </FieldLabel>
       </div>
 
-      <FieldLabel label="Confirmar senha" required>
+      <FieldLabel label="Confirmar senha" required error={errors.senhaConfirm}>
         <FInput
           type="password"
           placeholder="repita a senha"
           value={data.senhaConfirm}
+          hasError={!!errors.senhaConfirm || (!errors.senhaConfirm && !!data.senhaConfirm && data.password !== data.senhaConfirm)}
           onChange={(v) => setData({ ...data, senhaConfirm: v })}
         />
-        {data.senhaConfirm && data.password !== data.senhaConfirm && (
-          <div style={{ fontSize: 11.5, color: '#ef4444', marginTop: 5 }}>As senhas não coincidem.</div>
+        {!errors.senhaConfirm && data.senhaConfirm && data.password !== data.senhaConfirm && (
+          <div style={{ fontSize: 11.5, color: '#ef4444', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="#ef4444" strokeWidth="1.2"/><path d="M5.5 3.2v2.6M5.5 7.6v.1" stroke="#ef4444" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            As senhas não coincidem.
+          </div>
         )}
       </FieldLabel>
 
@@ -559,7 +575,15 @@ function Step3Contact({ data, setData, loginDisponivel, setLoginDisponivel, veri
           }}/>
       </FieldLabel>
 
-      <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 8, cursor: 'pointer', fontSize: 13, color: 'rgba(30,22,18,0.75)' }}>
+      <label style={{
+        display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 8, cursor: 'pointer',
+        fontSize: 13, color: errors.consent ? '#dc2626' : 'rgba(30,22,18,0.75)',
+        padding: errors.consent ? '10px 12px' : '0',
+        borderRadius: errors.consent ? 6 : 0,
+        background: errors.consent ? 'rgba(220,38,38,0.04)' : 'transparent',
+        border: errors.consent ? '1px solid #dc262630' : 'none',
+        transition: 'all .15s',
+      }}>
         <input
           type="checkbox"
           checked={!!data.consent}
@@ -567,6 +591,12 @@ function Step3Contact({ data, setData, loginDisponivel, setLoginDisponivel, veri
           style={{ marginTop: 3, accentColor: FO.orange, width: 15, height: 15 }}/>
         <span>Autorizo o contato da FiberOps por e-mail/WhatsApp conforme LGPD. Uso apenas operacional, sem compartilhamento com terceiros.</span>
       </label>
+      {errors.consent && (
+        <div style={{ fontSize: 11.5, color: '#dc2626', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="#dc2626" strokeWidth="1.2"/><path d="M5.5 3.2v2.6M5.5 7.6v.1" stroke="#dc2626" strokeWidth="1.3" strokeLinecap="round"/></svg>
+          {errors.consent}
+        </div>
+      )}
     </>
   )
 }
@@ -677,6 +707,202 @@ function SummaryBlock({ title, items }) {
   )
 }
 
+// ───────────────────────── Step 5 — Payment ─────────────────────────
+function Step5Payment({ data, onPaid }) {
+  const plan = PLANS.find((p) => p.id === data.plan) || PLANS[2]
+
+  const [loading,  setLoading]  = useState(null)  // 'PIX' | 'CREDIT_CARD' | null
+  const [error,    setError]    = useState(null)
+  const [waiting,  setWaiting]  = useState(false)  // true after redirect — polling active
+
+  const pollRef = useRef(null)
+
+  useEffect(() => () => clearInterval(pollRef.current), [])
+
+  function startPolling() {
+    clearInterval(pollRef.current)
+    pollRef.current = setInterval(async () => {
+      try {
+        const res  = await fetch(`/api/checkout/status?email=${encodeURIComponent(data.email)}`)
+        const json = await res.json()
+        if (json.confirmed) {
+          clearInterval(pollRef.current)
+          onPaid(json.payment_method)
+        }
+      } catch {}
+    }, 4000)
+  }
+
+  async function pay(billing_type) {
+    setLoading(billing_type)
+    setError(null)
+    try {
+      const res  = await fetch('/api/checkout/create-subscription', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email: data.email, billing_type }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Erro ao gerar cobrança')
+
+      const url = json.invoice_url || json.credit_card_url || json.pix_url
+      if (!url) throw new Error('Link de pagamento não retornado pelo Asaas.')
+
+      window.open(url, '_blank', 'noopener')
+      setWaiting(true)
+      startPolling()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const OPTIONS = [
+    {
+      id:    'PIX',
+      title: 'PIX',
+      desc:  'Aprovação instantânea · Qualquer banco',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <path d="M8 8l8 8-8 8M24 8l-8 8 8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      ),
+    },
+    {
+      id:    'CREDIT_CARD',
+      title: 'Cartão de crédito',
+      desc:  'Visa, Mastercard, Elo e outros',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <rect x="2" y="7" width="28" height="18" rx="3" stroke="currentColor" strokeWidth="2"/>
+          <path d="M2 13h28" stroke="currentColor" strokeWidth="2"/>
+          <rect x="6" y="18" width="8" height="3" rx="1" fill="currentColor"/>
+        </svg>
+      ),
+    },
+  ]
+
+  return (
+    <div>
+      {/* Plan summary */}
+      <div style={{
+        padding: '18px 22px', borderRadius: 12, marginBottom: 28,
+        background: `linear-gradient(135deg, ${FO.espresso} 0%, ${FO.espressoUp} 100%)`,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+      }}>
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: FO.orangeGlow, fontFamily: '"JetBrains Mono", monospace' }}>Plano selecionado</div>
+          <div style={{ fontFamily: '"Instrument Serif", serif', fontSize: 26, color: FO.cream, marginTop: 4, letterSpacing: '-0.01em' }}>
+            {plan.name} <span style={{ fontStyle: 'italic', color: FO.orangeGlow, fontSize: 16 }}>· {plan.trial}</span>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontFamily: '"Instrument Serif", serif', fontSize: 34, color: FO.cream, lineHeight: 1 }}>
+            <span style={{ fontSize: 15, verticalAlign: 'top', marginRight: 2 }}>R$</span>{plan.price}
+          </div>
+          <div style={{ fontSize: 12, color: FO.muted, marginTop: 2 }}>{plan.unit} · após o teste</div>
+        </div>
+      </div>
+
+      {/* Payment options */}
+      {!waiting ? (
+        <>
+          <div style={{ fontSize: 13, color: 'rgba(30,22,18,0.6)', marginBottom: 16, textAlign: 'center' }}>
+            Escolha como deseja pagar — você será redirecionado para a página segura do Asaas.
+          </div>
+
+          <div style={{ display: 'grid', gap: 12 }}>
+            {OPTIONS.map(({ id, title, desc, icon }) => {
+              const isLoading = loading === id
+              return (
+                <button key={id} type="button" onClick={() => pay(id)} disabled={!!loading}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 18,
+                    padding: '20px 22px', borderRadius: 12, border: `1.5px solid ${FO.line}`,
+                    background: '#fff', cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading && !isLoading ? 0.5 : 1,
+                    textAlign: 'left', fontFamily: 'inherit',
+                    transition: 'all .18s',
+                    boxShadow: '0 1px 3px rgba(26,18,13,0.04)',
+                  }}
+                  onMouseEnter={(e) => { if (!loading) { e.currentTarget.style.borderColor = FO.orange; e.currentTarget.style.boxShadow = `0 0 0 3px ${FO.orange}18, 0 4px 14px rgba(26,18,13,0.08)` }}}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = FO.line; e.currentTarget.style.boxShadow = '0 1px 3px rgba(26,18,13,0.04)' }}
+                >
+                  <div style={{
+                    width: 52, height: 52, borderRadius: 12, flexShrink: 0,
+                    background: FO.cream, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: FO.espresso,
+                  }}>
+                    {isLoading
+                      ? <span style={{ width: 22, height: 22, borderRadius: 11, border: `2.5px solid ${FO.beige}`, borderTopColor: FO.orange, display: 'inline-block', animation: 'fo-spin .7s linear infinite' }}/>
+                      : icon}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: FO.espresso }}>{title}</div>
+                    <div style={{ fontSize: 13, color: 'rgba(30,22,18,0.55)', marginTop: 2 }}>{desc}</div>
+                  </div>
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ color: 'rgba(30,22,18,0.3)', flexShrink: 0 }}>
+                    <path d="M6 4l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              )
+            })}
+          </div>
+
+          {error && (
+            <div style={{
+              marginTop: 16, padding: '12px 16px', borderRadius: 8,
+              background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.2)',
+              fontSize: 13, color: '#b91c1c', display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="7.5" cy="7.5" r="6" stroke="#dc2626" strokeWidth="1.3"/>
+                <path d="M7.5 4.5v3.5M7.5 10v.1" stroke="#dc2626" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+              {error}
+            </div>
+          )}
+
+          <div style={{
+            marginTop: 20, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center',
+            fontSize: 11.5, color: 'rgba(30,22,18,0.45)',
+          }}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5 1.5 3.5v4c0 2.5 2 4.5 5 5 3-0.5 5-2.5 5-5v-4L6.5 1.5Z" stroke="currentColor" strokeWidth="1.2"/></svg>
+            Pagamento processado com segurança pelo Asaas
+          </div>
+        </>
+      ) : (
+        /* Waiting state — user went to Asaas, polling for confirmation */
+        <div style={{ textAlign: 'center', padding: '32px 0' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 28, margin: '0 auto 20px',
+            background: FO.cream,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ width: 28, height: 28, borderRadius: 14, border: `3px solid ${FO.beige}`, borderTopColor: FO.orange, display: 'inline-block', animation: 'fo-spin .9s linear infinite' }}/>
+          </div>
+          <div style={{ fontFamily: '"Instrument Serif", serif', fontSize: 22, color: FO.espresso }}>
+            Aguardando confirmação…
+          </div>
+          <div style={{ marginTop: 8, fontSize: 13.5, color: 'rgba(30,22,18,0.6)', lineHeight: 1.6 }}>
+            Complete o pagamento na aba do Asaas.<br/>
+            Esta página confirma automaticamente assim que for aprovado.
+          </div>
+          <button type="button" onClick={() => { setWaiting(false); clearInterval(pollRef.current) }}
+            style={{
+              marginTop: 24, padding: '10px 20px', borderRadius: 6,
+              background: 'transparent', border: `1px solid ${FO.line}`,
+              color: 'rgba(30,22,18,0.6)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+            ← Escolher outro método
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ───────────────────────── Success screen ─────────────────────────
 function SuccessScreen({ data, autoLogged }) {
   const plan = PLANS.find((p) => p.id === data.plan) || PLANS[2]
@@ -765,9 +991,47 @@ function SuccessScreen({ data, autoLogged }) {
   )
 }
 
+// ───────────────────────── Validation ─────────────────────────
+function validateStep(step, data, { requireCnpj = false } = {}) {
+  const errs = {}
+  if (step === 1) {
+    if (!data.empresa?.trim())  errs.empresa = 'Razão social é obrigatória'
+    if (!data.size)             errs.size    = 'Selecione a base de clientes'
+    if (!data.vendor)           errs.vendor  = 'Selecione o fabricante de OLT'
+    if (!data.state)            errs.state   = 'Selecione o estado'
+    if (!data.city?.trim())     errs.city    = 'Informe a cidade'
+
+    if (requireCnpj) {
+      const digits = (data.cnpj ?? '').replace(/\D/g, '')
+      if (!digits)        errs.cnpj = 'CNPJ é obrigatório para planos pagos'
+      else if (digits.length !== 14) errs.cnpj = 'CNPJ incompleto — 14 dígitos'
+    }
+  }
+  if (step === 2) {
+    if (!data.nome?.trim())    errs.nome  = 'Nome completo é obrigatório'
+    if (!data.cargo)           errs.cargo = 'Selecione seu cargo'
+    if (!data.email?.trim())   errs.email = 'E-mail é obrigatório'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errs.email = 'E-mail inválido'
+    if (!data.phone?.trim())   errs.phone = 'WhatsApp é obrigatório'
+
+    const u = data.username?.toLowerCase().trim() || ''
+    if (!u)                                        errs.username = 'Usuário é obrigatório'
+    else if (u.length < 3)                         errs.username = 'Mínimo 3 caracteres'
+    else if (!/^[a-z0-9_.-]+$/.test(u))            errs.username = 'Use letras minúsculas, números e _ . -'
+
+    if (!data.password)                            errs.password = 'Senha é obrigatória'
+    else if (data.password.length < 6)             errs.password = 'Mínimo 6 caracteres'
+
+    if (!data.senhaConfirm)                        errs.senhaConfirm = 'Confirme sua senha'
+    else if (data.password !== data.senhaConfirm)  errs.senhaConfirm = 'As senhas não coincidem'
+
+    if (!data.consent) errs.consent = 'Autorização LGPD é necessária para continuar'
+  }
+  return errs
+}
+
 // ───────────────────────── Page ─────────────────────────
 export default function CadastroPage() {
-  const labels = ['Plano', 'Empresa', 'Contato', 'Confirmar']
   const router = useRouter()
 
   const [step,        setStep]        = useState(0)
@@ -775,39 +1039,101 @@ export default function CadastroPage() {
   const [autoLogged,  setAutoLogged]  = useState(false)
   const [enviando,    setEnviando]    = useState(false)
   const [erro,        setErro]        = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
 
-  // Form data across all steps
+  const wizardRef = useRef(null)
+
   const [data, setData] = useState({ plan: 'pro' })
 
-  // Credential availability check state (lifted to avoid losing on re-render)
-  const [loginDisponivel,    setLoginDisponivel]    = useState(null)
-  const [verificandoLogin,   setVerificandoLogin]   = useState(false)
+  const [loginDisponivel,  setLoginDisponivel]  = useState(null)
+  const [verificandoLogin, setVerificandoLogin] = useState(false)
 
-  const plan = PLANS.find((p) => p.id === data.plan) || PLANS[2]
+  // Clear field errors when user edits any field
+  function updateData(next) {
+    setData(next)
+    if (Object.keys(fieldErrors).length > 0) setFieldErrors({})
+  }
+
+  const plan       = PLANS.find((p) => p.id === data.plan) || PLANS[2]
+  const hasPayment = plan.price > 0
+  const labels     = hasPayment
+    ? ['Plano', 'Empresa', 'Contato', 'Confirmar', 'Pagamento']
+    : ['Plano', 'Empresa', 'Contato', 'Confirmar']
+  const LAST_STEP  = labels.length - 1
+
+  const isPaymentStep     = hasPayment && step === LAST_STEP
+  const isLastActionStep  = hasPayment ? step === LAST_STEP - 1 : step === LAST_STEP
 
   const ctaLabel = step === 0
     ? `Continuar com plano ${plan.name}`
-    : step === labels.length - 1
+    : isLastActionStep && hasPayment
+      ? (enviando ? 'Iniciando…' : 'Ir para pagamento →')
+    : isLastActionStep && !hasPayment
       ? (enviando ? 'Criando conta…' : 'Criar conta e acessar')
-      : 'Continuar'
+    : 'Continuar'
 
   async function handleNext() {
-    if (step < labels.length - 1) {
+    if (isPaymentStep) return
+
+    // Validate current step before advancing
+    const errs = validateStep(step, data, { requireCnpj: hasPayment })
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs)
+      wizardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    setFieldErrors({})
+
+    if (!isLastActionStep) {
       setErro(null)
       setStep((s) => s + 1)
       return
     }
+
     setErro(null)
     setEnviando(true)
     try {
-      await criarRegistro({
-        username:      data.username,
-        password:      data.password,
-        empresa:       data.empresa,
-        plano:         data.plan,
-        nome_completo: data.nome || data.empresa,
-      })
-      // Attempt auto-login immediately after account creation
+      if (hasPayment) {
+        // Init checkout record before showing payment step
+        await iniciarCheckoutPagamento({
+          email:    data.email,
+          empresa:  data.empresa,
+          cnpj:     data.cnpj,
+          plano:    data.plan,
+          username: data.username,
+          password: data.password,
+        })
+        setStep((s) => s + 1)
+      } else {
+        // Free / Carrier: create account directly
+        await criarRegistro({
+          username:      data.username,
+          password:      data.password,
+          empresa:       data.empresa,
+          plano:         data.plan,
+          nome_completo: data.nome || data.empresa,
+          email:         data.email,
+          telefone:      data.phone,
+        })
+        const result = await signIn('credentials', {
+          username: data.username,
+          password: data.password,
+          redirect: false,
+          callbackUrl: '/',
+        })
+        setAutoLogged(!!result?.ok)
+        setSubmitted(true)
+      }
+    } catch (e) {
+      setErro(e.message || 'Erro ao processar. Tente novamente.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  async function handlePaid() {
+    // Payment confirmed — account was already created server-side; just sign in
+    try {
       const result = await signIn('credentials', {
         username: data.username,
         password: data.password,
@@ -815,12 +1141,10 @@ export default function CadastroPage() {
         callbackUrl: '/',
       })
       setAutoLogged(!!result?.ok)
-      setSubmitted(true)
-    } catch (e) {
-      setErro(e.message || 'Erro ao criar conta.')
-    } finally {
-      setEnviando(false)
+    } catch {
+      setAutoLogged(false)
     }
+    setSubmitted(true)
   }
 
   return (
@@ -835,6 +1159,7 @@ export default function CadastroPage() {
         @keyframes fo-spin     { to { transform: rotate(360deg); } }
         @keyframes fo-pulse    { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(1.4); opacity: 0; } }
         @keyframes fo-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+        @keyframes fo-shake    { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
         * { box-sizing: border-box; }
         body { margin: 0; }
         input::placeholder, textarea::placeholder { color: rgba(30,22,18,0.35); }
@@ -873,13 +1198,32 @@ export default function CadastroPage() {
             </div>
 
             {/* Wizard card */}
-            <div className="fo-wizard-card" style={{
+            <div ref={wizardRef} className="fo-wizard-card" style={{
               background: '#fff', borderRadius: 14,
               border: `1px solid ${FO.line}`,
               boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 20px 50px rgba(26,18,13,0.08)',
               padding: '28px 32px',
             }}>
               <Stepper step={step} labels={labels}/>
+
+              {/* Validation error banner */}
+              {Object.keys(fieldErrors).length > 0 && (
+                <div style={{
+                  marginBottom: 18, padding: '12px 16px', borderRadius: 8,
+                  background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.2)',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  animation: 'fo-shake .4s ease',
+                  fontSize: 13, color: '#b91c1c',
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                    <circle cx="8" cy="8" r="6.5" stroke="#dc2626" strokeWidth="1.4"/>
+                    <path d="M8 5v3.5M8 10.5v.1" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  <span>
+                    Preencha os campos obrigatórios destacados em vermelho antes de continuar.
+                  </span>
+                </div>
+              )}
 
               {/* Step heading */}
               <div style={{ marginBottom: 20 }}>
@@ -891,7 +1235,8 @@ export default function CadastroPage() {
                     <>Escolha seu <span style={{ fontStyle: 'italic', color: FO.orange }}>plano</span></>,
                     <>Sobre sua <span style={{ fontStyle: 'italic', color: FO.orange }}>empresa</span></>,
                     <>Quem podemos <span style={{ fontStyle: 'italic', color: FO.orange }}>chamar?</span></>,
-                    <>Revise e <span style={{ fontStyle: 'italic', color: FO.orange }}>envie</span></>,
+                    <>Revise e <span style={{ fontStyle: 'italic', color: FO.orange }}>confirme</span></>,
+                    <>Finalize o <span style={{ fontStyle: 'italic', color: FO.orange }}>pagamento</span></>,
                   ][step]}
                 </h1>
                 <p style={{ margin: '6px 0 0', fontSize: 14, color: 'rgba(30,22,18,0.65)' }}>
@@ -900,72 +1245,77 @@ export default function CadastroPage() {
                     'Precisamos entender o porte da operação para ativar o ambiente certo.',
                     'Preencha seu contato e crie suas credenciais de acesso.',
                     'Confira as informações antes de enviar.',
+                    `Pague via PIX ou cartão para ativar seu plano ${plan.name}.`,
                   ][step]}
                 </p>
               </div>
 
               {/* Step body */}
               <div key={step} style={{ animation: 'fo-fade .25s ease' }}>
-                {step === 0 && <Step1Plan data={data} setData={setData}/>}
-                {step === 1 && <Step2Company data={data} setData={setData}/>}
+                {step === 0 && <Step1Plan data={data} setData={updateData}/>}
+                {step === 1 && <Step2Company data={data} setData={updateData} errors={fieldErrors} requireCnpj={hasPayment}/>}
                 {step === 2 && (
                   <Step3Contact
-                    data={data} setData={setData}
+                    data={data} setData={updateData}
                     loginDisponivel={loginDisponivel} setLoginDisponivel={setLoginDisponivel}
                     verificandoLogin={verificandoLogin} setVerificandoLogin={setVerificandoLogin}
+                    errors={fieldErrors}
                   />
                 )}
                 {step === 3 && <Step4Review data={data} erro={erro}/>}
+                {step === 4 && <Step5Payment data={data} onPaid={handlePaid}/>}
               </div>
 
               {/* Actions */}
-              <div style={{
-                marginTop: 24, display: 'flex', justifyContent: 'space-between',
-                alignItems: 'center', gap: 12, flexWrap: 'wrap',
-                borderTop: `1px solid ${FO.line}`, paddingTop: 20,
-              }}>
-                <button type="button" onClick={() => { setErro(null); setStep((s) => Math.max(0, s - 1)) }}
-                  disabled={step === 0}
-                  style={{
-                    padding: '10px 16px', borderRadius: 6,
-                    background: 'transparent', border: 'none',
-                    color: step === 0 ? 'rgba(30,22,18,0.3)' : 'rgba(30,22,18,0.7)',
-                    cursor: step === 0 ? 'not-allowed' : 'pointer',
-                    fontSize: 14, fontFamily: 'inherit',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                  }}>
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 3 L4 7 L9 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Voltar
-                </button>
-
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: 'rgba(30,22,18,0.5)', fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.08em' }}>
-                    {step + 1} / {labels.length}
-                  </span>
-                  <button type="button" onClick={handleNext} disabled={enviando}
+              {!isPaymentStep && (
+                <div style={{
+                  marginTop: 24, display: 'flex', justifyContent: 'space-between',
+                  alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                  borderTop: `1px solid ${FO.line}`, paddingTop: 20,
+                }}>
+                  <button type="button" onClick={() => { setErro(null); setStep((s) => Math.max(0, s - 1)) }}
+                    disabled={step === 0}
                     style={{
-                      padding: '12px 22px', borderRadius: 6, border: 'none',
-                      background: `linear-gradient(180deg, ${FO.orangeSoft} 0%, ${FO.orange} 45%, ${FO.orangeDeep} 100%)`,
-                      color: FO.cream, fontSize: 14, fontWeight: 500, fontFamily: 'inherit',
-                      cursor: enviando ? 'not-allowed' : 'pointer',
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      boxShadow: '0 1px 0 rgba(255,255,255,0.2) inset, 0 8px 18px rgba(196,90,44,0.3)',
-                      opacity: enviando ? 0.75 : 1,
+                      padding: '10px 16px', borderRadius: 6,
+                      background: 'transparent', border: 'none',
+                      color: step === 0 ? 'rgba(30,22,18,0.3)' : 'rgba(30,22,18,0.7)',
+                      cursor: step === 0 ? 'not-allowed' : 'pointer',
+                      fontSize: 14, fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', gap: 6,
                     }}>
-                    {enviando ? (
-                      <>
-                        <span style={{ width: 14, height: 14, borderRadius: 7, border: `2px solid ${FO.cream}60`, borderTopColor: FO.cream, display: 'inline-block', animation: 'fo-spin .7s linear infinite' }}/>
-                        Enviando…
-                      </>
-                    ) : (
-                      <>
-                        {ctaLabel}
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7 3l4 4-4 4" stroke={FO.cream} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </>
-                    )}
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 3 L4 7 L9 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    Voltar
                   </button>
+
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: 'rgba(30,22,18,0.5)', fontFamily: '"JetBrains Mono", monospace', letterSpacing: '0.08em' }}>
+                      {step + 1} / {labels.length}
+                    </span>
+                    <button type="button" onClick={handleNext} disabled={enviando}
+                      style={{
+                        padding: '12px 22px', borderRadius: 6, border: 'none',
+                        background: `linear-gradient(180deg, ${FO.orangeSoft} 0%, ${FO.orange} 45%, ${FO.orangeDeep} 100%)`,
+                        color: FO.cream, fontSize: 14, fontWeight: 500, fontFamily: 'inherit',
+                        cursor: enviando ? 'not-allowed' : 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        boxShadow: '0 1px 0 rgba(255,255,255,0.2) inset, 0 8px 18px rgba(196,90,44,0.3)',
+                        opacity: enviando ? 0.75 : 1,
+                      }}>
+                      {enviando ? (
+                        <>
+                          <span style={{ width: 14, height: 14, borderRadius: 7, border: `2px solid ${FO.cream}60`, borderTopColor: FO.cream, display: 'inline-block', animation: 'fo-spin .7s linear infinite' }}/>
+                          Aguarde…
+                        </>
+                      ) : (
+                        <>
+                          {ctaLabel}
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7 3l4 4-4 4" stroke={FO.cream} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Footer links */}
