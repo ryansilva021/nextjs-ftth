@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useTransition, useRef } from 'react'
 import { T, ALARM_CFG, defaultAlarms } from './pontoTheme'
-import { useLanguage } from '@/contexts/LanguageContext'
 import { registrarEntrada, registrarPausaInicio, registrarPausaFim, registrarSaida } from '@/actions/time-record'
 import { getUserAlarms, saveUserAlarms } from '@/actions/alarm-settings'
 import AlarmaModal            from './AlarmaModal'
@@ -10,22 +9,51 @@ import BaterPontoTab          from './tabs/BaterPontoTab'
 import IncluirPontoTab        from './tabs/IncluirPontoTab'
 import AjustarPontoTab        from './tabs/AjustarPontoTab'
 import DespertadoresTab       from './tabs/DespertadoresTab'
-import JustificarAusenciaTab  from './tabs/JustificarAusenciaTab'
-import MinhasSolicitacoesTab  from './tabs/MinhasSolicitacoesTab'
+import AusenciasTab           from './tabs/AusenciasTab'
+import RelatoriosTab          from './tabs/RelatoriosTab'
 import DadosCadastraisTab     from './tabs/DadosCadastraisTab'
 import HistoricoTab           from './tabs/HistoricoTab'
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'bater',         labelKey: 'ponto.tab.bater',         icon: '🕐' },
-  { id: 'incluir',       labelKey: 'ponto.tab.incluir',       icon: '➕' },
-  { id: 'ajustar',       labelKey: 'ponto.tab.ajustar',       icon: '✏️' },
-  { id: 'despertadores', labelKey: 'ponto.tab.despertadores', icon: '⏰' },
-  { id: 'ausencia',      labelKey: 'ponto.tab.ausencia',      icon: '📋' },
-  { id: 'solicitacoes',  labelKey: 'ponto.tab.solicitacoes',  icon: '📩' },
-  { id: 'historico',     labelKey: 'ponto.tab.historico',     icon: '📅' },
-  { id: 'dados',         labelKey: 'ponto.tab.dados',         icon: '👤' },
+  { id: 'bater',         label: 'Bater Ponto',    icon: '🕐' },
+  { id: 'incluir',       label: 'Incluir Ponto',  icon: '➕' },
+  { id: 'ajustar',       label: 'Ajustar Ponto',  icon: '✏️' },
+  { id: 'despertadores', label: 'Despertadores',  icon: '⏰' },
+  { id: 'ausencias',     label: 'Ausências',      icon: '📋' },
+  { id: 'relatorios',    label: 'Relatórios',     icon: '📊' },
+  { id: 'historico',     label: 'Histórico',      icon: '📅' },
+  { id: 'dados',         label: 'Dados',          icon: '👤' },
+]
+
+// ─── Mobile bottom nav (6 primary tabs) ──────────────────────────────────────
+
+const BOTTOM_NAV = [
+  {
+    id: 'bater', label: 'Ponto',
+    svg: <svg viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8.5" stroke="currentColor" strokeWidth="1.6"/><path d="M11 6.5v5l3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
+  },
+  {
+    id: 'incluir', label: 'Incluir',
+    svg: <svg viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8.5" stroke="currentColor" strokeWidth="1.6"/><path d="M11 7v8M7 11h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
+  },
+  {
+    id: 'ajustar', label: 'Ajustar',
+    svg: <svg viewBox="0 0 22 22" fill="none"><path d="M4 17.5L16.5 5l1.5 1.5L5.5 19z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M14 7l3 3" stroke="currentColor" strokeWidth="1.5"/></svg>,
+  },
+  {
+    id: 'despertadores', label: 'Alarme',
+    svg: <svg viewBox="0 0 22 22" fill="none"><path d="M11 3a6 6 0 0 0-6 6v3l-1.5 2h15L17 12V9a6 6 0 0 0-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9 18a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+  },
+  {
+    id: 'ausencias', label: 'Ausência',
+    svg: <svg viewBox="0 0 22 22" fill="none"><rect x="3" y="4.5" width="16" height="15" rx="1.6" stroke="currentColor" strokeWidth="1.5"/><path d="M3 8.5h16M7 2v4M15 2v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+  },
+  {
+    id: 'relatorios', label: 'Relatórios',
+    svg: <svg viewBox="0 0 22 22" fill="none"><path d="M3 17l5-6 4 4 5-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  },
 ]
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -63,7 +91,6 @@ function getLocation() {
 // ─── Shell ────────────────────────────────────────────────────────────────────
 
 export default function PontoClient({ initialRecord, initialRequests, userName, userProfile, projectSchedule }) {
-  const { t } = useLanguage()
   const [activeTab,  setActiveTab]  = useState('bater')
   const [record,     setRecord]     = useState(initialRecord)
   const [requests,   setRequests]   = useState(initialRequests ?? [])
@@ -260,139 +287,98 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
 
   return (
     <div style={{
-      height: '100%', minHeight: '100dvh',
-      background: T.canvas, fontFamily: T.ff, color: T.text,
-      display: 'flex', flexDirection: 'column',
+      minHeight: '100dvh',
+      background: 'radial-gradient(120% 80% at 50% 0%, #251a13 0%, #1A120D 60%, #150e09 100%)',
+      fontFamily: "'Inter', system-ui, sans-serif",
+      color: '#F7F0E2',
     }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        @keyframes fo-wave{0%,60%,100%{transform:rotate(0)}10%{transform:rotate(14deg)}20%{transform:rotate(-8deg)}30%{transform:rotate(12deg)}40%{transform:rotate(-4deg)}50%{transform:rotate(8deg)}}
+        @keyframes fo-status-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+        .ponto-tabs-bar::-webkit-scrollbar{display:none}
+        .fo-tab{padding:14px 18px;background:transparent;border:none;color:rgba(237,227,210,0.55);font-size:13.5px;font-weight:500;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;cursor:pointer;display:inline-flex;align-items:center;gap:8px;margin-bottom:-1px;font-family:inherit}
+        .fo-tab:hover{color:#F7F0E2}
+        .fo-tab.active{color:#F4A771;border-bottom-color:#C45A2C}
+        .fo-tab .fo-badge{padding:1px 7px;border-radius:999px;font-size:10px;font-weight:600;background:rgba(229,160,74,0.2);color:#E5A04A}
+        /* Desktop: show top tab bar, hide bottom nav */
+        .fo-tabbar-desktop{display:flex}
+        .fo-bottomnav{display:none}
+        .fo-hero{padding:30px 30px 8px}
+        /* Mobile: hide top tab bar, show bottom nav */
+        @media(max-width:768px){
+          .fo-tabbar-desktop{display:none !important}
+          .fo-bottomnav{display:flex !important}
+          .fo-hero{padding:20px 16px 6px}
+          .fo-hero h1{font-size:clamp(24px,7vw,32px) !important}
+          .fo-hero .fo-date{font-size:12.5px !important}
+          .fo-content-area{padding-bottom:72px}
+        }
+        /* Bottom nav styles */
+        .fo-bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:60;background:rgba(20,14,9,0.95);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid rgba(237,227,210,0.10);padding:6px 0 calc(6px + env(safe-area-inset-bottom));gap:0;justify-content:space-around;box-shadow:0 -8px 24px rgba(0,0,0,0.4)}
+        .fo-bn{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;background:transparent;border:none;color:rgba(237,227,210,0.45);font-size:9.5px;font-weight:500;border-radius:0;font-family:inherit;cursor:pointer;letter-spacing:0.02em;position:relative;transition:color .15s}
+        .fo-bn svg{width:20px;height:20px;flex-shrink:0;opacity:0.8}
+        .fo-bn.active{color:#F4A771}
+        .fo-bn.active svg{opacity:1}
+        .fo-bn.active::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:28px;height:2px;border-radius:0 0 2px 2px;background:#C45A2C}
+        .fo-bn .fo-nbadge{position:absolute;top:2px;right:calc(50% - 18px);min-width:14px;height:14px;padding:0 4px;border-radius:7px;background:#E5A04A;color:#1A120D;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace}
+      `}</style>
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div style={{
-        background: T.card, borderBottom: `1px solid ${T.border}`,
-        padding: '16px 16px 0', flexShrink: 0,
-        position: 'sticky', top: 0, zIndex: 10,
+      {/* ── Hero ─────────────────────────────────────────────────────────────── */}
+      <section className="fo-hero">
+        <div style={{ fontSize: 10.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: '#F4A771', fontFamily: "'JetBrains Mono', monospace", fontWeight: 500 }}>
+          Controle de ponto
+        </div>
+        <h1 style={{
+          margin: '6px 0 4px',
+          fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontSize: 40, letterSpacing: '-0.02em',
+          color: '#F7F0E2', lineHeight: 1.1,
+        }}>
+          Olá, {userName?.split(' ')[0]?.toLowerCase() || userName}{' '}
+          <span style={{ display: 'inline-block', animation: 'fo-wave 1.6s ease-in-out infinite', transformOrigin: '70% 70%' }}>👋</span>
+        </h1>
+        <div className="fo-date" style={{ fontSize: 13.5, color: 'rgba(237,227,210,0.55)', textTransform: 'capitalize' }}>
+          {today}
+        </div>
+        {record && (
+          <div style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 10px', borderRadius: 999, background: 'rgba(93,190,122,0.12)', color: '#7fd197', fontSize: 11.5, fontWeight: 500, border: '1px solid rgba(93,190,122,0.25)' }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: '#7fd197', boxShadow: '0 0 8px #7fd197', animation: 'fo-status-pulse 1.6s ease-out infinite' }} />
+            Ponto sincronizado · CLT 6.382/76
+          </div>
+        )}
+      </section>
+
+      {/* ── Sticky top tab bar (desktop only) ───────────────────────────────── */}
+      <div className="fo-tabbar-desktop" style={{
+        position: 'sticky', top: 0, zIndex: 20,
+        background: 'rgba(20,14,9,0.88)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+        borderBottom: '1px solid rgba(237,227,210,0.10)',
+        marginTop: 18,
       }}>
-        <div style={{ maxWidth: 640, margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '0 30px' }}>
+          <button onClick={() => scrollTabs(-1)} aria-label="Rolar para esquerda" style={{ flexShrink: 0, width: 28, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: canScrollLeft ? 'rgba(237,227,210,0.6)' : 'transparent', padding: 0, pointerEvents: canScrollLeft ? 'auto' : 'none', fontSize: 20 }}>‹</button>
 
-          {/* Topo: saudação + badge lado a lado */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-            marginBottom: 14,
-            flexWrap: 'nowrap',
-          }}>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{
-                fontSize: 10, color: T.dim,
-                textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3,
-              }}>
-                {t('ponto.header')}
-              </div>
-              <div style={{
-                fontSize: 17, fontWeight: 800, color: T.text,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                Olá, {userName} 👋
-              </div>
-              <div style={{ fontSize: 11, color: T.dim, marginTop: 2, textTransform: 'capitalize' }}>
-                {today}
-              </div>
-            </div>
-            {record && (
-              <div style={{ flexShrink: 0 }}>
-                <StatusBadgeMini status={record.status} />
-              </div>
-            )}
+          <div ref={tabsRef} className="ponto-tabs-bar" style={{ display: 'flex', gap: 2, flex: 1, overflowX: 'auto', flexWrap: 'nowrap', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {TABS.map(tab => {
+              const active = activeTab === tab.id
+              const label = tab.label
+              const pendCount = tab.id === 'ajustar' ? requests.filter(r => r.status === 'pendente').length : 0
+              return (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`fo-tab${active ? ' active' : ''}`}>
+                  <span style={{ fontSize: 14, opacity: 0.85 }}>{tab.icon}</span>
+                  {label}
+                  {pendCount > 0 && <span className="fo-badge">{pendCount}</span>}
+                </button>
+              )
+            })}
           </div>
 
-          {/* Tab bar com setas de navegação */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-            {/* Seta esquerda */}
-            <button
-              onClick={() => scrollTabs(-1)}
-              aria-label="Rolar para esquerda"
-              style={{
-                flexShrink: 0, width: 28, height: 36,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: canScrollLeft ? T.muted : 'transparent',
-                transition: 'color .15s', padding: 0,
-                pointerEvents: canScrollLeft ? 'auto' : 'none',
-              }}
-            >
-              ‹
-            </button>
-
-            {/* Tabs */}
-            <div
-              ref={tabsRef}
-              className="ponto-tabs"
-              style={{
-                display: 'flex', gap: 0, flex: 1,
-                overflowX: 'auto', flexWrap: 'nowrap',
-                msOverflowStyle: 'none', scrollbarWidth: 'none',
-              }}
-            >
-              {TABS.map(tab => {
-                const active = activeTab === tab.id
-                const label = tab.id === 'historico' ? 'Histórico'
-                            : tab.id === 'solicitacoes' ? 'Solicitações'
-                            : t(tab.labelKey)
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    style={{
-                      flexShrink: 0,
-                      padding: '8px 14px',
-                      background: 'none', border: 'none',
-                      borderBottom: `2px solid ${active ? T.accent : 'transparent'}`,
-                      color: active ? T.accent : T.dim,
-                      fontSize: 12, fontWeight: active ? 700 : 500,
-                      fontFamily: T.ff, cursor: 'pointer',
-                      transition: 'all .15s',
-                      whiteSpace: 'nowrap',
-                      display: 'flex', alignItems: 'center', gap: 5,
-                    }}
-                  >
-                    <span style={{ fontSize: 14 }}>{tab.icon}</span>
-                    {label}
-                    {tab.id === 'solicitacoes' && requests.filter(r => r.status === 'pendente').length > 0 && (
-                      <span style={{
-                        background: T.warning, color: '#000', borderRadius: 99,
-                        fontSize: 9, fontWeight: 800, padding: '1px 5px', lineHeight: 1.4,
-                      }}>
-                        {requests.filter(r => r.status === 'pendente').length}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-              <style>{`.ponto-tabs::-webkit-scrollbar{display:none}`}</style>
-            </div>
-
-            {/* Seta direita */}
-            <button
-              onClick={() => scrollTabs(1)}
-              aria-label="Rolar para direita"
-              style={{
-                flexShrink: 0, width: 28, height: 36,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: canScrollRight ? T.muted : 'transparent',
-                transition: 'color .15s', padding: 0,
-                pointerEvents: canScrollRight ? 'auto' : 'none',
-              }}
-            >
-              ›
-            </button>
-          </div>
+          <button onClick={() => scrollTabs(1)} aria-label="Rolar para direita" style={{ flexShrink: 0, width: 28, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', color: canScrollRight ? 'rgba(237,227,210,0.6)' : 'transparent', padding: 0, pointerEvents: canScrollRight ? 'auto' : 'none', fontSize: 20 }}>›</button>
         </div>
       </div>
 
-      {/* ── Tab Content ───────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, minHeight: 0 }}>
+      {/* ── Tab Content ───────────────────────────────────────────────────────── */}
+      <div className="fo-content-area" style={{ flex: 1 }}>
         {activeTab === 'bater' && (
           <BaterPontoTab
             record={record}
@@ -403,26 +389,23 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
         {activeTab === 'incluir' && (
           <IncluirPontoTab
             showToast={showToast}
-            onSuccess={req => { addRequest(req); setActiveTab('solicitacoes') }}
+            onSuccess={req => { addRequest(req); setActiveTab('relatorios') }}
           />
         )}
         {activeTab === 'ajustar' && (
           <AjustarPontoTab
             showToast={showToast}
-            onSuccess={req => { addRequest(req); setActiveTab('solicitacoes') }}
+            onSuccess={req => { addRequest(req); setActiveTab('relatorios') }}
           />
         )}
         {activeTab === 'despertadores' && (
           <DespertadoresTab alarms={alarms} setAlarms={setAlarms} />
         )}
-        {activeTab === 'ausencia' && (
-          <JustificarAusenciaTab
-            showToast={showToast}
-            onSuccess={req => { addRequest(req); setActiveTab('solicitacoes') }}
-          />
+        {activeTab === 'ausencias' && (
+          <AusenciasTab showToast={showToast} />
         )}
-        {activeTab === 'solicitacoes' && (
-          <MinhasSolicitacoesTab requests={requests} />
+        {activeTab === 'relatorios' && (
+          <RelatoriosTab showToast={showToast} />
         )}
         {activeTab === 'historico' && (
           <HistoricoTab />
@@ -431,6 +414,21 @@ export default function PontoClient({ initialRecord, initialRequests, userName, 
           <DadosCadastraisTab userProfile={userProfile} />
         )}
       </div>
+
+      {/* ── Mobile bottom nav ─────────────────────────────────────────────────── */}
+      <nav className="fo-bottomnav" aria-label="Navegação de ponto">
+        {BOTTOM_NAV.map(item => {
+          const active = activeTab === item.id
+          const pendCount = (item.id === 'ajustar') ? requests.filter(r => r.status === 'pendente').length : 0
+          return (
+            <button key={item.id} className={`fo-bn${active ? ' active' : ''}`} onClick={() => setActiveTab(item.id)}>
+              {item.svg}
+              <span>{item.label}</span>
+              {pendCount > 0 && <span className="fo-nbadge">{pendCount}</span>}
+            </button>
+          )
+        })}
+      </nav>
 
       {/* Toast global */}
       {toast && (
